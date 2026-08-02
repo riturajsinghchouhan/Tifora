@@ -20,6 +20,21 @@ export const getAvailablePlans = async (req, res) => {
     }
 };
 
+export const getPlanById = async (req, res) => {
+    try {
+        const { planId } = req.params;
+        const plan = await TiffinPlan.findById(planId)
+            .populate('restaurantId', 'name address location image logo');
+        if (!plan) {
+            return res.status(404).json({ success: false, message: 'Tiffin Plan not found' });
+        }
+        res.status(200).json({ success: true, data: plan });
+    } catch (error) {
+        console.error('Error fetching Tiffin Plan by ID:', error);
+        res.status(500).json({ success: false, message: 'Server error fetching Tiffin Plan' });
+    }
+};
+
 export const purchaseSubscription = async (req, res) => {
     try {
         const userId = getUserId(req);

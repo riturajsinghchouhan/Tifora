@@ -13,7 +13,7 @@ export const createTiffinPlan = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized: Restaurant ID not found' });
         }
 
-        const { name, durationDays, mealType, price, itemsDescription, isVegetarian } = req.body;
+        const { name, durationDays, mealType, price, itemsDescription, isVegetarian, image, items } = req.body;
 
         if (!name || !durationDays || !price) {
             return res.status(400).json({ success: false, message: 'Name, duration, and price are required' });
@@ -26,6 +26,8 @@ export const createTiffinPlan = async (req, res) => {
             mealType: mealType || 'Morning',
             price: Number(price),
             itemsDescription: itemsDescription || '',
+            image: image || '',
+            items: Array.isArray(items) ? items : [],
             isVegetarian: isVegetarian !== undefined ? Boolean(isVegetarian) : true,
             isActive: true
         });
@@ -57,7 +59,7 @@ export const updateTiffinPlan = async (req, res) => {
     try {
         const restaurantId = getRestaurantId(req);
         const { planId } = req.params;
-        const { name, durationDays, mealType, price, itemsDescription, isVegetarian, isActive } = req.body;
+        const { name, durationDays, mealType, price, itemsDescription, isVegetarian, isActive, image, items } = req.body;
 
         const plan = await TiffinPlan.findOne({ _id: planId, restaurantId });
         if (!plan) {
@@ -69,6 +71,8 @@ export const updateTiffinPlan = async (req, res) => {
         if (mealType !== undefined) plan.mealType = mealType;
         if (price !== undefined) plan.price = Number(price);
         if (itemsDescription !== undefined) plan.itemsDescription = itemsDescription;
+        if (image !== undefined) plan.image = image;
+        if (items !== undefined && Array.isArray(items)) plan.items = items;
         if (isVegetarian !== undefined) plan.isVegetarian = Boolean(isVegetarian);
         if (isActive !== undefined) plan.isActive = Boolean(isActive);
 

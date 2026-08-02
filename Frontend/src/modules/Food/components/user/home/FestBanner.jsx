@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRightCircle, Leaf, Flame, Sparkles } from 'lucide-react';
+import { ArrowRightCircle, Leaf, Flame } from 'lucide-react';
 
 
 // Images for different modes - Extended pool for rotation
@@ -87,9 +87,7 @@ export default function FestBanner({ isVegMode, images = [], hideFoodImages = fa
           transition={{ delay: 0.2 }}
           className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-sm font-bold"
         >
-          <Sparkles className="h-2.5 w-2.5 text-[#fff200] animate-pulse" />
           <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Indian Bites Missions</span>
-          <Sparkles className="h-2.5 w-2.5 text-[#fff200] animate-pulse" />
         </motion.div>
 
         <motion.div

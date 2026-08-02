@@ -7,7 +7,6 @@ import {
     Clock, 
     CheckCircle2, 
     XCircle, 
-    Sparkles, 
     Utensils, 
     Leaf, 
     Flame, 
@@ -270,7 +269,6 @@ export default function TiffinSettings() {
 
                         <div className="max-w-3xl mx-auto text-left mb-8">
                             <div className="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
-                                <Sparkles className="w-4 h-4 text-amber-500" />
                                 Or start with a popular template:
                             </div>
                             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3.5">

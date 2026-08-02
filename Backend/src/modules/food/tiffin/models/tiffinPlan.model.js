@@ -33,6 +33,17 @@ const tiffinPlanSchema = new mongoose.Schema(
             default: '',
             trim: true
         },
+        image: {
+            type: String,
+            default: ''
+        },
+        items: [
+            {
+                name: { type: String, trim: true },
+                quantity: { type: String, default: '' },
+                image: { type: String, default: '' }
+            }
+        ],
         isVegetarian: {
             type: Boolean,
             default: true

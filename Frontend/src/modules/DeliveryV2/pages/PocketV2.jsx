@@ -4,7 +4,7 @@ import {
   Wallet, IndianRupee, ArrowRight,
   ShieldCheck, AlertTriangle, HelpCircle,
   Receipt, FileText, LayoutGrid, X, ChevronRight,
-  Sparkles, Loader2
+  Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { deliveryAPI } from '@food/api';

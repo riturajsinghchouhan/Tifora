@@ -16,6 +16,7 @@ import {
 // User Controllers
 import {
     getAvailablePlans,
+    getPlanById,
     purchaseSubscription,
     getMySubscriptions,
     pauseSubscription,
@@ -57,8 +58,10 @@ router.post('/assign', authMiddleware, requireRoles('RESTAURANT'), assignDeliver
 // --- User Tiffin Routes ---
 router.get('/user/plans/available', getAvailablePlans);
 router.get('/user/plans/:restaurantId', getAvailablePlans);
+router.get('/user/plan/:planId', getPlanById);
 router.get('/plans/available', getAvailablePlans);
 router.get('/plans/available/:restaurantId', getAvailablePlans);
+router.get('/plan/:planId', getPlanById);
 router.post('/user/purchase', authMiddleware, requireRoles('USER'), purchaseSubscription);
 router.post('/purchase', authMiddleware, requireRoles('USER'), purchaseSubscription);
 router.get('/user/my-subscriptions', authMiddleware, requireRoles('USER'), getMySubscriptions);

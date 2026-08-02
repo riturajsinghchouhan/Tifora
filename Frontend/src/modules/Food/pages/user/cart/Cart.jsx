@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, Fragment } from "react"
 import { createPortal } from "react-dom"
 import { Link, useNavigate } from "react-router-dom"
-import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Wallet, Building2, Sparkles, Banknote, Zap, CheckCircle2, MessageCircle, Send, Mail, Copy } from "lucide-react"
+import { Plus, Minus, ArrowLeft, ChevronRight, Clock, MapPin, Phone, FileText, Utensils, Tag, Percent, Share2, ChevronUp, ChevronDown, X, Check, Settings, CreditCard, Wallet, Building2, Banknote, Zap, CheckCircle2, MessageCircle, Send, Mail, Copy } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import confetti from "canvas-confetti"
 
@@ -2364,9 +2364,6 @@ export default function Cart() {
               {addons.length > 0 && (
                 <div className="bg-white dark:bg-[#1a1a1a] px-4 md:px-6 py-5 rounded-2xl shadow-sm border border-slate-100 dark:border-gray-800">
                   <div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4">
-                    <div className="w-6 h-6 md:w-8 md:h-8 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center">
-                       <Sparkles className="h-4 w-4 md:h-5 md:w-5 text-primary" />
-                    </div>
                     <span className="text-sm md:text-base font-semibold text-gray-800 dark:text-gray-200">Complete your meal with</span>
                   </div>
                   {loadingAddons ? (
@@ -2857,7 +2854,6 @@ export default function Cart() {
                     {Number((pricing?.freeDeliveryUpTo ?? feeSettings.freeDeliveryUpTo) || 0) > 0 && (
                       <div className="-mt-1.5">
                         <div className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 text-primary border border-primary/25 px-2.5 py-1 text-[11px] font-semibold shadow-sm animate-pulse">
-                          <Sparkles className="h-3 w-3" />
                           <span>Free delivery at</span>
                           <span className="text-secondary">
                             {RUPEE_SYMBOL}{Number((pricing?.freeDeliveryUpTo ?? feeSettings.freeDeliveryUpTo) || 0).toFixed(0)}+
@@ -2894,7 +2890,6 @@ export default function Cart() {
                       <div className="rounded-lg bg-gradient-to-r from-primary/5 via-primary/12 to-primary/5 dark:from-primary/10 dark:via-primary/15 dark:to-primary/10 border border-primary/20 p-3 space-y-2 mt-2 shadow-sm animate-pulse">
                         <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2">
-                            <Sparkles className="h-4 w-4 text-primary" />
                             <span className="font-semibold text-primary">Other platform total</span>
                           </div>
                           <span className="text-gray-700 dark:text-gray-300 font-medium">{RUPEE_SYMBOL}{platformPricingSavings.totalPlatformPrice.toFixed(2)}</span>
@@ -3288,7 +3283,6 @@ export default function Cart() {
                     transition={{ duration: 0.6, delay: 1.0 }}
                   >
                     <div className="flex items-center justify-center gap-2 mb-3">
-                      <Sparkles className="h-5 w-5 text-primary" />
                       <span className="font-bold text-primary">You Saved on this Order</span>
                     </div>
                     <div className="text-center space-y-1">

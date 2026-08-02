@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom"
 import { Input } from "@food/components/ui/input"
 import { Button } from "@food/components/ui/button"
 import { Label } from "@food/components/ui/label"
-import { Image as ImageIcon, Upload, Clock, Calendar as CalendarIcon, Sparkles, X, LogOut, FileText } from "lucide-react"
+import { Image as ImageIcon, Upload, Clock, Calendar as CalendarIcon, X, LogOut, FileText } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@food/components/ui/popover"
 import { Calendar } from "@food/components/ui/calendar"
 import {
@@ -2814,7 +2814,6 @@ export default function RestaurantOnboarding() {
                 className="text-xs bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 flex items-center gap-1.5"
                 title="Edit Details"
               >
-                <Sparkles className="w-3 h-3" />
                 Edit Details
               </Button>
             )}

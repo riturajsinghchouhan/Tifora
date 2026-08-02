@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { Tag, User, Home as HomeIcon, UtensilsCrossed, ShoppingBag } from "lucide-react"
+import { Tag, User, Home as HomeIcon, Package, ShoppingBag } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getPublicLandingSettings } from "@food/api"
 import { useAppLocation } from "@food/hooks/useAppLocation"
@@ -36,11 +36,13 @@ export default function BottomNavigation() {
   // Check active routes - support both /user/* and /* paths
   const isDining = pathname === "/food/dining" || pathname.startsWith("/food/user/dining")
   const isUnder250 = pathname === "/food/under-250" || pathname.startsWith("/food/user/under-250")
+  const isTiffin = pathname === "/food/tiffin" || pathname.startsWith("/food/user/tiffin")
   const isOrders = pathname === "/food/orders" || pathname.startsWith("/food/user/orders")
   const isProfile = pathname === "/food/profile" || pathname.startsWith("/food/user/profile")
   const isHome =
     !isDining &&
     !isUnder250 &&
+    !isTiffin &&
     !isOrders &&
     !isProfile &&
     (pathname === "/food" ||
@@ -49,15 +51,16 @@ export default function BottomNavigation() {
       (pathname.startsWith("/food/user") &&
         !pathname.includes("/dining") &&
         !pathname.includes("/under-250") &&
+        !pathname.includes("/tiffin") &&
         !pathname.includes("/profile")))
 
   return (
     <div className="md:hidden fixed bottom-3 left-3 right-3 bg-white dark:bg-[#1a1a1a] rounded-[2rem] z-50 shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-gray-100 dark:border-gray-800">
-      <div className="flex items-center justify-between px-2 py-1.5">
+      <div className="flex items-center justify-between px-2 py-1.5 gap-1">
         {/* Home Tab */}
         <Link
           to="/food/user/"
-          className={`flex flex-col items-center justify-center gap-1 w-[22%] py-2 rounded-[1.5rem] transition-all duration-300 ${isHome
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-[1.5rem] transition-all duration-300 ${isHome
               ? "bg-[#ffeef2] dark:bg-primary/20 text-primary"
               : "text-slate-500 dark:text-gray-400"
             }`}
@@ -68,10 +71,24 @@ export default function BottomNavigation() {
           </span>
         </Link>
 
+        {/* Tiffin Tab */}
+        <Link
+          to="/food/user/tiffin"
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-[1.5rem] transition-all duration-300 ${isTiffin
+              ? "bg-[#ffeef2] dark:bg-primary/20 text-primary"
+              : "text-slate-500 dark:text-gray-400"
+            }`}
+        >
+          <Package className={`h-5 w-5 ${isTiffin ? "text-primary" : "text-slate-500 dark:text-gray-400"}`} strokeWidth={isTiffin ? 2.5 : 2} />
+          <span className={`text-[10px] sm:text-xs font-bold ${isTiffin ? "text-primary" : "text-slate-500 dark:text-gray-400 font-semibold"}`}>
+            Tiffin
+          </span>
+        </Link>
+
         {/* Under 250 Tab */}
         <Link
           to="/food/user/under-250"
-          className={`flex flex-col items-center justify-center gap-1 w-[22%] py-2 rounded-[1.5rem] transition-all duration-300 ${isUnder250
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-[1.5rem] transition-all duration-300 ${isUnder250
               ? "bg-[#ffeef2] dark:bg-primary/20 text-primary"
               : "text-slate-500 dark:text-gray-400"
             }`}
@@ -85,7 +102,7 @@ export default function BottomNavigation() {
         {/* Orders Tab */}
         <Link
           to="/food/user/orders"
-          className={`flex flex-col items-center justify-center gap-1 w-[22%] py-2 rounded-[1.5rem] transition-all duration-300 ${isOrders
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-[1.5rem] transition-all duration-300 ${isOrders
               ? "bg-[#ffeef2] dark:bg-primary/20 text-primary"
               : "text-slate-500 dark:text-gray-400"
             }`}
@@ -99,7 +116,7 @@ export default function BottomNavigation() {
         {/* Profile Tab */}
         <Link
           to="/food/user/profile"
-          className={`flex flex-col items-center justify-center gap-1 w-[22%] py-2 rounded-[1.5rem] transition-all duration-300 ${isProfile
+          className={`flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-[1.5rem] transition-all duration-300 ${isProfile
               ? "bg-[#ffeef2] dark:bg-primary/20 text-primary"
               : "text-slate-500 dark:text-gray-400"
             }`}

@@ -68,7 +68,7 @@ export default function MySubscriptions() {
             <div className="p-4 space-y-4 max-w-lg mx-auto">
                 {loading ? (
                     <div className="flex justify-center p-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#be123c]"></div>
                     </div>
                 ) : subscriptions.length === 0 ? (
                     <div className="text-center p-10 bg-white rounded-2xl border border-gray-200 shadow-sm">
@@ -77,7 +77,7 @@ export default function MySubscriptions() {
                         <p className="text-xs text-gray-500 mt-1 mb-4">You have not subscribed to any tiffin meal plan yet.</p>
                         <button
                             onClick={() => navigate('/food/user/tiffin')}
-                            className="bg-orange-500 text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md hover:bg-orange-600 transition"
+                            className="bg-[#be123c] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md hover:bg-[#9f1239] transition"
                         >
                             Explore Plans
                         </button>
@@ -115,12 +115,12 @@ export default function MySubscriptions() {
                                 </div>
 
                                 <div className="flex items-center gap-2 text-xs text-gray-600">
-                                    <Clock className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                                    <Clock className="w-3.5 h-3.5 text-[#be123c] shrink-0" />
                                     <span>Slot: <strong>{sub.planId?.mealType} (11 AM & 7 PM)</strong></span>
                                 </div>
 
                                 <div className="flex items-center gap-2 text-xs text-gray-600">
-                                    <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                                    <MapPin className="w-3.5 h-3.5 text-[#be123c] shrink-0" />
                                     <span className="truncate">{sub.deliveryAddress?.street}, {sub.deliveryAddress?.city}</span>
                                 </div>
 

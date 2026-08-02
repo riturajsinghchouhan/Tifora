@@ -1,4 +1,4 @@
-﻿import { Outlet, useLocation, useNavigate } from "react-router-dom"
+import { Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useEffect, useState, createContext, useContext } from "react"
 import { ProfileProvider } from "@food/context/ProfileContext"
 import { CartProvider } from "@food/context/CartContext"
@@ -109,6 +109,8 @@ function UserLayoutShell() {
     normalizedPath === "/user/dining" ||
     normalizedPath === "/under-250" ||
     normalizedPath === "/user/under-250" ||
+    normalizedPath === "/tiffin" ||
+    normalizedPath === "/user/tiffin" ||
     normalizedPath === "/orders" ||
     normalizedPath === "/user/orders" ||
     isProfileRoot ||
