@@ -1,0 +1,86 @@
+# Tiffin Service (Subscription Orders) - Perfect Implementation Plan
+
+This plan is tailored specifically to the `Tifora` codebase. 
+
+> [!IMPORTANT]
+> **Zero Disruption Guarantee:** To guarantee that the current standard ordering flow never breaks, the Tiffin Service will be built as an entirely separate module. We will not modify the complex logic in `order.model.js`. Instead, we will create a dedicated `tiffin` submodule in the backend and dedicated Tiffin pages in the frontend (User, Restaurant, DeliveryV2, Admin).
+
+## User Review Required (Policy Decisions)
+
+> [!WARNING]
+> These edge cases require a business policy decision from you. Please review:
+> 
+> 1. **Cancellation & Refunds:** If a user cancels mid-plan, do we refund the prorated amount to their wallet, or is it strictly non-refundable? *(Recommendation: Prorated refund to User Wallet minus a small cancellation fee).*
+> 2. **Restaurant Holidays:** If a restaurant marks tomorrow as a "Holiday", should the system automatically pause all active tiffins for that day and extend their subscription by 1 day? *(Recommendation: Yes, this prevents missed deliveries).*
+> 3. **Delivery Boy Assignment Rejection:** If a delivery boy rejects the manual 10-20 tiffin assignment, it will revert to "unassigned". Does the restaurant get a push notification/alarm? *(Recommendation: Yes, ring the `NewOrderNotification` alarm for the restaurant).*
+
+---
+
+## 1. Backend Architecture (Isolated Module)
+
+We will create a new directory: `Backend/src/modules/food/tiffin/`
+
+### Models (`/models/`)
+1. **`tiffinPlan.model.js`:** Restaurant creates this. Fields: `restaurantId`, `name`, `durationDays` (e.g., 7, 30), `mealType` (Morning, Evening, Both), `price`, `itemsDescription`.
+2. **`tiffinSubscription.model.js`:** User purchases this upfront. Fields: `userId`, `restaurantId`, `planId`, `startDate`, `endDate`, `deliveryAddress`, `status` (active, paused, cancelled, expired), `paymentId`.
+3. **`tiffinDelivery.model.js`:** The actual daily drop-off. Fields: `subscriptionId`, `type` (Morning/Evening), `date`, `status` (pending, assigned, out_for_delivery, delivered, failed), `assignedTo` (Delivery Partner), `verification` (OTP or PictureUrl).
+
+### Controllers & Routes (`/controllers/`, `/routes/`)
+- **`userTiffin.controller.js`:** Browse plans, Upfront Checkout (Razorpay/Wallet integration), View My Subscriptions, Pause/Resume Subscription.
+- **`restaurantTiffin.controller.js`:** Manage Plans (CRUD), View Daily Prep Count (Morning/Evening), Bulk Manual Assignment of `tiffinDelivery` to a specific delivery boy.
+- **`deliveryTiffin.controller.js`:** Fetch assigned tiffins (sorted by `$near` proximity), Update status, Upload verification picture.
+- **`adminTiffin.controller.js`:** View all subscriptions, Manage Delivery Boy Payouts specifically for Tiffin drops.
+
+### Automated Tasks (`/scripts/tiffinScheduler.js`)
+- A midnight Cron Job that queries active `TiffinSubscriptions` and generates `TiffinDelivery` records for the upcoming day. (Skips users who have "paused" their subscription).
+
+---
+
+## 2. Frontend Architecture (Isolated Components)
+
+We will inject new routes into the existing Routers without touching existing pages.
+
+### User App (`Frontend/src/modules/Food/pages/user/Tiffin/`)
+- **New Pages:** `TiffinHome.jsx` (List of restaurants offering tiffins), `TiffinPlanDetails.jsx`, `TiffinCheckout.jsx`, `MySubscriptions.jsx`.
+- **Integration:** Add a distinct "Tiffin Service" banner/button on the main User Home page.
+
+### Restaurant Dashboard (`Frontend/src/modules/Food/pages/restaurant/Tiffin/`)
+- **New Pages:** `TiffinSettings.jsx` (Create plans), `TiffinPrepDashboard.jsx` (Shows how many to cook today), `TiffinDispatchPanel.jsx` (Manual assignment by zone).
+- **Integration:** Add a new tab to `RestaurantSidebar.jsx`.
+
+### Delivery App (`Frontend/src/modules/DeliveryV2/pages/Tiffin/`)
+- **New Pages:** `TiffinRouteList.jsx` (List of 10-20 assigned orders sorted by nearest distance), `TiffinDropoff.jsx` (Map view, Call User, OTP/Picture Upload).
+- **Integration:** Add a "Tiffin Route" tab in the `DeliveryV2Router.jsx` bottom nav. 
+
+### Admin App (`Frontend/src/modules/Food/pages/admin/Tiffin/`)
+- **New Pages:** `TiffinPayouts.jsx` (Track how many tiffins a delivery boy delivered and calculate their earnings separately from standard orders).
+
+---
+
+## 3. Edge Cases & Perfect Solutions
+
+> [!CAUTION]
+> 1. **User Wants to Pause Subscription (e.g., out of town):** 
+>    - **Solution:** User taps "Pause" in the app. The cron job skips them, and their `endDate` extends automatically.
+> 
+> 2. **User is Unreachable (Not answering phone):** 
+>    - **Solution:** Delivery boy calls -> no answer -> clicks "User Unavailable" -> takes a photo of the tiffin at the door -> system marks it as `delivered (unattended)`.
+> 
+> 3. **Delivery Boy Vehicle Breaks Down Mid-Route:**
+>    - **Solution:** Restaurant opens `TiffinDispatchPanel.jsx`, selects the undelivered tiffins from that boy, and clicks "Re-assign", moving them to another delivery boy instantly.
+> 
+> 4. **User Changes Delivery Address Mid-Subscription:**
+>    - **Solution:** Validation logic will block the change if the new address is outside the restaurant's allowed zone.
+> 
+> 5. **Delayed Delivery (SLA Breach):**
+>    - **Solution:** If a morning tiffin is still `out_for_delivery` by 1:30 PM, it flags red in the Admin and Restaurant dashboards for immediate action.
+
+---
+
+## Verification Plan
+1. **Sanity Check:** Ensure standard `FoodOrder` works exactly as before.
+2. **Restaurant Config:** Create a Tiffin plan successfully.
+3. **User Flow:** Purchase the plan using Wallet/Razorpay.
+4. **Task Execution:** Trigger `tiffinScheduler.js` to ensure the daily drops are generated.
+5. **Assignment:** Assign the drops to a Delivery Boy in the Restaurant Panel.
+6. **Delivery Flow:** Check the Delivery App; verify proximity sorting, OTP verification, and picture upload fallback.

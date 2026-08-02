@@ -9,6 +9,8 @@ const SignIn = lazy(() => import("./pages/auth/SignIn"))
 const OTP = lazy(() => import("./pages/auth/OTP"))
 const SignupStep1 = lazy(() => import("./pages/auth/SignupStep1"))
 const SignupStep2 = lazy(() => import("./pages/auth/SignupStep2"))
+const TiffinRouteList = lazy(() => import("./pages/tiffin/TiffinRouteList"))
+const TiffinDropoff = lazy(() => import("./pages/tiffin/TiffinDropoff"))
 
 // V2 Pages
 import DeliveryHomeV2 from './pages/DeliveryHomeV2';
@@ -54,6 +56,8 @@ const DeliveryV2Router = () => {
         <Route path="/pocket" element={<ProtectedRoute><DeliveryHomeV2 tab="pocket" /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><DeliveryHomeV2 tab="history" /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><DeliveryHomeV2 tab="profile" /></ProtectedRoute>} />
+        <Route path="/tiffin-route" element={<ProtectedRoute><TiffinRouteList /></ProtectedRoute>} />
+        <Route path="/tiffin-dropoff/:id" element={<ProtectedRoute><TiffinDropoff /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsV2 /></ProtectedRoute>} />
         <Route path="/profile/details" element={<ProtectedRoute><ProfileDetailsV2 /></ProtectedRoute>} />
         <Route path="/profile/bank" element={<ProtectedRoute><ProfileBankV2 /></ProtectedRoute>} />

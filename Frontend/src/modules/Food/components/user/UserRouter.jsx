@@ -92,6 +92,12 @@ const Wallet = lazy(() => import("@food/pages/user/Wallet"))
 // Complaints
 const SubmitComplaint = lazy(() => import("@food/pages/user/complaints/SubmitComplaint"))
 
+// Tiffin Service
+const TiffinHome = lazy(() => import("@food/pages/user/tiffin/TiffinHome"))
+const TiffinPlanDetails = lazy(() => import("@food/pages/user/tiffin/TiffinPlanDetails"))
+const TiffinCheckout = lazy(() => import("@food/pages/user/tiffin/TiffinCheckout"))
+const MySubscriptions = lazy(() => import("@food/pages/user/tiffin/MySubscriptions"))
+
 export default function UserRouter() {
   return (
     <Suspense fallback={<Loader />}>
@@ -126,6 +132,12 @@ export default function UserRouter() {
           <Route path="restaurants/:slug" element={<RestaurantDetails />} />
           <Route path="search" element={<SearchResults />} />
           <Route path="product/:id" element={<ProductDetail />} />
+
+          {/* Tiffin Service Routes */}
+          <Route path="tiffin" element={<TiffinHome />} />
+          <Route path="tiffin/plan/:id" element={<TiffinPlanDetails />} />
+          <Route path="tiffin/checkout" element={<ProtectedRoute requiredRole="user" loginPath="/user/auth/login"><TiffinCheckout /></ProtectedRoute>} />
+          <Route path="tiffin/my-subscriptions" element={<ProtectedRoute requiredRole="user" loginPath="/user/auth/login"><MySubscriptions /></ProtectedRoute>} />
 
           {/* Cart - Now Public */}
           <Route path="cart" element={<Cart />} />

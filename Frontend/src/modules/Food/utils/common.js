@@ -7,7 +7,7 @@ const ABSOLUTE_URL_RE = /^(https?:)?\/\//i;
 const DEFAULT_PUBLIC_MEDIA_ORIGIN =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_PUBLIC_MEDIA_ORIGIN
     ? String(import.meta.env.VITE_PUBLIC_MEDIA_ORIGIN).trim().replace(/\/+$/, "")
-    : "https://theindianbite.com";
+    : "";
 
 const trimSlashes = (value = "") => String(value || "").trim().replace(/\/+$/, "");
 
@@ -34,20 +34,10 @@ const getSafeOrigin = (value = "") => {
 };
 
 const getPreferredMediaOrigin = (backendOrigin = "") => {
-  const appHost = typeof window !== "undefined" ? window.location?.hostname || "" : "";
-  const backendHost = (() => {
-    try {
-      return backendOrigin ? new URL(backendOrigin).hostname || "" : "";
-    } catch {
-      return "";
-    }
-  })();
-
-  if (LOCAL_HOST_RE.test(appHost) && LOCAL_HOST_RE.test(backendHost || appHost)) {
+  if (DEFAULT_PUBLIC_MEDIA_ORIGIN) {
     return getSafeOrigin(DEFAULT_PUBLIC_MEDIA_ORIGIN) || DEFAULT_PUBLIC_MEDIA_ORIGIN;
   }
-
-  return getSafeOrigin(backendOrigin) || trimSlashes(backendOrigin);
+  return getSafeOrigin(backendOrigin) || trimSlashes(backendOrigin) || "";
 };
 
 /**
@@ -63,6 +53,14 @@ export const normalizeImageUrl = (imageUrl, backendOrigin = "") => {
     const match = trimmed.match(/\/image\/upload\/(?:v\d+\/)?(.+)$/i);
     if (match && match[1]) {
       trimmed = `/uploads/${match[1]}`;
+    }
+  }
+
+  // Remap legacy theindianbite to local uploads
+  if (trimmed.includes("theindianbite.com")) {
+    const match = trimmed.match(/theindianbite\.com(?:\/api\/v1)?\/(.+)$/i);
+    if (match && match[1]) {
+      trimmed = `/${match[1]}`;
     }
   }
 
@@ -87,6 +85,7 @@ export const normalizeImageUrl = (imageUrl, backendOrigin = "") => {
         if (mediaOrigin) {
           return `${mediaOrigin}${toApiUploadPath(parsed.pathname || "")}`.replace(/ /g, "%20");
         }
+        return `${toApiUploadPath(parsed.pathname || "")}`.replace(/ /g, "%20");
       }
 
       if (appHost && !LOCAL_HOST_RE.test(appHost) && isLocalParsedHost) {

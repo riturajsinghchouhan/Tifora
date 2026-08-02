@@ -22,6 +22,7 @@ import appConfigRoutes from '../core/appConfig/appConfig.routes.js';
 import promocodeRoutes from './promocodeRoutes.js';
 import { requireZone } from '../middlewares/zone.middleware.js';
 import envSettingRoutes from './admin/envSettingRoutes.js';
+import tiffinRoutes from '../modules/food/tiffin/routes/tiffin.routes.js';
 
 const router = express.Router();
 
@@ -70,6 +71,19 @@ router.use('/v1/food/payments', authMiddleware, paymentRoutes);
 router.use('/v1/payments/webhook', webhookRoutes);
 router.use('/v1/fcm-tokens', fcmRoutes);
 router.use('/fcm-tokens', fcmRoutes);
+
+// Tiffin Service Routes
+router.use('/v1/food/restaurant/tiffin', tiffinRoutes);
+router.use('/v1/food/user/tiffin', tiffinRoutes);
+router.use('/v1/food/delivery/tiffin', tiffinRoutes);
+router.use('/v1/food/admin/tiffin', tiffinRoutes);
+router.use('/v1/food/tiffin', tiffinRoutes);
+router.use('/v1/restaurant/tiffin', tiffinRoutes);
+router.use('/v1/user/tiffin', tiffinRoutes);
+router.use('/v1/delivery/tiffin', tiffinRoutes);
+router.use('/v1/admin/tiffin', tiffinRoutes);
+router.use('/v1/tiffin', tiffinRoutes);
+router.use('/tiffin', tiffinRoutes);
 
 router.get('/v1/admin/queues', authMiddleware, requireRoles('ADMIN', 'SUPER_ADMIN', 'SUB_ADMIN'), getQueuesController);
 

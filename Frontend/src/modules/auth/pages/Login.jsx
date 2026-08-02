@@ -468,53 +468,69 @@ export default function UnifiedOTPFastLogin() {
       {/* Name Collection Modal */}
       <Dialog open={showNameModal} onOpenChange={setShowNameModal}>
         <DialogContent
-          className="sm:max-w-[425px] rounded-3xl border-none p-0 overflow-hidden bg-white dark:bg-[#1a1a1a]"
+          className="w-[92vw] max-w-[400px] sm:max-w-[420px] rounded-[28px] border border-gray-100 dark:border-gray-800 p-0 overflow-hidden bg-white dark:bg-[#18181b] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)]"
           showCloseButton={false}
         >
-          <div className="bg-primary p-5 sm:p-6 text-center relative">
-            <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl" />
+          {/* Top Decorative Ambient Glow */}
+          <div className="relative pt-8 pb-4 px-6 text-center bg-gradient-to-b from-red-50/70 via-white to-white dark:from-red-950/20 dark:via-[#18181b] dark:to-[#18181b]">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-20 bg-red-400/15 dark:bg-red-500/10 blur-2xl pointer-events-none" />
+
             <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="w-14 h-14 sm:w-16 sm:h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-3 border border-white/30"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", bounce: 0.5, duration: 0.5 }}
+              className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#FF5252] to-[#FF7676] text-white flex items-center justify-center mx-auto mb-4 shadow-[0_10px_25px_rgba(229,57,53,0.35)] ring-4 ring-red-100/70 dark:ring-red-950/60"
             >
-              <User className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+              <User className="w-8 h-8 text-white" />
+              <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-amber-400 text-amber-950 flex items-center justify-center shadow-md">
+                <Star className="w-3.5 h-3.5 fill-amber-950" />
+              </div>
             </motion.div>
-            <DialogTitle className="text-xl sm:text-2xl font-bold text-white mb-1.5">Almost there!</DialogTitle>
-            <DialogDescription className="text-white/90 text-sm">
+
+            <DialogTitle className="text-2xl sm:text-[26px] font-black text-gray-900 dark:text-white tracking-tight mb-1.5 font-['Poppins']">
+              Almost there!
+            </DialogTitle>
+            <DialogDescription className="text-gray-500 dark:text-gray-400 text-sm font-medium leading-relaxed max-w-[280px] mx-auto">
               We'd love to know your name to personalize your experience.
             </DialogDescription>
           </div>
 
-          <form onSubmit={handleNameSubmit} className="p-5 sm:p-6 pt-4 space-y-4 sm:space-y-5">
+          <form onSubmit={handleNameSubmit} className="px-6 pb-7 pt-2 space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-1">
+              <Label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 ml-1 block">
                 Full Name
               </Label>
               <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#E53935] transition-colors pointer-events-none">
+                  <User className="w-5 h-5" />
+                </div>
                 <Input
                   id="name"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Enter your name"
-                  className="pl-4 h-12 sm:h-14 bg-gray-50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary transition-all group-hover:border-primary/30"
+                  placeholder="Enter your full name"
+                  className="w-full pl-11 pr-4 h-[52px] bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100/60 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700/80 rounded-2xl text-gray-900 dark:text-white font-medium text-[15px] focus:ring-4 focus:ring-red-500/15 focus:border-[#E53935] transition-all outline-none placeholder:text-gray-400"
                   autoFocus
                 />
               </div>
             </div>
 
-            <div className="flex flex-col gap-2.5">
-              <Button
+            <div className="flex flex-col gap-3 pt-1">
+              <button
                 type="submit"
-                disabled={isUpdatingName}
-                className="w-full h-12 sm:h-14 bg-primary hover:bg-[#6b2f57] text-white rounded-xl font-bold text-[15px] sm:text-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                disabled={isUpdatingName || !newName.trim()}
+                className="w-full h-[52px] bg-gradient-to-r from-[#FF5252] to-[#E53935] text-white rounded-2xl font-bold text-base shadow-[0_10px_25px_rgba(229,57,53,0.35)] hover:shadow-[0_15px_30px_rgba(229,57,53,0.45)] hover:-translate-y-0.5 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-[0_10px_25px_rgba(229,57,53,0.35)]"
               >
                 {isUpdatingName ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  "Complete Profile"
+                  <>
+                    <span>Complete Profile</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
                 )}
-              </Button>
+              </button>
+
               {!pendingVerify ? (
                 <button
                   type="button"
@@ -522,12 +538,15 @@ export default function UnifiedOTPFastLogin() {
                     setShowNameModal(false)
                     navigate("/food/user", { replace: true })
                   }}
-                  className="text-xs sm:text-sm text-gray-400 hover:text-gray-600 transition-colors py-1.5"
+                  className="text-xs sm:text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium transition-colors py-1 text-center"
                 >
                   Skip for now
                 </button>
               ) : (
-                <p className="text-[11px] sm:text-xs text-gray-400 text-center">Name is required to complete signup.</p>
+                <div className="flex items-center justify-center gap-1.5 text-[11px] sm:text-xs text-gray-400 dark:text-gray-500">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Name is required to complete signup.</span>
+                </div>
               )}
             </div>
           </form>

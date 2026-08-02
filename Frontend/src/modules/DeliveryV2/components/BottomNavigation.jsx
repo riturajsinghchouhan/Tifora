@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom"
 import { useEffect, useState } from "react"
-import { User } from "lucide-react"
+import { User, Package } from "lucide-react"
 import { deliveryAPI } from "@food/api"
 
 // Heroicons Outline
@@ -109,6 +109,15 @@ export default function BottomNavigation() {
         >
           {TabIcon(isActive("/food/delivery/pocket"), WalletOutline, WalletSolid)}
           {TabLabel(isActive("/food/delivery/pocket"), "Pocket")}
+        </button>
+
+        {/* Tiffin Route */}
+        <button
+          onClick={() => navigate("/food/delivery/tiffin-route")}
+          className="flex flex-col items-center gap-1.5 p-2.5"
+        >
+          <Package className={`w-6 h-6 ${isActive("/food/delivery/tiffin-route") ? "text-[var(--dv-primary)]" : "text-gray-500"}`} />
+          {TabLabel(isActive("/food/delivery/tiffin-route"), "Tiffin")}
         </button>
 
         {/* Trip History */}

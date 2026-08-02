@@ -13,6 +13,14 @@ export const getImageUrl = (url) => {
     }
   }
 
+  // Translate legacy theindianbite.com URLs to local server uploads paths
+  if (processedUrl.includes("theindianbite.com")) {
+    const match = processedUrl.match(/theindianbite\.com(?:\/api\/v1)?\/(.+)$/i);
+    if (match && match[1]) {
+      processedUrl = `/${match[1]}`;
+    }
+  }
+
   // If it's already an absolute URL (http, https, data URI, blob), return as is
   if (processedUrl.startsWith("http") || processedUrl.startsWith("data:") || processedUrl.startsWith("blob:")) {
     return processedUrl;

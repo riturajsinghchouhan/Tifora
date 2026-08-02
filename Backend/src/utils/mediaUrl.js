@@ -34,13 +34,22 @@ export const getMediaBaseUrl = () => {
 
 export const normalizeMediaUrl = (value) => {
   if (!value) return "";
-  const raw = typeof value === "string"
+  let raw = typeof value === "string"
     ? value.trim()
     : typeof value === "object"
       ? String(value.url || value.secure_url || "").trim()
       : "";
   if (!raw) return "";
   if (/^(data:|blob:)/i.test(raw)) return raw;
+
+  // Remap legacy domain to relative uploads path
+  if (raw.includes("theindianbite.com")) {
+    const match = raw.match(/theindianbite\.com(?:\/api\/v1)?\/(.+)$/i);
+    if (match && match[1]) {
+      raw = `/${match[1]}`;
+    }
+  }
+
   if (ABSOLUTE_URL_RE.test(raw)) return raw;
   if (!isUploadPath(raw)) return raw;
 

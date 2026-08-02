@@ -19,6 +19,9 @@ const TermsAndConditionsPage = lazy(() => import("@food/pages/restaurant/TermsAn
 const MenuCategoriesPage = lazy(() => import("@food/pages/restaurant/MenuCategoriesPage"))
 
 const ExploreMore = lazy(() => import("@food/pages/restaurant/ExploreMore"))
+const TiffinSettings = lazy(() => import("@food/pages/restaurant/tiffin/TiffinSettings"))
+const TiffinPrepDashboard = lazy(() => import("@food/pages/restaurant/tiffin/TiffinPrepDashboard"))
+const TiffinDispatchPanel = lazy(() => import("@food/pages/restaurant/tiffin/TiffinDispatchPanel"))
 const DeliverySettings = lazy(() => import("@food/pages/restaurant/DeliverySettings"))
 const RushHour = lazy(() => import("@food/pages/restaurant/RushHour"))
 const OutletTimings = lazy(() => import("@food/pages/restaurant/OutletTimings"))
@@ -91,6 +94,9 @@ export default function RestaurantRouter() {
             <Route path="menu-categories" element={<MenuCategoriesPage />} />
 
             <Route path="explore" element={<ExploreMore />} />
+            <Route path="tiffin-settings" element={<TiffinSettings />} />
+            <Route path="tiffin-dashboard" element={<TiffinPrepDashboard />} />
+            <Route path="tiffin-dispatch" element={<TiffinDispatchPanel />} />
             <Route path="outlet-timings" element={<OutletTimings />} />
             <Route path="outlet-timings/:day" element={<DaySlots />} />
             <Route path="outlet-info" element={<OutletInfo />} />
