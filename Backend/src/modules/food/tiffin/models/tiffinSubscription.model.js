@@ -6,14 +6,17 @@ const deliveryAddressSchema = new mongoose.Schema(
         name: { type: String, default: '', trim: true },
         fullName: { type: String, default: '', trim: true },
         street: { type: String, required: true, trim: true },
+        area: { type: String, default: '', trim: true },
+        landmark: { type: String, default: '', trim: true },
+        zone: { type: String, default: '', trim: true },
+        zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodZone', default: null },
         additionalDetails: { type: String, default: '', trim: true },
         city: { type: String, required: true, trim: true },
         state: { type: String, required: true, trim: true },
         zipCode: { type: String, default: '', trim: true },
-        phone: { type: String, default: '', trim: true },
         location: {
             type: { type: String, enum: ['Point'], default: 'Point' },
-            coordinates: { type: [Number], default: undefined }
+            coordinates: { type: [Number], default: [75.8577, 22.7196] }
         }
     },
     { _id: false }

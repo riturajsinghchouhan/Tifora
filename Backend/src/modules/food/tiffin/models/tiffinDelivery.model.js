@@ -11,8 +11,7 @@ const tiffinDeliverySchema = new mongoose.Schema(
         restaurantId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'FoodRestaurant',
-            required: true,
-            index: true
+            required: true
         },
         userId: {
             type: mongoose.Schema.Types.ObjectId,
@@ -23,11 +22,15 @@ const tiffinDeliverySchema = new mongoose.Schema(
             // Flattened for easy geospatial querying by delivery boy
             location: {
                 type: { type: String, enum: ['Point'], default: 'Point' },
-                coordinates: { type: [Number], default: undefined }
+                coordinates: { type: [Number], default: [75.8577, 22.7196] }
             },
             fullAddress: { type: String, default: '' },
             phone: { type: String, default: '' },
-            name: { type: String, default: '' }
+            name: { type: String, default: '' },
+            area: { type: String, default: '' },
+            landmark: { type: String, default: '' },
+            zone: { type: String, default: '' },
+            zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodZone', default: null }
         },
         type: {
             type: String,
@@ -48,8 +51,7 @@ const tiffinDeliverySchema = new mongoose.Schema(
         assignedTo: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'FoodDeliveryPartner',
-            default: null,
-            index: true
+            default: null
         },
         assignedAt: {
             type: Date,

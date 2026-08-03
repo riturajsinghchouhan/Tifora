@@ -577,6 +577,201 @@ const DeliveryTrackingMapInner = ({
                 />
               </div>
             )}
+    restaurantCoords?.lat,
+    restaurantCoords?.lng,
+    customerCoords?.lat,
+    customerCoords?.lng,
+    fullRoutePath?.length,
+  ]);
+
+  const liveRiderDirectionsOptions = useMemo(() => {
+    const origin = liveRouteOriginRef.current;
+    if (!origin || !routeDestination || !isRiderOffRoute) return null;
+    return {
+      origin,
+      destination: routeDestination,
+      travelMode: 'DRIVING',
+    };
+  }, [
+    routeDestination?.lat,
+    routeDestination?.lng,
+    isRiderOffRoute,
+    liveRouteRequestKey,
+  ]);
+
+  const liveDirectionsCallback = useCallback((result, status) => {
+    if (status !== 'OK' || !result) return;
+    const rawPath = result.routes?.[0]?.overview_path || [];
+    const plain = rawPath.map(normPt).filter(Boolean);
+    if (plain.length > 1) {
+      setFullRoutePath(plain);
+      debugLog(`✅ Live off-route path: ${plain.length} points`);
+    }
+    const durationText = result?.routes?.[0]?.legs?.[0]?.duration?.text;
+    if (durationText) {
+      setCurrentEta(durationText);
+      onEtaUpdate?.(durationText);
+    }
+  }, [onEtaUpdate]);
+
+  /**
+   * SPLIT POLYLINE LOGIC:
+   * Given the full route path and the rider's current position, split into:
+   *   - traveledPath: restaurant → nearest point to rider (dashed grey)
+   *   - remainingPath: nearest point → destination (solid colored)
+   */
+  const { traveledPath, remainingPath } = useMemo(() => {
+    if (!fullRoutePath || fullRoutePath.length < 2) {
+      return { traveledPath: [], remainingPath: [] };
+    }
+    if (!displayRiderLocation || !isLoaded || !window.google?.maps?.geometry) {
+      // No rider yet: show everything as remaining
+      return { traveledPath: [], remainingPath: fullRoutePath };
+    }
+
+    const splitIdx = findClosestPointIndex(fullRoutePath, displayRiderLocation);
+
+    // traveledPath: start → splitIdx (inclusive) + rider's exact position
+    const traveled = [
+      ...fullRoutePath.slice(0, splitIdx + 1),
+      { lat: displayRiderLocation.lat, lng: displayRiderLocation.lng }
+    ];
+
+    // remainingPath: rider's exact position → end
+    const remaining = [
+      { lat: displayRiderLocation.lat, lng: displayRiderLocation.lng },
+      ...fullRoutePath.slice(splitIdx + 1)
+    ];
+
+    return { traveledPath: traveled, remainingPath: remaining };
+  }, [fullRoutePath, displayRiderLocation, isLoaded]);
+
+  // Route color by phase
+  const remainingColor = isOrderPickedUp ? '#3b82f6' : '#22c55e';
+
+  const center = useMemo(() => {
+    if (isOrderPickedUp) return customerCoords || { lat: 0, lng: 0 };
+    return restaurantCoords || { lat: 0, lng: 0 };
+  }, [isOrderPickedUp, restaurantCoords, customerCoords]);
+
+  if (!isLoaded) return <div className="w-full h-full bg-gray-100 animate-pulse" />;
+
+  return (
+    <div className="relative w-full h-full overflow-hidden rounded-2xl shadow-inner border border-gray-100">
+      <GoogleMap
+        mapContainerStyle={{ width: '100%', height: '100%' }}
+        center={center}
+        zoom={15}
+        onLoad={setMap}
+        options={{
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: false,
+          scaleControl: true,
+          streetViewControl: false,
+          rotateControl: false,
+          fullscreenControl: false,
+          gestureHandling: 'greedy',
+          styles: [
+            { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+            { featureType: 'transit', stylers: [{ visibility: 'off' }] }
+          ]
+        }}
+      >
+        {/* Initial restaurant → customer route when no rider polyline yet */}
+        {!fullRoutePath && baselineDirectionsOptions && !baselineRequestedRef.current && (
+          <DirectionsService
+            options={baselineDirectionsOptions}
+            callback={(r, s) => {
+              baselineRequestedRef.current = true;
+              baselineDirectionsCallback(r, s);
+            }}
+          />
+        )}
+
+        {/* Rider deviated — recalculate from current rider position */}
+        {liveRiderDirectionsOptions && (
+          <DirectionsService
+            key={`live-route-${liveRouteRequestKey}`}
+            options={liveRiderDirectionsOptions}
+            callback={liveDirectionsCallback}
+          />
+        )}
+
+        {/* ── TRAVELED PATH: dashed grey (already covered by driver) ── */}
+        {traveledPath.length > 1 && (
+          <Polyline
+            path={traveledPath}
+            options={{
+              strokeColor: '#9ca3af',
+              strokeOpacity: 0,           // hide solid stroke
+              strokeWeight: 6,
+              zIndex: 6,
+              icons: [
+                {
+                  icon: {
+                    path: 'M 0,-1 0,1',  // vertical line = dash segment
+                    strokeOpacity: 0.85,
+                    strokeWeight: 5,
+                    scale: 4,
+                  },
+                  offset: '0',
+                  repeat: '14px',
+                }
+              ]
+            }}
+          />
+        )}
+
+        {/* ── REMAINING PATH: solid colored (driver's upcoming route) ── */}
+        {remainingPath.length > 1 && (
+          <Polyline
+            path={remainingPath}
+            options={{
+              strokeColor: remainingColor,
+              strokeOpacity: 0.95,
+              strokeWeight: 6,
+              zIndex: 8,
+            }}
+          />
+        )}
+
+        {/* ── RESTAURANT PIN ── */}
+        <OverlayView position={restaurantCoords} mapPaneName={OverlayView.MARKER_LAYER}>
+          <div className="relative -translate-x-1/2 -translate-y-full mb-1 group">
+            {!isOrderPickedUp && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                <motion.div
+                  animate={{ scale: [1, 2], opacity: [0.5, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-16 h-16 rounded-full border-4 border-primary/50"
+                />
+              </div>
+            )}
+            <div className="relative w-11 h-11 rounded-full p-1 bg-white shadow-xl border-2 border-primary overflow-hidden group-hover:scale-110 transition-transform">
+              <img
+                src={order?.restaurantLogo || order?.restaurantId?.logo || order?.restaurantId?.profileImage || `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(RESTAURANT_PIN_SVG)}`}
+                alt="Restaurant"
+                className="w-full h-full object-contain rounded-full bg-gray-50"
+                onError={(e) => { e.target.src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(RESTAURANT_PIN_SVG)}`; }}
+              />
+            </div>
+            <div className="absolute top-[100%] left-1/2 -translate-x-1/2 w-3 h-3 bg-primary -mt-1 shadow-sm" style={{ clipPath: 'polygon(50% 100%, 0 0, 100% 0)' }} />
+          </div>
+        </OverlayView>
+
+        {/* ── CUSTOMER PIN ── */}
+        <OverlayView position={customerCoords} mapPaneName={OverlayView.MARKER_LAYER}>
+          <div className="relative -translate-x-1/2 -translate-y-full mb-1 group">
+            {isOrderPickedUp && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                <motion.div
+                  animate={{ scale: [1, 2], opacity: [0.5, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-16 h-16 rounded-full border-4 border-green-500/50"
+                />
+              </div>
+            )}
             <div className="relative w-11 h-11 rounded-full p-1 bg-white shadow-xl border-2 border-green-500 overflow-hidden group-hover:scale-110 transition-transform">
               <img
                 src={order?.customerImage || order?.userId?.profileImage || order?.userId?.avatar || `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(CUSTOMER_PIN_SVG)}`}
@@ -601,10 +796,10 @@ const DeliveryTrackingMapInner = ({
                 transition: 'transform 0.2s linear',
                 willChange: 'transform',
               }}
-              className="relative w-16 h-16"
+              className="relative w-[80px] h-[80px]"
             >
               <img
-                src="/MapRider.png"
+                src={bikeLogo}
                 alt="Rider"
                 className="w-full h-full object-contain drop-shadow-2xl"
                 onError={(e) => { e.target.src = bikeLogo; }}

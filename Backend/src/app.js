@@ -50,6 +50,8 @@ app.use(helmet({
                 'https://maps.googleapis.com',
                 'https://maps.gstatic.com',
                 'https://checkout.razorpay.com',
+                'https://*.firebaseio.com',
+                'https://*.googleapis.com',
                 'blob:'
             ],
             scriptSrcElem: [
@@ -58,6 +60,8 @@ app.use(helmet({
                 'https://maps.googleapis.com',
                 'https://maps.gstatic.com',
                 'https://checkout.razorpay.com',
+                'https://*.firebaseio.com',
+                'https://*.googleapis.com',
                 'blob:'
             ],
             connectSrc: [
@@ -66,13 +70,17 @@ app.use(helmet({
                 'https://maps.gstatic.com',
                 'https://api.razorpay.com',
                 'https://checkout.razorpay.com',
+                'https://*.firebaseio.com',
+                'https://*.googleapis.com',
+                'wss://*.firebaseio.com',
                 'wss:',
                 'ws:'
             ],
             frameSrc: [
                 "'self'",
                 'https://api.razorpay.com',
-                'https://checkout.razorpay.com'
+                'https://checkout.razorpay.com',
+                'https://*.firebaseapp.com'
             ]
         }
     },

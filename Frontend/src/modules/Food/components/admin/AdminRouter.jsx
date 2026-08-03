@@ -182,7 +182,7 @@ export default function AdminRouter() {
             <Route path="orders/refunded" element={<OrdersPage statusKey="refunded" />} />
             <Route path="orders/offline-payments" element={<OrdersPage statusKey="offline-payments" />} />
             <Route path="order-detect-delivery" element={<OrderDetectDelivery />} />
-            <Route path="order-refunds/new" element={<NewRefundRequests />} />
+            <Route path="tiffin-management" element={<AdminTiffinManagement />} />
             <Route path="tiffin-subscriptions" element={<AdminTiffinManagement />} />
 
             {/* RESTAURANT MANAGEMENT */}

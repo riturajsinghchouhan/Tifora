@@ -2,20 +2,26 @@ import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { ArrowLeft, Search, MoreVertical, ChevronRight, Star, RotateCcw, AlertCircle, Loader2, Clock, X, Share2, MessageCircle, Send, Copy, Mail, MessagesSquare, Link2, Phone } from "lucide-react"
 import { orderAPI } from "@food/api"
+import api from "@food/api"
 import { useCart } from "@food/context/CartContext"
 import { toast } from "sonner"
 import { getCompanyNameAsync } from "@food/utils/businessSettings"
 import { isModuleAuthenticated } from "@food/utils/auth"
+import TiffinTrackingCard from "@food/components/user/TiffinTrackingCard"
+import { motion, AnimatePresence } from "framer-motion"
+
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
-
 
 export default function Orders() {
   const navigate = useNavigate()
   const { replaceCart } = useCart()
   const isAuthenticated = isModuleAuthenticated("user")
+  const [mainTab, setMainTab] = useState('normal') // 'normal' or 'tiffin'
   const [orders, setOrders] = useState([])
+  const [tiffinDeliveries, setTiffinDeliveries] = useState([])
+  const [tiffinLoading, setTiffinLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState('today') // 'today' or 'past'
@@ -85,6 +91,34 @@ export default function Orders() {
 
     return () => clearInterval(interval)
   }, [orders])
+
+  useEffect(() => {
+    fetchOrders()
+
+    if (isAuthenticated) {
+      setTiffinLoading(true)
+      api.get('/food/tiffin/user/deliveries')
+        .then(res => {
+          if (res.data?.success) setTiffinDeliveries(res.data.data)
+        })
+        .catch(err => debugError("Error fetching tiffin deliveries", err))
+        .finally(() => setTiffinLoading(false))
+    }
+
+    const interval = setInterval(() => {
+      if (activeTab === 'today') {
+        fetchOrders(false)
+        if (isAuthenticated) {
+          api.get('/food/tiffin/user/deliveries')
+            .then(res => {
+              if (res.data?.success) setTiffinDeliveries(res.data.data)
+            })
+            .catch(() => {})
+        }
+      }
+    }, 15000)
+    return () => clearInterval(interval)
+  }, [activeTab, isAuthenticated])
 
   // Get order status text
   const getOrderStatus = (order) => {
@@ -188,7 +222,7 @@ export default function Orders() {
   }, [orders, shownRatingForOrders, ratingModal.open])
 
   // Fetch orders from backend API
-  useEffect(() => {
+  const fetchOrders = async (showLoading = true) => {
     const FETCH_LIMIT = 100
 
     const fetchAllOrders = async () => {
@@ -240,161 +274,136 @@ export default function Orders() {
       return [...firstPageOrders, ...remainingOrders]
     }
 
-    const fetchOrders = async () => {
-      try {
-        setLoading(true)
-        const ordersData = await fetchAllOrders()
+    try {
+      if (showLoading) setLoading(true)
+      const ordersData = await fetchAllOrders()
 
-        if (ordersData.length > 0) {
-          debugLog('?? Raw orders from API:', ordersData.slice(0, 3).map(o => ({
-            id: o.orderId || o._id,
-            status: o.orderStatus || o.status,
-            restaurantRating: o.ratings?.restaurant?.rating || null,
-            deliveryPartnerRating: o.ratings?.deliveryPartner?.rating || null,
-            deliveredAt: o.deliveredAt,
-            restaurant: o.restaurantId?.restaurantName || o.restaurantId?.name || o.restaurantName
-          })))
+      if (ordersData.length > 0) {
+        debugLog('?? Raw orders from API:', ordersData.slice(0, 3).map(o => ({
+          id: o.orderId || o._id,
+          status: o.orderStatus || o.status,
+          restaurantRating: o.ratings?.restaurant?.rating || null,
+          deliveryPartnerRating: o.ratings?.deliveryPartner?.rating || null,
+          deliveredAt: o.deliveredAt,
+          restaurant: o.restaurantId?.restaurantName || o.restaurantId?.name || o.restaurantName
+        })))
 
-          // Transform API orders to match UI structure
-          const transformedOrders = ordersData.map(order => {
-            const createdAt = order.createdAt ? new Date(order.createdAt) : new Date()
+        // Transform API orders to match UI structure
+        const transformedOrders = ordersData.map(order => {
+          const createdAt = order.createdAt ? new Date(order.createdAt) : new Date()
 
-            // Check if cancelled by restaurant or user
-            const backendStatus = order.orderStatus || order.status
-            const isCancelled =
-              backendStatus === 'cancelled' ||
-              backendStatus === 'cancelled_by_user' ||
-              backendStatus === 'cancelled_by_restaurant' ||
-              backendStatus === 'cancelled_by_admin' ||
-              backendStatus === 'dead'
-            const cancellationReason = order.cancellationReason || ''
-            // Check cancelledBy field first, then fallback to cancellation reason pattern
-            const isRestaurantCancelled = isCancelled && (
-              order.cancelledBy === 'restaurant' ||
-              /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue|order not accepted within time limit|restaurant did not respond/i.test(cancellationReason)
-            )
-            const isUserCancelled = isCancelled && order.cancelledBy === 'user'
-            const isDead = backendStatus === 'dead'
+          // Check if cancelled by restaurant or user
+          const backendStatus = order.orderStatus || order.status
+          const isCancelled =
+            backendStatus === 'cancelled' ||
+            backendStatus === 'cancelled_by_user' ||
+            backendStatus === 'cancelled_by_restaurant' ||
+            backendStatus === 'cancelled_by_admin' ||
+            backendStatus === 'dead'
+          const cancellationReason = order.cancellationReason || ''
+          // Check cancelledBy field first, then fallback to cancellation reason pattern
+          const isRestaurantCancelled = isCancelled && (
+            order.cancelledBy === 'restaurant' ||
+            /rejected by restaurant|restaurant rejected|restaurant cancelled|restaurant is too busy|item not available|outside delivery area|kitchen closing|technical issue|order not accepted within time limit|restaurant did not respond/i.test(cancellationReason)
+          )
+          const isUserCancelled = isCancelled && order.cancelledBy === 'user'
+          const isDead = backendStatus === 'dead'
 
-            // Get original status from backend before transformation
-            const originalStatus = backendStatus
-            const restaurantRating = order.ratings?.restaurant?.rating || null
-            const deliveryPartnerRating = order.ratings?.deliveryPartner?.rating || null
+          // Get original status from backend before transformation
+          const originalStatus = backendStatus
+          const restaurantRating = order.ratings?.restaurant?.rating || null
+          const deliveryPartnerRating = order.ratings?.deliveryPartner?.rating || null
 
-            return {
-              id: order._id?.toString() || order.orderId || `ORD-${order._id}`,
-              mongoId: order._id,
-              orderId: order.orderId || order._id?.toString(), // Keep orderId for display
-              status: isRestaurantCancelled ? 'restaurant_cancelled' : getOrderStatus({ ...order, status: backendStatus }),
-              originalStatus: originalStatus, // Keep original status for reference
-              createdAt: createdAt.toISOString(),
-              address: order.address || order.deliveryAddress || {},
-              items: (order.items || []).map(item => ({
-                itemId: item.itemId || item._id || item.id,
-                name: item.name || item.foodName || 'Item',
-                variantName: item.variantName || '',
-                quantity: item.quantity || 1,
-                price: item.price || 0,
-                image: item.image || null,
-                description: item.description || null,
-                isVeg: item.isVeg === true || item.foodType === 'Veg' || item.category === 'veg' || item.type === 'veg',
-                _id: item._id || item.id,
-                id: item.id || item._id
-              })),
-              total: order.pricing?.total || order.total || 0,
-              subtotal: order.pricing?.subtotal || 0,
-              deliveryFee: order.pricing?.deliveryFee || 0,
-              tax: order.pricing?.tax || 0,
-              pricing: order.pricing || {}, // Keep full pricing object for discounts, coupons
-              payment: order.payment || {},
-              paymentMethod: order.payment?.method || order.paymentMethod,
-              restaurant: order.restaurantId?.restaurantName || order.restaurantId?.name || order.restaurantName || 'Restaurant',
-              restaurantId: order.restaurantId?._id || order.restaurantId,
-              restaurantSlug: order.restaurantId?.slug || null,
-              restaurantImage: order.restaurantId?.profileImage?.url || order.restaurantId?.profileImage || null,
-              restaurantLocation: order.restaurantId?.location?.area || order.restaurantId?.location?.city || order.address?.city || order.deliveryAddress?.city || '',
-              restaurantRating,
-              deliveryPartnerRating,
-              ratings: order.ratings || {},
-              rating: restaurantRating || null,
-              review: order.review || null,
-              tracking: order.tracking || {},
-              cancellationReason: cancellationReason,
-              isRestaurantCancelled: isRestaurantCancelled,
-              isUserCancelled: isUserCancelled,
-              isDead: isDead,
-              cancelledBy: order.cancelledBy,
-              eta: order.eta || { min: order.estimatedDeliveryTime || 30, max: order.estimatedDeliveryTime || 30 },
-              estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
-              preparationTime: order.preparationTime || 0,
-              deliveredAt: order.deliveredAt || null,
-              deliveryPartnerId: order.deliveryPartnerId?._id || order.deliveryPartnerId || null,
-              deliveryPartnerName: order.deliveryPartnerId?.name || order.deliveryPartnerName || null,
-              deliveryPartnerPhone: order.deliveryPartnerId?.phone || order.deliveryPartnerPhone || null,
-              note: order.note || null
-            }
-          })
+          return {
+            id: order._id?.toString() || order.orderId || `ORD-${order._id}`,
+            mongoId: order._id,
+            orderId: order.orderId || order._id?.toString(), // Keep orderId for display
+            status: isRestaurantCancelled ? 'restaurant_cancelled' : getOrderStatus({ ...order, status: backendStatus }),
+            originalStatus: originalStatus, // Keep original status for reference
+            createdAt: createdAt.toISOString(),
+            address: order.address || order.deliveryAddress || {},
+            items: (order.items || []).map(item => ({
+              itemId: item.itemId || item._id || item.id,
+              name: item.name || item.foodName || 'Item',
+              variantName: item.variantName || '',
+              quantity: item.quantity || 1,
+              price: item.price || 0,
+              image: item.image || null,
+              description: item.description || null,
+              isVeg: item.isVeg === true || item.foodType === 'Veg' || item.category === 'veg' || item.type === 'veg',
+              _id: item._id || item.id,
+              id: item.id || item._id
+            })),
+            total: order.pricing?.total || order.total || 0,
+            subtotal: order.pricing?.subtotal || 0,
+            deliveryFee: order.pricing?.deliveryFee || 0,
+            tax: order.pricing?.tax || 0,
+            pricing: order.pricing || {}, // Keep full pricing object for discounts, coupons
+            payment: order.payment || {},
+            paymentMethod: order.payment?.method || order.paymentMethod,
+            restaurant: order.restaurantId?.restaurantName || order.restaurantId?.name || order.restaurantName || 'Restaurant',
+            restaurantId: order.restaurantId?._id || order.restaurantId,
+            restaurantSlug: order.restaurantId?.slug || null,
+            restaurantImage: order.restaurantId?.profileImage?.url || order.restaurantId?.profileImage || null,
+            restaurantLocation: order.restaurantId?.location?.area || order.restaurantId?.location?.city || order.address?.city || order.deliveryAddress?.city || '',
+            restaurantRating,
+            deliveryPartnerRating,
+            ratings: order.ratings || {},
+            rating: restaurantRating || null,
+            review: order.review || null,
+            tracking: order.tracking || {},
+            cancellationReason: cancellationReason,
+            isRestaurantCancelled: isRestaurantCancelled,
+            isUserCancelled: isUserCancelled,
+            isDead: isDead,
+            cancelledBy: order.cancelledBy,
+            eta: order.eta || { min: order.estimatedDeliveryTime || 30, max: order.estimatedDeliveryTime || 30 },
+            estimatedDeliveryTime: order.estimatedDeliveryTime || 30,
+            preparationTime: order.preparationTime || 0,
+            deliveredAt: order.deliveredAt || null,
+            deliveryPartnerId: order.deliveryPartnerId?._id || order.deliveryPartnerId || null,
+            deliveryPartnerName: order.deliveryPartnerId?.name || order.deliveryPartnerName || null,
+            deliveryPartnerPhone: order.deliveryPartnerId?.phone || order.deliveryPartnerPhone || null,
+            note: order.note || null
+          }
+        })
 
-          // Sort by date (newest first)
-          transformedOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        // Sort by date (newest first)
+        transformedOrders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
-          debugLog('? Orders fetched and transformed:', {
-            total: transformedOrders.length,
-            delivered: transformedOrders.filter(o => o.status === 'delivered' || o.originalStatus === 'delivered').length,
-            withRating: transformedOrders.filter(o => o.restaurantRating && (!o.deliveryPartnerId || o.deliveryPartnerRating)).length,
-            sample: transformedOrders.slice(0, 2).map(o => ({
-              id: o.id,
-              status: o.status,
-              originalStatus: o.originalStatus,
-              restaurantRating: o.restaurantRating,
-              deliveryPartnerRating: o.deliveryPartnerRating,
-              deliveredAt: o.deliveredAt
-            }))
-          })
+        debugLog('? Orders fetched and transformed:', {
+          total: transformedOrders.length,
+          delivered: transformedOrders.filter(o => o.status === 'delivered' || o.originalStatus === 'delivered').length,
+          withRating: transformedOrders.filter(o => o.restaurantRating && (!o.deliveryPartnerId || o.deliveryPartnerRating)).length,
+          sample: transformedOrders.slice(0, 2).map(o => ({
+            id: o.id,
+            status: o.status,
+            originalStatus: o.originalStatus,
+            restaurantRating: o.restaurantRating,
+            deliveryPartnerRating: o.deliveryPartnerRating,
+            deliveredAt: o.deliveredAt
+          }))
+        })
 
-          setOrders(transformedOrders)
-        } else {
-          debugLog('?? No orders data in response')
-          setOrders([])
-        }
-      } catch (error) {
-        debugError('Error fetching user orders:', error)
-        let errorMessage = 'Failed to load orders'
-        if (error?.response?.status === 401) {
-          errorMessage = 'Please login to view your orders'
-        } else if (error?.response?.data?.message) {
-          errorMessage = error.response.data.message
-        }
-        toast.error(errorMessage)
+        setOrders(transformedOrders)
+      } else {
+        debugLog('?? No orders data in response')
         setOrders([])
-      } finally {
-        setLoading(false)
       }
-    }
-
-    if (!isAuthenticated) {
+    } catch (error) {
+      debugError('Error fetching user orders:', error)
+      let errorMessage = 'Failed to load orders'
+      if (error?.response?.status === 401) {
+        errorMessage = 'Please login to view your orders'
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message
+      }
+      toast.error(errorMessage)
+      setOrders([])
+    } finally {
       setLoading(false)
-      return
     }
-
-    fetchOrders()
-
-    const pollMs = 60000
-    const pollInterval = setInterval(() => {
-      if (document.hidden || !isAuthenticated) return
-      fetchOrders()
-    }, pollMs)
-
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && isAuthenticated) fetchOrders()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-
-    return () => {
-      clearInterval(pollInterval)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
-  }, [isAuthenticated])
+  }
 
   // Format date helper
   const formatDate = (dateString) => {
@@ -699,7 +708,7 @@ Order again from this restaurant in the ${companyName} app.`
     }
   }
 
-  if (loading) {
+  if (loading && mainTab === 'normal') {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24">
         <div className="bg-white dark:bg-[#121212] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b dark:border-gray-800">
@@ -715,78 +724,111 @@ Order again from this restaurant in the ${companyName} app.`
     )
   }
 
-  if (orders.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24">
-        <div className="bg-white dark:bg-[#121212] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b dark:border-gray-800">
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24 font-sans">
+      {/* Header */}
+      <div className="bg-white dark:bg-[#121212] p-4 shadow-sm sticky top-0 z-10 border-b dark:border-gray-800">
+        <div className="flex items-center">
           <Link to="/user">
             <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300 cursor-pointer" />
           </Link>
           <h1 className="ml-4 text-xl font-semibold text-gray-800 dark:text-gray-100">Your Orders</h1>
         </div>
-        <div className="px-4 py-8 text-center text-gray-600 dark:text-gray-400">
-          <p>You haven't placed any orders yet</p>
-          <Link to="/user">
-            <button className="mt-4 text-primary font-medium">Start Ordering</button>
-          </Link>
-        </div>
-      </div>
-    )
-  }
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24 font-sans">
-      {/* Header */}
-      <div className="bg-white dark:bg-[#121212] p-4 flex items-center shadow-sm sticky top-0 z-10 border-b dark:border-gray-800">
-        <Link to="/user">
-          <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-300 cursor-pointer" />
-        </Link>
-        <h1 className="ml-4 text-xl font-semibold text-gray-800 dark:text-gray-100">Your Orders</h1>
-      </div>
-
-      {/* Search Bar */}
-      <div className="p-4 bg-white dark:bg-[#121212] mt-1 border-b dark:border-gray-800">
-        <div className="flex items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 shadow-sm">
-          <Search className="w-5 h-5 text-primary" />
-          <input
-            type="text"
-            placeholder="Search by restaurant or dish"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 ml-3 bg-transparent outline-none text-gray-600 dark:text-gray-300 placeholder-gray-400"
-          />
+        {/* Main Tabs */}
+        <div className="flex mt-4 space-x-6 border-b dark:border-gray-800">
+          <button
+            onClick={() => setMainTab('normal')}
+            className={`pb-3 text-sm font-medium transition-colors relative ${mainTab === 'normal' ? 'text-primary' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
+            Normal Orders
+            {mainTab === 'normal' && (
+              <motion.div layoutId="mainTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-md" />
+            )}
+          </button>
+          <button
+            onClick={() => setMainTab('tiffin')}
+            className={`pb-3 text-sm font-medium transition-colors relative ${mainTab === 'tiffin' ? 'text-primary' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+          >
+            Tiffin Tracking
+            {mainTab === 'tiffin' && (
+              <motion.div layoutId="mainTabIndicator" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-md" />
+            )}
+          </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white dark:bg-[#121212] px-4 pt-3 flex gap-6 border-b dark:border-gray-800 sticky top-[60px] z-10 shadow-sm">
-        <button 
-          onClick={() => setActiveTab('today')}
-          className={`pb-3 text-[15px] font-semibold transition-colors relative ${activeTab === 'today' ? 'text-primary' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-300'}`}
-        >
-          Today's Orders
-          {activeTab === 'today' && (
-            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-primary rounded-t-md" />
+      {mainTab === 'tiffin' && (
+        <div className="p-4">
+          {tiffinLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : tiffinDeliveries.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-20 h-20 bg-gray-50 dark:bg-[#1a1a1a] rounded-full flex items-center justify-center mb-4">
+                <Clock className="w-10 h-10 text-gray-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">No Active Tiffins</h2>
+              <p className="text-gray-500 dark:text-gray-400 max-w-[240px]">You don't have any active tiffin deliveries for today.</p>
+            </div>
+          ) : (
+            tiffinDeliveries.map(delivery => (
+              <TiffinTrackingCard key={delivery._id} delivery={delivery} />
+            ))
           )}
-        </button>
-        <button 
-          onClick={() => setActiveTab('past')}
-          className={`pb-3 text-[15px] font-semibold transition-colors relative ${activeTab === 'past' ? 'text-primary' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-300'}`}
-        >
-          Order History
-          {activeTab === 'past' && (
-            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-primary rounded-t-md" />
-          )}
-        </button>
-      </div>
+        </div>
+      )}
 
-      {/* Orders List */}
-      <div className="px-4 py-2 space-y-4">
-        {filteredOrders.length === 0 ? (
-          <div className="bg-white dark:bg-[#121212] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-8 text-center">
-            <p className="text-gray-600 dark:text-gray-400">No orders found matching your search</p>
-          </div>
-        ) : (
+      {mainTab === 'normal' && (
+        <>
+              {/* Search Bar */}
+              <div className="p-4 bg-white dark:bg-[#121212] mt-1 border-b dark:border-gray-800">
+                <div className="flex items-center bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 shadow-sm">
+                  <Search className="w-5 h-5 text-primary" />
+                  <input
+                    type="text"
+                    placeholder="Search by restaurant or dish"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 ml-3 bg-transparent outline-none text-gray-600 dark:text-gray-300 placeholder-gray-400"
+                  />
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div className="bg-white dark:bg-[#121212] px-4 pt-3 flex gap-6 border-b dark:border-gray-800 sticky top-[110px] z-10 shadow-sm">
+                <button 
+                  onClick={() => setActiveTab('today')}
+                  className={`pb-3 text-[15px] font-semibold transition-colors relative ${activeTab === 'today' ? 'text-primary' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-300'}`}
+                >
+                  Today's Orders
+                  {activeTab === 'today' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-primary rounded-t-md" />
+                  )}
+                </button>
+                <button 
+                  onClick={() => setActiveTab('past')}
+                  className={`pb-3 text-[15px] font-semibold transition-colors relative ${activeTab === 'past' ? 'text-primary' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-300'}`}
+                >
+                  Order History
+                  {activeTab === 'past' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-primary rounded-t-md" />
+                  )}
+                </button>
+              </div>
+
+              {/* Orders List */}
+              <div className="px-4 py-2 space-y-4">
+                {orders.length === 0 ? (
+                  <div className="bg-white dark:bg-[#121212] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-8 text-center">
+                    <p className="text-gray-600 dark:text-gray-400">No orders found</p>
+                  </div>
+                ) : filteredOrders.length === 0 ? (
+                  <div className="bg-white dark:bg-[#121212] rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 p-8 text-center">
+                    <p className="text-gray-600 dark:text-gray-400">No orders found matching your search</p>
+                  </div>
+                ) : (
           filteredOrders.map((order) => {
             // Check payment method - COD/wallet orders have 'pending' status which is normal
             const isCodOrWallet = order.payment?.method === 'cash' ||
@@ -1143,6 +1185,8 @@ Order again from this restaurant in the ${companyName} app.`
           })
         )}
       </div>
+      </>
+      )}
 
        {/* Footer Branding */}
       <div className="flex justify-center mt-8 mb-4">

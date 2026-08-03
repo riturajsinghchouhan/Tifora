@@ -111,13 +111,13 @@ export default function BottomNavigation() {
           {TabLabel(isActive("/food/delivery/pocket"), "Pocket")}
         </button>
 
-        {/* Tiffin Route */}
+        {/* Tiffins Route */}
         <button
-          onClick={() => navigate("/food/delivery/tiffin-route")}
+          onClick={() => navigate("/food/delivery/tiffin")}
           className="flex flex-col items-center gap-1.5 p-2.5"
         >
-          <Package className={`w-6 h-6 ${isActive("/food/delivery/tiffin-route") ? "text-[var(--dv-primary)]" : "text-gray-500"}`} />
-          {TabLabel(isActive("/food/delivery/tiffin-route"), "Tiffin")}
+          <Package className={`w-6 h-6 ${isActive("/food/delivery/tiffin") ? "text-[var(--dv-primary)]" : "text-gray-500"}`} />
+          {TabLabel(isActive("/food/delivery/tiffin"), "Tiffins")}
         </button>
 
         {/* Trip History */}

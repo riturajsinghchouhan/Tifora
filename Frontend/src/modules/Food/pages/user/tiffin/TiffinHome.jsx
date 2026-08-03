@@ -135,7 +135,7 @@ export default function TiffinHome() {
                                 <div className="flex-1 w-full">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <span className="text-xs font-semibold text-gray-500">{plan.restaurantName || 'Featured Kitchen'}</span>
+                                            <span className="text-xs font-semibold text-gray-500">{plan.restaurantId?.restaurantName || plan.restaurantId?.name || plan.restaurantName || "Renuka's Kitchen"}</span>
                                             <h3 className="font-bold text-gray-900 text-base group-hover:text-[#be123c] transition-colors">{plan.name}</h3>
                                         </div>
                                         <div className="text-right">

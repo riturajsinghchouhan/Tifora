@@ -31,11 +31,12 @@ import ActionSlider from '@/modules/DeliveryV2/components/ui/ActionSlider';
 import PocketV2 from '@/modules/DeliveryV2/pages/PocketV2';
 import HistoryV2 from '@/modules/DeliveryV2/pages/HistoryV2';
 import ProfileV2 from '@/modules/DeliveryV2/pages/ProfileV2';
+import TiffinDeliverySection from '@/modules/DeliveryV2/pages/tiffin/TiffinDeliverySection';
 
 // Icons
 import { 
   Bell, HelpCircle, AlertTriangle, 
-  Wallet, History, User as UserIcon, LayoutGrid,
+  Wallet, History, User as UserIcon, LayoutGrid, Layers, UtensilsCrossed,
   Plus, Minus, Navigation2, Navigation, Target, Play, CheckCircle2, Clock, ChevronDown,
   Contact, Package, Phone, MapPin
 } from 'lucide-react';
@@ -1291,15 +1292,13 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                 <motion.div animate={{ x: isOnline ? 59 : 0 }} className="absolute left-1 w-6 h-6 bg-white rounded-full shadow-sm" />
               </button>
 
-              {/* DEV SIMULATION TOGGLE */}
-              {import.meta.env.DEV && (
-                 <button 
-                   onClick={() => setIsSimMode(!isSimMode)}
-                   className={`px-3 h-8 rounded-lg text-[9px] font-black border transition-all ${isSimMode ? 'bg-orange-500 border-orange-400 text-white animate-pulse' : 'bg-white/10 border-white/20 text-white/40'}`}
-                 >
-                   SIM
-                 </button>
-              )}
+              {/* SIMULATION TOGGLE */}
+              <button 
+                onClick={() => setIsSimMode(!isSimMode)}
+                className={`px-3 h-8 rounded-lg text-[9px] font-black border transition-all ${isSimMode ? 'bg-orange-500 border-orange-400 text-white animate-pulse' : 'bg-white/10 border-white/20 text-white/40'}`}
+              >
+                SIM
+              </button>
            </div>
           <div className="flex items-center gap-3">
              <button onClick={() => setShowEmergencyPopup(true)} className="w-9 h-9 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20 active:scale-95 transition-all shadow-lg"><AlertTriangle className="w-4 h-4" /></button>
@@ -1424,8 +1423,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         }}
       />
 
-      {/* â”€â”€â”€ 2. MAIN CONTENT â”€â”€â”€ */}
-      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'history' || currentTab === 'profile' || currentTab === 'pocket' ? 'pt-0' : 'pt-[120px]'} no-scrollbar`}>
+      {/* ─── 2. MAIN CONTENT ─── */}
+      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'history' || currentTab === 'profile' || currentTab === 'pocket' || currentTab === 'tiffin' ? 'pt-0' : 'pt-[120px]'} no-scrollbar`}>
          {currentTab === 'feed' ? (
            <div className="absolute inset-0 top-[-120px]">
              {isOnline ? (
@@ -1457,7 +1456,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                </div>
              )}
 
-             <div className="absolute right-4 bottom-28 md:bottom-32 flex flex-col gap-4 z-[120]">
+             <div className="absolute right-4 bottom-40 md:bottom-48 flex flex-col gap-4 z-[400]">
                 <div className="flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
                    <button onClick={() => setZoom(z => Math.min(22, z + 1))} className="p-3 hover:bg-gray-50 border-b border-gray-100 text-gray-900 active:scale-90 transition-all" aria-label="Zoom in"><Plus className="w-5 h-5 stroke-[2.75]" /></button>
                    <button onClick={() => setZoom(z => Math.max(8, z - 1))} className="p-3 hover:bg-gray-50 text-gray-900 active:scale-90 transition-all" aria-label="Zoom out"><Minus className="w-5 h-5 stroke-[2.75]" /></button>
@@ -1562,6 +1561,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
               </div>
             )}
            </div>
+         ) : currentTab === 'tiffin' ? (
+           <TiffinDeliverySection />
          ) : currentTab === 'pocket' ? (
            <PocketV2 />
          ) : currentTab === 'history' ? (
@@ -1572,8 +1573,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
          {/* OVERLAYS (Persistent if active) */}
       </div>
-
-      {/* OVERLAYS (Persistent if active) - Outside flex container to avoid clipping and z-index issues */}
       {(currentTab === 'feed' || activeOrder || incomingOrder || showVerification || isModalMinimized) && (
         <AnimatePresence>
           {!isModalMinimized && (
@@ -1732,7 +1731,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                              </div>
                            )}
                         </div>
-                        <ActionSlider label="Slide to Arrive" successLabel="Arrived âœ“" disabled={!isWithinRange} onConfirm={reachDrop} color="bg-blue-600" />
+                        <ActionSlider label="Slide to Arrive" successLabel="Arrived ✓" disabled={!isWithinRange} onConfirm={reachDrop} color="bg-blue-600" />
                       </div>
                     ) : (
                       <button 
@@ -1768,7 +1767,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         </AnimatePresence>
       )}
 
-      {/* â”€â”€â”€ MODALS RESTORED FROM OLD UI â”€â”€â”€ */}
+      {/* ——— MODALS RESTORED FROM OLD UI ——— */}
       <BottomPopup isOpen={showEmergencyPopup} title="Emergency Help" onClose={() => setShowEmergencyPopup(false)}>
          <div className="grid gap-4 py-2">
            {emergencyOptions.map((opt, i) => (
@@ -1796,7 +1795,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         title="Notifications" 
         onClose={() => {
            setShowNotifications(false);
-           // Optional: refresh count if needed
         }}
       >
          <div className="flex flex-col gap-3 -mt-2 max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
@@ -1820,7 +1818,6 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                            onClick={() => {
                               markBroadcastAsRead(item.id);
                               if (item.link) {
-                                 // Handle link if present
                                  const path = item.link.startsWith('/') ? item.link : `/${item.link}`;
                                  navigate(path);
                                  setShowNotifications(false);
@@ -1851,73 +1848,76 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                   </div>
                </>
             ) : (
-               <div className="py-20 flex flex-col items-center justify-center text-center px-10">
-                  <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mb-4 border border-gray-100/50">
-                     <Bell className="w-7 h-7 text-gray-300" />
-                  </div>
-                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest leading-none mb-2">No Notifications</h3>
-                  <p className="text-xs text-gray-400 font-bold uppercase tracking-tight leading-relaxed">System notifications for order requests and updates will appear here.</p>
-               </div>
-            )}
-         </div>
-         <div className="mt-8 mb-2">
+                <div className="py-20 flex flex-col items-center justify-center text-center px-10">
+                   <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mb-4 border border-gray-100/50">
+                      <Bell className="w-7 h-7 text-gray-300" />
+                   </div>
+                   <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest leading-none mb-2">No Notifications</h3>
+                   <p className="text-xs text-gray-400 font-bold uppercase tracking-tight leading-relaxed">System notifications for order requests and updates will appear here.</p>
+                </div>
+             )}
+          </div>
+          <div className="mt-8 mb-2">
+             <button 
+                onClick={() => {
+                   setShowNotifications(false);
+                   navigate('/food/delivery/notifications');
+                }}
+                className="w-full py-4 rounded-2xl bg-gray-950 text-white text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-gray-950/20 active:scale-95 transition-all"
+             >
+                View Notification History
+             </button>
+          </div>
+       </BottomPopup>
+
+       {/* Floating Minimize/Restore Toggle - Above navbar */}
+       {isModalMinimized && (activeOrder || incomingOrder || showVerification) && (
+         <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="fixed bottom-[100px] inset-x-0 z-[300] px-6"
+         >
             <button 
-               onClick={() => {
-                  setShowNotifications(false);
-                  navigate('/food/delivery/notifications');
-               }}
-               className="w-full py-4 rounded-2xl bg-gray-950 text-white text-xs font-black uppercase tracking-[0.2em] shadow-xl shadow-gray-950/20 active:scale-95 transition-all"
+              onClick={() => setIsModalMinimized(false)}
+              className="w-full bg-gray-900/90 text-white rounded-2xl py-4 flex items-center justify-between px-6 shadow-2xl backdrop-blur-md border border-white/10"
             >
-               View Notification History
+               <div className="flex flex-col items-start gap-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                    {incomingOrders.length > 1
+                      ? `${incomingOrders.length} orders waiting`
+                      : 'Order Action Pending'}
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {incomingOrders.length > 1
+                      ? 'Tap to choose and accept'
+                      : 'Tap to open delivery panel'}
+                  </span>
+               </div>
+               <div className="bg-orange-500 p-2 rounded-xl text-white">
+                  <Plus className="w-5 h-5" />
+               </div>
             </button>
-         </div>
-      </BottomPopup>
+         </motion.div>
+       )}
 
-      {/* Floating Minimize/Restore Toggle - Above navbar */}
-      {isModalMinimized && (activeOrder || incomingOrder || showVerification) && (
-        <motion.div 
-           initial={{ y: 100, opacity: 0 }}
-           animate={{ y: 0, opacity: 1 }}
-           className="fixed bottom-[100px] inset-x-0 z-[300] px-6"
-        >
-           <button 
-             onClick={() => setIsModalMinimized(false)}
-             className="w-full bg-gray-900/90 text-white rounded-2xl py-4 flex items-center justify-between px-6 shadow-2xl backdrop-blur-md border border-white/10"
-           >
-              <div className="flex flex-col items-start gap-0.5">
-                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                   {incomingOrders.length > 1
-                     ? `${incomingOrders.length} orders waiting`
-                     : 'Order Action Pending'}
-                 </span>
-                 <span className="text-xs font-bold uppercase tracking-wider">
-                   {incomingOrders.length > 1
-                     ? 'Tap to choose and accept'
-                     : 'Tap to open delivery panel'}
-                 </span>
-              </div>
-              <div className="bg-orange-500 p-2 rounded-xl text-white">
-                 <Plus className="w-5 h-5" />
-              </div>
-           </button>
-        </motion.div>
-      )}
-
-      {/* â”€â”€â”€ 3. BOTTOM NAV (Fixed - Compact Pro) â”€â”€â”€ */}
-      <div className="bg-white border-t border-gray-100 px-8 py-3 pb-6 flex justify-between items-center z-[200] shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-         <button onClick={() => navigate('/food/delivery/feed')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'feed' ? 'text-gray-950 scale-110' : 'text-gray-400 opacity-70'}`}>
-            <LayoutGrid className="w-6 h-6" /><span className="text-[11px] font-medium font-sans">Feed</span>
-         </button>
-         <button onClick={() => navigate('/food/delivery/pocket')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'pocket' ? 'text-gray-950 scale-110' : 'text-gray-400 opacity-70'}`}>
-            <Wallet className="w-6 h-6" /><span className="text-[11px] font-medium font-sans">Pocket</span>
-         </button>
-         <button onClick={() => navigate('/food/delivery/history')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'history' ? 'text-gray-950 scale-110' : 'text-gray-400 opacity-70'}`}>
-            <History className="w-6 h-6" /><span className="text-[11px] font-medium font-sans">Trip History</span>
-         </button>
-         <button onClick={() => navigate('/food/delivery/profile')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'profile' ? 'text-gray-950 scale-110' : 'text-gray-400 opacity-70'}`}>
-            <UserIcon className="w-6 h-6" /><span className="text-[11px] font-medium font-sans">Profile</span>
-         </button>
-      </div>
-    </div>
-  );
-}
+       {/* ─── 3. BOTTOM NAV (Fixed - Compact Pro) ─── */}
+       <div className="bg-white border-t border-gray-100 px-4 py-2.5 pb-6 flex justify-between items-center z-[200] shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+          <button onClick={() => navigate('/food/delivery/feed')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'feed' ? 'text-gray-950 scale-105 font-bold' : 'text-gray-400 opacity-70'}`}>
+             <LayoutGrid className="w-5 h-5" /><span className="text-[11px] font-medium font-sans">Feed</span>
+          </button>
+          <button onClick={() => navigate('/food/delivery/tiffin')} className={`flex flex-col items-center gap-1 transition-all relative ${currentTab === 'tiffin' ? 'text-[#0ea5e9] scale-105 font-bold' : 'text-gray-400 opacity-70'}`}>
+             <Layers className={`w-5 h-5 ${currentTab === 'tiffin' ? 'text-[#0ea5e9]' : ''}`} /><span className="text-[11px] font-medium font-sans">Tiffins</span>
+          </button>
+          <button onClick={() => navigate('/food/delivery/pocket')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'pocket' ? 'text-gray-950 scale-105 font-bold' : 'text-gray-400 opacity-70'}`}>
+             <Wallet className="w-5 h-5" /><span className="text-[11px] font-medium font-sans">Pocket</span>
+          </button>
+          <button onClick={() => navigate('/food/delivery/history')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'history' ? 'text-gray-950 scale-105 font-bold' : 'text-gray-400 opacity-70'}`}>
+             <History className="w-5 h-5" /><span className="text-[11px] font-medium font-sans">Trip History</span>
+          </button>
+          <button onClick={() => navigate('/food/delivery/profile')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'profile' ? 'text-gray-950 scale-105 font-bold' : 'text-gray-400 opacity-70'}`}>
+             <UserIcon className="w-5 h-5" /><span className="text-[11px] font-medium font-sans">Profile</span>
+          </button>
+       </div>
+     </div>
+   );
+ }

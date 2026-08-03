@@ -11,6 +11,7 @@ const SignupStep1 = lazy(() => import("./pages/auth/SignupStep1"))
 const SignupStep2 = lazy(() => import("./pages/auth/SignupStep2"))
 const TiffinRouteList = lazy(() => import("./pages/tiffin/TiffinRouteList"))
 const TiffinDropoff = lazy(() => import("./pages/tiffin/TiffinDropoff"))
+const TiffinNavigationPage = lazy(() => import("./pages/tiffin/TiffinNavigationPage"))
 
 // V2 Pages
 import DeliveryHomeV2 from './pages/DeliveryHomeV2';
@@ -53,11 +54,13 @@ const DeliveryV2Router = () => {
         {/* Protected Core Routes */}
         <Route path="/" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />
         <Route path="/feed" element={<ProtectedRoute><DeliveryHomeV2 tab="feed" /></ProtectedRoute>} />
+        <Route path="/tiffin" element={<ProtectedRoute><DeliveryHomeV2 tab="tiffin" /></ProtectedRoute>} />
         <Route path="/pocket" element={<ProtectedRoute><DeliveryHomeV2 tab="pocket" /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><DeliveryHomeV2 tab="history" /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><DeliveryHomeV2 tab="profile" /></ProtectedRoute>} />
-        <Route path="/tiffin-route" element={<ProtectedRoute><TiffinRouteList /></ProtectedRoute>} />
+        <Route path="/tiffin-route" element={<ProtectedRoute><DeliveryHomeV2 tab="tiffin" /></ProtectedRoute>} />
         <Route path="/tiffin-dropoff/:id" element={<ProtectedRoute><TiffinDropoff /></ProtectedRoute>} />
+        <Route path="/tiffin-nav/:id" element={<ProtectedRoute><TiffinNavigationPage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsV2 /></ProtectedRoute>} />
         <Route path="/profile/details" element={<ProtectedRoute><ProfileDetailsV2 /></ProtectedRoute>} />
         <Route path="/profile/bank" element={<ProtectedRoute><ProfileBankV2 /></ProtectedRoute>} />

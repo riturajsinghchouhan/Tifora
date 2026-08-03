@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Calendar, CreditCard, Wallet, ShieldCheck, Clock } from 'lucide-react';
 import api from '@food/api';
+import { initRazorpayPayment } from '@food/utils/razorpay';
 
 export default function TiffinCheckout() {
     const location = useLocation();
@@ -44,11 +45,53 @@ export default function TiffinCheckout() {
                 paymentMethod
             };
 
-            await api.post('/user/tiffin/purchase', payload).catch(() => null);
-
-            alert('Tiffin Subscription activated successfully!');
-            navigate('/food/user/tiffin/my-subscriptions');
+            const response = await api.post('/user/tiffin/purchase', payload);
+            
+            if (paymentMethod === 'razorpay' && response.data?.razorpay) {
+                const rzData = response.data.razorpay;
+                const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+                
+                initRazorpayPayment({
+                    key: razorpayKey,
+                    amount: rzData.amount,
+                    currency: rzData.currency,
+                    name: 'Tifora Tiffin',
+                    description: `Subscription for ${plan.name}`,
+                    order_id: rzData.orderId,
+                    prefill: {
+                        name: 'Foodelo User',
+                        email: 'user@example.com',
+                        contact: '9999999999'
+                    },
+                    theme: {
+                        color: '#be123c'
+                    },
+                    handler: async function (paymentResponse) {
+                        try {
+                            const verifyPayload = {
+                                razorpayOrderId: paymentResponse.razorpay_order_id,
+                                razorpayPaymentId: paymentResponse.razorpay_payment_id,
+                                razorpaySignature: paymentResponse.razorpay_signature,
+                                subscriptionTemp: response.data.subscriptionTemp
+                            };
+                            
+                            const verifyRes = await api.post('/user/tiffin/purchase/verify', verifyPayload);
+                            if (verifyRes.data.success) {
+                                alert('Tiffin Subscription activated successfully!');
+                                navigate('/food/user/tiffin/my-subscriptions');
+                            }
+                        } catch (verifyErr) {
+                            console.error('Verification failed', verifyErr);
+                            alert('Payment verification failed');
+                        }
+                    }
+                });
+            } else {
+                alert('Tiffin Subscription activated successfully!');
+                navigate('/food/user/tiffin/my-subscriptions');
+            }
         } catch (err) {
+            console.error('Checkout failed', err);
             alert('Failed to complete subscription');
         } finally {
             setSubmitting(false);

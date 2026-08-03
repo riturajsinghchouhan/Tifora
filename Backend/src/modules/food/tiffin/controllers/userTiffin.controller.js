@@ -11,7 +11,7 @@ export const getAvailablePlans = async (req, res) => {
         const { restaurantId } = req.params;
         const filter = restaurantId ? { restaurantId, isActive: true } : { isActive: true };
         const plans = await TiffinPlan.find(filter)
-            .populate('restaurantId', 'name address location image logo')
+            .populate('restaurantId', 'restaurantName name address location profileImage logo phone')
             .sort({ createdAt: -1 });
         res.status(200).json({ success: true, data: plans });
     } catch (error) {
@@ -24,7 +24,7 @@ export const getPlanById = async (req, res) => {
     try {
         const { planId } = req.params;
         const plan = await TiffinPlan.findById(planId)
-            .populate('restaurantId', 'name address location image logo');
+            .populate('restaurantId', 'restaurantName name address location profileImage logo phone');
         if (!plan) {
             return res.status(404).json({ success: false, message: 'Tiffin Plan not found' });
         }
@@ -35,6 +35,9 @@ export const getPlanById = async (req, res) => {
     }
 };
 
+import { createRazorpayOrder, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
+import { getIO, rooms } from '../../../../config/socket.js';
+
 export const purchaseSubscription = async (req, res) => {
     try {
         const userId = getUserId(req);
@@ -42,7 +45,7 @@ export const purchaseSubscription = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized: User not authenticated' });
         }
 
-        const { restaurantId, planId, startDate, deliveryAddress, paymentId, amountPaid } = req.body;
+        const { restaurantId, planId, startDate, deliveryAddress, paymentId, amountPaid, paymentMethod } = req.body;
 
         const plan = await TiffinPlan.findById(planId);
         if (!plan || !plan.isActive) {
@@ -53,6 +56,32 @@ export const purchaseSubscription = async (req, res) => {
         const end = new Date(start);
         end.setDate(end.getDate() + plan.durationDays);
 
+        const amountToPay = amountPaid || plan.price;
+
+        // If Razorpay, just create order and return to frontend
+        if (paymentMethod === 'razorpay') {
+            const amountPaise = Math.round(amountToPay * 100);
+            const rzOrder = await createRazorpayOrder(amountPaise, 'INR', `tiffin_plan_${planId}`);
+            
+            return res.status(200).json({
+                success: true,
+                razorpay: {
+                    orderId: rzOrder.id,
+                    amount: amountPaise,
+                    currency: 'INR'
+                },
+                subscriptionTemp: {
+                    restaurantId: restaurantId || plan.restaurantId,
+                    planId,
+                    startDate: start,
+                    endDate: end,
+                    deliveryAddress,
+                    amountPaid: amountToPay
+                }
+            });
+        }
+
+        // For non-razorpay (e.g. wallet/offline)
         const newSubscription = new TiffinSubscription({
             userId,
             restaurantId: restaurantId || plan.restaurantId,
@@ -62,16 +91,96 @@ export const purchaseSubscription = async (req, res) => {
             deliveryAddress,
             paymentId: paymentId || `OFFLINE_${Date.now()}`,
             paymentStatus: 'paid',
-            amountPaid: amountPaid || plan.price
+            amountPaid: amountToPay
         });
 
         await newSubscription.save();
+        await generateInitialDeliveries(newSubscription, plan, start);
+
         res.status(201).json({ success: true, data: newSubscription, message: 'Subscription purchased successfully' });
     } catch (error) {
         console.error('Error purchasing subscription:', error);
         res.status(500).json({ success: false, message: 'Server error purchasing subscription' });
     }
 };
+
+export const verifyTiffinPayment = async (req, res) => {
+    try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+        const { razorpayOrderId, razorpayPaymentId, razorpaySignature, subscriptionTemp } = req.body;
+        
+        if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+            return res.status(400).json({ success: false, message: 'Missing Razorpay payload' });
+        }
+
+        const isValid = verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+        if (!isValid) {
+            return res.status(400).json({ success: false, message: 'Invalid payment signature' });
+        }
+
+        const plan = await TiffinPlan.findById(subscriptionTemp.planId);
+        if (!plan) return res.status(404).json({ success: false, message: 'Plan not found' });
+
+        const newSubscription = new TiffinSubscription({
+            userId,
+            restaurantId: subscriptionTemp.restaurantId,
+            planId: subscriptionTemp.planId,
+            startDate: subscriptionTemp.startDate,
+            endDate: subscriptionTemp.endDate,
+            deliveryAddress: subscriptionTemp.deliveryAddress,
+            paymentId: null, // Could link to a transaction doc if needed
+            paymentStatus: 'paid',
+            amountPaid: subscriptionTemp.amountPaid,
+            status: 'active'
+        });
+
+        await newSubscription.save();
+        await generateInitialDeliveries(newSubscription, plan, new Date(subscriptionTemp.startDate));
+
+        try {
+            const io = getIO();
+            const room = rooms.restaurant(subscriptionTemp.restaurantId);
+            io.to(room).emit('new-tiffin-subscription', { subscription: newSubscription });
+        } catch (err) {
+            console.error('Failed to emit socket:', err);
+        }
+
+        res.status(200).json({ success: true, message: 'Payment verified and subscription activated', data: newSubscription });
+    } catch (error) {
+        console.error('Error verifying tiffin payment:', error);
+        res.status(500).json({ success: false, message: 'Failed to verify payment' });
+    }
+};
+
+async function generateInitialDeliveries(newSubscription, plan, start) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startCheck = new Date(start);
+    startCheck.setHours(0, 0, 0, 0);
+
+    if (startCheck.getTime() <= today.getTime()) {
+        try {
+            const { TiffinDelivery } = await import('../models/tiffinDelivery.model.js');
+            const mealTypes = plan.mealType === 'Both' ? ['Morning', 'Evening'] : [plan.mealType];
+            
+            for (const type of mealTypes) {
+                await TiffinDelivery.create({
+                    subscriptionId: newSubscription._id,
+                    restaurantId: newSubscription.restaurantId,
+                    userId: newSubscription.userId,
+                    deliveryAddress: newSubscription.deliveryAddress,
+                    type,
+                    date: today,
+                    status: 'pending'
+                });
+            }
+        } catch (err) {
+            console.error('Failed to generate initial tiffin deliveries:', err);
+        }
+    }
+}
 
 export const getMySubscriptions = async (req, res) => {
     try {
@@ -137,5 +246,35 @@ export const resumeSubscription = async (req, res) => {
     } catch (error) {
         console.error('Error resuming subscription:', error);
         res.status(500).json({ success: false, message: 'Server error resuming subscription' });
+    }
+};
+
+export const getMyTiffinDeliveriesUser = async (req, res) => {
+    try {
+        const userId = getUserId(req);
+        if (!userId) {
+            return res.status(401).json({ success: false, message: 'Unauthorized: User not authenticated' });
+        }
+        
+        const { TiffinDelivery } = await import('../models/tiffinDelivery.model.js');
+        
+        // Fetch today's deliveries or active deliveries for this user
+        // We will fetch deliveries for the last 3 days to be safe and upcoming ones
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+        const deliveries = await TiffinDelivery.find({ 
+            userId,
+            date: { $gte: threeDaysAgo }
+        })
+        .populate('restaurantId', 'name address phone image logo')
+        .populate('subscriptionId', 'planId') // To get plan details if needed
+        .populate('assignedTo', 'name phone profileImage location')
+        .sort({ date: -1, type: 1 });
+
+        res.status(200).json({ success: true, data: deliveries });
+    } catch (error) {
+        console.error('Error fetching user tiffin deliveries:', error);
+        res.status(500).json({ success: false, message: 'Server error fetching tiffin deliveries' });
     }
 };

@@ -65,6 +65,25 @@ export const adminSidebarMenu = [
   },
   {
     type: "section",
+    label: "TIFFIN MANAGEMENT",
+    items: [
+      {
+        type: "expandable",
+        label: "Tiffin Service",
+        icon: "UtensilsCrossed",
+        subItems: [
+          { label: "Tiffin Service Management", path: "/admin/food/tiffin-management" },
+          { label: "Subscription Plans", path: "/admin/food/tiffin-management?tab=plans" },
+          { label: "Customer Subscriptions", path: "/admin/food/tiffin-management?tab=subscriptions" },
+          { label: "Daily Meal Dispatch", path: "/admin/food/tiffin-management?tab=deliveries" },
+          { label: "Kitchen Partners", path: "/admin/food/tiffin-management?tab=kitchens" },
+          { label: "Delivery Payouts", path: "/admin/food/tiffin-management?tab=payouts" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "section",
     label: "RESTAURANT MANAGEMENT",
     items: [
       {

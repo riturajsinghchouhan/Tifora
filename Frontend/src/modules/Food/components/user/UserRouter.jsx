@@ -40,6 +40,7 @@ const Orders = lazy(() => import("@food/pages/user/orders/Orders"))
 const OrderTracking = lazy(() => import("@food/pages/user/orders/OrderTracking"))
 const OrderInvoice = lazy(() => import("@food/pages/user/orders/OrderInvoice"))
 const UserOrderDetails = lazy(() => import("@food/pages/user/orders/UserOrderDetails"))
+const TiffinUserTrackingMap = lazy(() => import("@food/pages/user/orders/TiffinUserTrackingMap"))
 
 // Offers
 const Offers = lazy(() => import("@food/pages/user/Offers"))
@@ -175,6 +176,14 @@ export default function UserRouter() {
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
                 <UserOrderDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="tiffin-tracking/:deliveryId"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <TiffinUserTrackingMap />
               </ProtectedRoute>
             }
           />

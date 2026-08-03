@@ -85,7 +85,7 @@ export default function TiffinPlanDetails() {
                         const fetched = res.data.data;
                         setPlan({
                             ...fetched,
-                            restaurantName: fetched.restaurantId?.name || fetched.restaurantName || 'Featured Kitchen'
+                            restaurantName: fetched.restaurantId?.restaurantName || fetched.restaurantId?.name || fetched.restaurantName || "Renuka's Kitchen"
                         });
                         if (fetched.durationDays) setSelectedDuration(fetched.durationDays);
                         if (fetched.mealType) setSelectedTiming(fetched.mealType);

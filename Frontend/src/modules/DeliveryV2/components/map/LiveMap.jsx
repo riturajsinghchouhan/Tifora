@@ -2,15 +2,14 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { 
   GoogleMap, 
   Marker, 
-  DirectionsService, 
   Polygon,
   Polyline,
-  useJsApiLoader,
   OverlayView
 } from '@react-google-maps/api';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { zoneAPI } from '@food/api';
-import { useGoogleMapsApiKey } from '@food/utils/googleMapsApiKey';
+import { loadGoogleMaps, isGoogleMapsLoaded } from '@food/utils/googleMapsLoader';
+import bikelogo from '@food/assets/bikelogo.png';
 
 const mapContainerStyle = {
   width: '100%',
@@ -43,16 +42,20 @@ const LIBRARIES = ['places', 'geometry'];
 
 export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineReceived, zoom = 12 }) => {
   const { riderLocation, activeOrder, tripStatus } = useDeliveryStore();
-  const googleMapsApiKey = useGoogleMapsApiKey();
-  
-  const { isLoaded, loadError } = useJsApiLoader(
-    {
-      id: 'delivery-live-map',
-      googleMapsApiKey: googleMapsApiKey || '__pending__',
-      libraries: LIBRARIES,
-    },
-    [googleMapsApiKey]
-  );
+  const [mapsReady, setMapsReady] = useState(isGoogleMapsLoaded());
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    if (isGoogleMapsLoaded()) {
+      setMapsReady(true);
+      return;
+    }
+    loadGoogleMaps().then(() => {
+      setMapsReady(true);
+    }).catch(() => {
+      setLoadError(true);
+    });
+  }, []);
 
   const [directions, setDirections] = useState(null);
   const [baselineDirections, setBaselineDirections] = useState(null);
@@ -164,22 +167,52 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
     }
   }, [directions, onPathReceived]);
 
-  const directionsCallback = useCallback((result, status) => {
-    if (status === 'OK' && result) {
-      setDirections(result);
-      setLastDirectionsAt(Date.now());
-      const rawPolyline = result.routes?.[0]?.overview_polyline;
-      const encodedPolyline =
-        typeof rawPolyline === 'string' ? rawPolyline : rawPolyline?.points || '';
-      if (encodedPolyline && onPolylineReceived) onPolylineReceived(encodedPolyline);
-    }
-  }, [onPolylineReceived]);
+  // --- Imperative Directions API Calls ---
+  const directionsRequestedRef = useRef('');
+  
+  useEffect(() => {
+    if (!mapsReady || !window.google?.maps) return;
+    if (!shouldUpdateRoute) return;
 
-  const baselineDirectionsCallback = useCallback((result, status) => {
-    if (status === 'OK' && result) {
-      setBaselineDirections(result);
+    if (parsedRiderLocation && targetLocation) {
+      const requestKey = `${parsedRiderLocation.lat},${parsedRiderLocation.lng}-${targetLocation.lat},${targetLocation.lng}`;
+      if (directionsRequestedRef.current === requestKey) return;
+      directionsRequestedRef.current = requestKey;
+
+      const service = new window.google.maps.DirectionsService();
+      service.route({
+        origin: parsedRiderLocation,
+        destination: targetLocation,
+        travelMode: window.google.maps.TravelMode.DRIVING
+      }, (result, status) => {
+        if (status === 'OK' && result) {
+          setDirections(result);
+          setLastDirectionsAt(Date.now());
+          const rawPolyline = result.routes?.[0]?.overview_polyline;
+          const encodedPolyline = typeof rawPolyline === 'string' ? rawPolyline : rawPolyline?.points || '';
+          if (encodedPolyline && onPolylineReceived) onPolylineReceived(encodedPolyline);
+        }
+      });
     }
-  }, []);
+  }, [mapsReady, shouldUpdateRoute, parsedRiderLocation, targetLocation, onPolylineReceived]);
+
+  const baselineRequestedRef = useRef(false);
+  useEffect(() => {
+    if (!mapsReady || !window.google?.maps) return;
+    if (restaurantPoint && customerPoint && !baselineDirections && !baselineRequestedRef.current) {
+      baselineRequestedRef.current = true;
+      const service = new window.google.maps.DirectionsService();
+      service.route({
+        origin: restaurantPoint,
+        destination: customerPoint,
+        travelMode: window.google.maps.TravelMode.DRIVING
+      }, (result, status) => {
+        if (status === 'OK' && result) {
+          setBaselineDirections(result);
+        }
+      });
+    }
+  }, [mapsReady, restaurantPoint, customerPoint, baselineDirections]);
 
   useEffect(() => {
     (async () => {
@@ -226,7 +259,7 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
       if (customerPoint) bounds.extend(customerPoint);
       if (parsedRiderLocation) bounds.extend(parsedRiderLocation);
 
-      map.fitBounds(bounds, { top: 70, right: 70, bottom: 120, left: 70 });
+      map.fitBounds(bounds, { top: 20, right: 20, bottom: 80, left: 20 });
     }
 
     if (parsedRiderLocation) {
@@ -278,19 +311,9 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
   }, [directions, parsedRiderLocation]);
 
   if (loadError) return <div className="absolute inset-0 flex items-center justify-center bg-gray-50 text-red-500 font-bold">Map Load Error</div>;
-  if (!isLoaded) return <div className="absolute inset-0 flex items-center justify-center bg-gray-50"><div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!mapsReady) return <div className="absolute inset-0 flex items-center justify-center bg-gray-50"><div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin" /></div>;
 
-  const directionsServiceOptions = (parsedRiderLocation && targetLocation) ? {
-    origin: parsedRiderLocation,
-    destination: targetLocation,
-    travelMode: 'DRIVING',
-  } : null;
 
-  const baselineServiceOptions = (restaurantPoint && customerPoint) ? {
-    origin: restaurantPoint,
-    destination: customerPoint,
-    travelMode: 'DRIVING',
-  } : null;
 
   const defaultCenter = { lat: 22.7196, lng: 75.8577 }; // Center on Indore as fallback
 
@@ -306,13 +329,7 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
         onClick={(e) => onMapClick?.(e.latLng.lat(), e.latLng.lng())}
         options={mapOptions}
       >
-        {directionsServiceOptions && shouldUpdateRoute && (
-          <DirectionsService options={directionsServiceOptions} callback={directionsCallback} />
-        )}
 
-        {baselineServiceOptions && !baselineDirections && (
-          <DirectionsService options={baselineServiceOptions} callback={baselineDirectionsCallback} />
-        )}
 
         {traveledPath.length > 0 && (
           <Polyline 
@@ -345,8 +362,8 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
 
         {parsedRiderLocation && (
           <OverlayView position={parsedRiderLocation} mapPaneName={OverlayView.MARKER_LAYER}>
-            <div style={{ transform: `translate(-50%, -50%) rotate(${parsedRiderLocation.heading || 0}deg)`, transition: 'transform 0.5s linear' }} className="relative w-[72px] h-[72px]">
-              <img src="/MapRider.png" alt="Rider" className="w-full h-full object-contain" />
+            <div style={{ transform: `translate(-50%, -50%) rotate(${parsedRiderLocation.heading || 0}deg)`, transition: 'transform 0.5s linear' }} className="relative w-[80px] h-[80px]">
+              <img src={bikelogo} alt="Rider" className="w-full h-full object-contain drop-shadow-md" />
             </div>
           </OverlayView>
         )}
