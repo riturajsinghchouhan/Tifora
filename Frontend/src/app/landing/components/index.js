@@ -1,0 +1,9 @@
+export { default as LandingNavbar } from "./LandingNavbar";
+export { default as LandingHero } from "./LandingHero";
+export { default as LandingServices } from "./LandingServices";
+export { default as LandingWhyTifora } from "./LandingWhyTifora";
+export { default as LandingHowItWorks } from "./LandingHowItWorks";
+export { default as LandingPopularPicks } from "./LandingPopularPicks";
+export { default as LandingTestimonials } from "./LandingTestimonials";
+export { default as LandingAppDownload } from "./LandingAppDownload";
+export { default as LandingFooter } from "./LandingFooter";
