@@ -1,5 +1,5 @@
 export const APP_CONFIG = {
-  NAME: 'Indian Bites',
+  NAME: 'Tifora',
   VERSION: '1.0.0',
 };
 

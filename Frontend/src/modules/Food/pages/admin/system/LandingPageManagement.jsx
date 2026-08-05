@@ -65,7 +65,7 @@ export default function LandingPageManagement() {
     under250PriceLimit: 250, 
     festBannerImages: [],
     stats: { restaurants: '3,00,000+', cities: '800+', orders: '3 billion+' },
-    appLinks: { playStore: 'https://play.google.com/store/apps/details?id=com.indian.bite.user', appStore: '' },
+    appLinks: { playStore: 'https://play.google.com/store/apps/details?id=com.tifora.user', appStore: '' },
     socialLinks: { instagram: '', twitter: '', facebook: '', linkedin: '', youtube: '' },
     footerLinks: {
       about: [
@@ -86,7 +86,7 @@ export default function LandingPageManagement() {
           { label: 'Sitemap', url: '#' }
       ]
     },
-    copyrightText: '© 2026 Indian Bites™ Ltd. All rights reserved.',
+    copyrightText: '© 2026 Tifora™ Ltd. All rights reserved.',
     heroSlides: []
   })
   const [settingsLoading, setSettingsLoading] = useState(true)
@@ -1086,7 +1086,7 @@ export default function LandingPageManagement() {
           under250PriceLimit: Number(nextSettings.under250PriceLimit) || 250,
           festBannerImages: Array.isArray(nextSettings.festBannerImages) ? nextSettings.festBannerImages : [],
           stats: nextSettings.stats || { restaurants: '3,00,000+', cities: '800+', orders: '3 billion+' },
-          appLinks: nextSettings.appLinks || { playStore: 'https://play.google.com/store/apps/details?id=com.indian.bite.user', appStore: '' },
+          appLinks: nextSettings.appLinks || { playStore: 'https://play.google.com/store/apps/details?id=com.tifora.user', appStore: '' },
           socialLinks: nextSettings.socialLinks || { instagram: '', twitter: '', facebook: '', linkedin: '', youtube: '' },
           footerLinks: nextSettings.footerLinks || {
             about: [
@@ -1107,7 +1107,7 @@ export default function LandingPageManagement() {
                 { label: 'Sitemap', url: '#' }
             ]
           },
-          copyrightText: nextSettings.copyrightText || '© 2026 Indian Bites™ Ltd. All rights reserved.',
+          copyrightText: nextSettings.copyrightText || '© 2026 Tifora™ Ltd. All rights reserved.',
           heroSlides: Array.isArray(nextSettings.heroSlides) ? nextSettings.heroSlides : []
         })
       }
@@ -2339,7 +2339,7 @@ export default function LandingPageManagement() {
 
               <div className="mb-6">
                   <Label>Copyright Text</Label>
-                  <Input value={settings.copyrightText || ''} onChange={(e) => setSettings({...settings, copyrightText: e.target.value})} placeholder="© 2026 Indian Bites™ Ltd." />
+                  <Input value={settings.copyrightText || ''} onChange={(e) => setSettings({...settings, copyrightText: e.target.value})} placeholder="© 2026 Tifora™ Ltd." />
               </div>
 
               <div className="mb-6 space-y-6 mt-8">
@@ -2347,7 +2347,7 @@ export default function LandingPageManagement() {
                 
                 {['about', 'forRestaurants', 'learnMore'].map(sectionKey => {
                   const sectionLabels = {
-                    about: 'About IB',
+                    about: 'About Tifora',
                     forRestaurants: 'For Restaurants',
                     learnMore: 'Learn More'
                   };

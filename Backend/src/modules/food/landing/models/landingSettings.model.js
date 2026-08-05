@@ -51,7 +51,7 @@ const foodLandingSettingsSchema = new mongoose.Schema(
             orders: { type: String, default: '3 billion+' }
         },
         appLinks: {
-            playStore: { type: String, default: 'https://play.google.com/store/apps/details?id=com.indian.bite.user' },
+            playStore: { type: String, default: 'https://play.google.com/store/apps/details?id=com.tifora.user' },
             appStore: { type: String, default: '' }
         },
         socialLinks: {
@@ -82,7 +82,7 @@ const foodLandingSettingsSchema = new mongoose.Schema(
         },
         copyrightText: {
             type: String,
-            default: '© 2026 Indian Bites™ Ltd. All rights reserved.'
+            default: '© 2026 Tifora™ Ltd. All rights reserved.'
         },
         heroSlides: {
             type: Array,

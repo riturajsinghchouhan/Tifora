@@ -241,7 +241,7 @@ export default function UserOrderDetails() {
         debugWarn("Could not load business settings", err)
       }
 
-      const companyName = settings.companyName || "Indian Bites"
+      const companyName = settings.companyName || "Tifora"
       const primaryColor = [220, 38, 38]
       const secondaryColor = [71, 85, 105]
       const subtotalAmount = Number(pricing.subtotal || pricing.total || 0)

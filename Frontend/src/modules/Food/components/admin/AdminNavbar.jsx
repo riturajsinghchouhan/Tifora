@@ -294,7 +294,7 @@ export default function AdminNavbar({ onMenuClick }) {
                 ) : null}
               </div>
               <span className="text-red-600 font-extrabold text-xl ml-1 tracking-tight">
-                {businessSettings?.companyName || "Indian Bites"}
+                {businessSettings?.companyName || "Tifora"}
               </span>
             </div>
           </div>

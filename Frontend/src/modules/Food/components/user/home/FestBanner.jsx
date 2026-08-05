@@ -89,7 +89,7 @@ export default function FestBanner({ isVegMode, images = [], hideFoodImages = fa
               transition={{ delay: 0.2 }}
               className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-sm font-bold"
             >
-              <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Indian Bites Missions</span>
+              <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Tifora Missions</span>
             </motion.div>
 
             <motion.div
