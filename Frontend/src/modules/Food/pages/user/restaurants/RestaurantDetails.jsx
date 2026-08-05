@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, Component, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"
-import { restaurantAPI, diningAPI, orderAPI } from "@food/api"
+import api, { restaurantAPI, diningAPI, orderAPI } from "@food/api"
 import { API_BASE_URL } from "@food/api/config"
 import { toast } from "sonner"
 import { useAppLocation } from "@food/hooks/useAppLocation"
@@ -36,6 +36,8 @@ import {
   Send,
   Mail,
   Tag,
+  Timer,
+  Calendar,
 } from "lucide-react"
 import { Button } from "@food/components/ui/button"
 import { Badge } from "@food/components/ui/badge"
@@ -2693,6 +2695,22 @@ function RestaurantDetailsContent() {
             </button>
           </div>
 
+          {/* Tiffin Plans Section */}
+          <TiffinPlansSection restaurantId={restaurant?.restaurantId || restaurant?.id || restaurant?._id} />
+
+          <div className="mt-8 mb-4 px-4 sm:px-0">
+            <div className="flex flex-col items-center text-center bg-white dark:bg-[#1f1f1f] border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-md">
+               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary mb-1.5">
+                  <Timer className="h-3.5 w-3.5" />
+                  <span className="text-[10px] font-bold uppercase tracking-wider">Restaurant Menu</span>
+               </div>
+               <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-tight leading-none">
+                  Instant Orders
+               </h2>
+               <p className="text-xs text-gray-500 mt-1 font-medium">À la carte items delivered hot & fresh.</p>
+            </div>
+          </div>
+
           {/* Filter/Category Buttons */}
           <div className="border-y border-gray-200 py-3 -mx-4 px-4">
             <div className="flex flex-col gap-3">
@@ -4224,6 +4242,101 @@ function RestaurantDetailsContent() {
           document.body
         )}
     </AnimatedPage>
+  )
+}
+
+function TiffinPlansSection({ restaurantId }) {
+  const navigate = useNavigate();
+  const [plans, setPlans] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!restaurantId) return;
+
+    const fetchPlans = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get(`/user/tiffin/plans/available/${restaurantId}`).catch(() => null);
+        if (res?.data?.success) {
+          setPlans(res.data.data);
+        } else {
+          setPlans([]);
+        }
+      } catch (err) {
+        setPlans([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPlans();
+  }, [restaurantId]);
+
+  if (loading) {
+    return (
+      <div className="mt-6 flex justify-center">
+         <div className="h-[200px] w-full animate-pulse bg-primary/5 dark:bg-primary/5 rounded-2xl border border-primary/20 dark:border-primary/20" />
+      </div>
+    );
+  }
+
+  if (!plans || plans.length === 0) {
+    return null; // Don't show the section if no plans available
+  }
+
+  return (
+    <div className="mt-6 pt-5 pb-3 px-4 sm:px-5 relative overflow-hidden rounded-3xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 shadow-md">
+      
+      <div className="flex items-center justify-between mb-4 relative z-10">
+        <div>
+           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary mb-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Subscriptions</span>
+           </div>
+           <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-tight leading-none">
+              Tiffin Plans
+           </h2>
+           <p className="text-xs text-gray-500 mt-1 font-medium">Daily & Monthly fixed-time meals</p>
+        </div>
+      </div>
+      
+      <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x relative z-10 pr-4">
+        {plans.map((plan) => (
+          <div key={plan._id} className="group min-w-[280px] w-[280px] sm:min-w-[300px] snap-center bg-white dark:bg-[#1f1f1f] rounded-2xl border border-gray-200 dark:border-gray-800 p-4 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300 relative overflow-hidden flex flex-col">
+            
+            {/* Top accent line */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-primary/40 opacity-80" />
+
+            {plan.isVegetarian && (
+               <div className="absolute top-4 right-4 flex items-center gap-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded text-[10px] border border-green-100 dark:border-green-800/50">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                  <span className="font-bold uppercase tracking-wider">Veg</span>
+               </div>
+            )}
+            
+            <h3 className="text-base font-bold text-gray-900 dark:text-white pr-14 leading-snug mt-0.5">{plan.name}</h3>
+            
+            <p className="text-[11px] text-gray-500 mt-1 line-clamp-1">{plan.itemsDescription || plan.description}</p>
+            
+            <div className="mt-2.5 pt-2.5 border-t border-dashed border-gray-200 dark:border-gray-800 flex items-end justify-between flex-1">
+               <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-widest">{plan.durationDays} Days • {plan.mealType}</span>
+                  <div className="flex items-baseline gap-1">
+                     <span className="text-xl font-black text-gray-900 dark:text-white leading-none">₹{plan.price}</span>
+                     <span className="text-[10px] font-medium text-gray-500">/plan</span>
+                  </div>
+               </div>
+               
+               <Button 
+                 className="h-8 rounded-full px-4 text-xs font-bold shadow-md shadow-primary/20 bg-primary hover:bg-primary/90 text-white border-0 transition-transform active:scale-95"
+                 onClick={() => navigate(`/food/user/tiffin/plan/${plan._id}`, { state: { plan } })}
+               >
+                 Subscribe
+               </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 

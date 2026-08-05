@@ -14,6 +14,7 @@ import {
 import api from '@food/api';
 import { toast } from 'sonner';
 import { loadGoogleMaps, isGoogleMapsLoaded } from '@food/utils/googleMapsLoader';
+import { useDeliveryNotificationContext } from '@food/context/DeliveryNotificationContext';
 import bikelogo from '@food/assets/bikelogo.png';
 
 const mapContainerStyle = {
@@ -72,6 +73,7 @@ export default function TiffinNavigationPage() {
     const [callConfirmed, setCallConfirmed] = useState(false);
     const [photoPreview, setPhotoPreview] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [sendingOtp, setSendingOtp] = useState(false);
     const [modalError, setModalError] = useState('');
 
     // Load Google Maps using singleton loader (won't conflict with LiveMap)
@@ -80,6 +82,7 @@ export default function TiffinNavigationPage() {
             setMapsReady(true);
             return;
         }
+
         loadGoogleMaps().then(() => {
             setMapsReady(true);
         }).catch(() => {
@@ -106,17 +109,64 @@ export default function TiffinNavigationPage() {
         fetchDelivery();
     }, [id, delivery]);
 
-    // Get rider GPS
+    // Get delivery notification context for live location emission
+    const { emitLocation } = useDeliveryNotificationContext();
+    const watchIdRef = useRef(null);
+    const lastEmitRef = useRef(0);
+
+    // Get rider GPS — use watchPosition for continuous tracking
     useEffect(() => {
-        if (riderCoords) return;
-        if (navigator.geolocation) {
+        if (!navigator.geolocation) {
+            setRiderCoords({ lat: 22.7196, lng: 75.8577 });
+            return;
+        }
+
+        // Get initial position quickly
+        if (!riderCoords) {
             navigator.geolocation.getCurrentPosition(
-                (pos) => setRiderCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                (pos) => setRiderCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, heading: pos.coords.heading || 0 }),
                 () => setRiderCoords({ lat: 22.7196, lng: 75.8577 }),
                 { enableHighAccuracy: true, timeout: 8000 }
             );
         }
-    }, []);
+
+        // Continuous watch for live tracking
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            (pos) => {
+                const newCoords = {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    heading: pos.coords.heading || 0,
+                    speed: pos.coords.speed || 0,
+                    accuracy: pos.coords.accuracy || null,
+                };
+                setRiderCoords(newCoords);
+
+                // Emit location via socket every 10 seconds
+                const now = Date.now();
+                if (now - lastEmitRef.current >= 10000 && id) {
+                    lastEmitRef.current = now;
+                    emitLocation({
+                        orderId: id, // deliveryId is the tracking room ID
+                        lat: newCoords.lat,
+                        lng: newCoords.lng,
+                        heading: newCoords.heading,
+                        speed: newCoords.speed,
+                        accuracy: newCoords.accuracy,
+                        status: 'on_the_way',
+                    });
+                }
+            },
+            (err) => console.warn('[TiffinNav] watchPosition error:', err.message),
+            { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+        );
+
+        return () => {
+            if (watchIdRef.current != null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+            }
+        };
+    }, [id, emitLocation]);
 
     // Parse customer coordinates
     const customerCoords = React.useMemo(() => {
@@ -163,6 +213,23 @@ export default function TiffinNavigationPage() {
             }
         );
     }, [riderCoords, customerCoords, mapsReady]);
+
+    const handleSendOtp = async () => {
+        setSendingOtp(true);
+        setModalError('');
+        try {
+            const res = await api.post(`/food/tiffin/delivery/${id}/send-otp`, {}, { contextModule: 'delivery' });
+            if (res.data?.success) {
+                // Not using toast directly since it might not be imported, or maybe it is? I'll just clear errors.
+            } else {
+                setModalError(res.data?.message || 'Failed to send OTP');
+            }
+        } catch (err) {
+            setModalError(err.response?.data?.message || 'Error sending OTP');
+        } finally {
+            setSendingOtp(false);
+        }
+    };
 
     const handleMapLoad = useCallback((mapInstance) => {
         mapRef.current = mapInstance;
@@ -350,8 +417,14 @@ export default function TiffinNavigationPage() {
                         <GoogleMap
                             mapContainerStyle={mapContainerStyle}
                             center={riderCoords || customerCoords || { lat: 22.7196, lng: 75.8577 }}
-                            zoom={14}
-                            options={mapOptions}
+                            zoom={18}
+                            tilt={60}
+                            heading={riderCoords?.heading || 0}
+                            options={{
+                                ...mapOptions,
+                                tiltInteractionEnabled: false,
+                                rotateControl: false
+                            }}
                             onLoad={handleMapLoad}
                         >
                             {directions && (
@@ -523,7 +596,7 @@ export default function TiffinNavigationPage() {
 
                         {verifyMode === 'otp' ? (
                             <div className="space-y-3">
-                                <p className="text-xs text-gray-500 text-center">Ask the customer for their 4-digit handover OTP (Default: <strong className="text-gray-900">1234</strong>)</p>
+                                <p className="text-xs text-gray-500 text-center">Ask the customer for their 4-digit handover OTP</p>
                                 <div className="flex items-center justify-center gap-3">
                                     {[0, 1, 2, 3].map(i => (
                                         <input
@@ -538,6 +611,17 @@ export default function TiffinNavigationPage() {
                                             className="w-12 h-14 text-center text-xl font-black rounded-2xl border-2 border-gray-200 focus:border-[#0ea5e9] focus:ring-2 focus:ring-sky-500/20 outline-none transition bg-gray-50/50 hover:bg-white"
                                         />
                                     ))}
+                                </div>
+                                <div className="flex justify-center pt-2">
+                                    <button 
+                                        type="button" 
+                                        onClick={handleSendOtp} 
+                                        disabled={sendingOtp}
+                                        className="py-2 px-4 bg-sky-100 hover:bg-sky-200 text-sky-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 w-full max-w-[200px]"
+                                    >
+                                        {sendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                                        {sendingOtp ? 'Sending...' : 'Send OTP to Customer'}
+                                    </button>
                                 </div>
                             </div>
                         ) : (

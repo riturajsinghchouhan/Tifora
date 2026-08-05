@@ -1,200 +1,171 @@
-import { useState, useEffect } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { ArrowLeft, Star, Clock } from "lucide-react"
-import { Button } from "@food/components/ui/button"
-import { Card, CardContent } from "@food/components/ui/card"
-import { restaurantAPI } from "@food/api"
-import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
-import { toast } from "sonner"
-import { RestaurantGridSkeleton } from "@food/components/ui/loading-skeletons"
-import { useDelayedLoading } from "@food/hooks/useDelayedLoading"
-
-// Import banner image
-import offerBanner from "../../assets/offerpagebanner.svg"
-const debugLog = (...args) => {}
-const debugWarn = (...args) => {}
-const debugError = (...args) => {}
-
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Clock, CheckCircle2, ChevronRight, ArrowLeft } from 'lucide-react';
+import api from '@food/api';
+import useAppBackNavigation from "@food/hooks/useAppBackNavigation";
 
 export default function Offers() {
-  const navigate = useNavigate()
-  const goBack = useAppBackNavigation()
-  const [offers, setOffers] = useState([])
-  const [groupedOffers, setGroupedOffers] = useState({})
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const showOffersSkeleton = useDelayedLoading(loading)
+    const navigate = useNavigate();
+    const goBack = useAppBackNavigation();
+    const [plans, setPlans] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-  // Fetch offers from API
-  useEffect(() => {
-    const fetchOffers = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const response = await restaurantAPI.getPublicOffers()
-        const data = response?.data?.data
-        
-        if (data) {
-          setOffers(data.allOffers || [])
-          setGroupedOffers(data.groupedByOffer || {})
-        }
-      } catch (err) {
-        debugError('Error fetching offers:', err)
-        debugError('Error details:', err?.response?.data || err?.message)
-        const errorMessage = err?.response?.data?.message || err?.message || 'Failed to load offers'
-        setError(errorMessage)
-        toast.error(errorMessage)
-      } finally {
-        setLoading(false)
-      }
-    }
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const res = await api.get('/user/tiffin/plans/available').catch(() => null);
+                if (res?.data?.success) {
+                    setPlans(res.data.data);
+                } else {
+                    // Fallback demo plans
+                    setPlans([
+                        {
+                            _id: 'plan-1',
+                            name: 'Homestyle North Indian Tiffin',
+                            restaurantName: 'Annapurna Rasoi',
+                            mealType: 'Both',
+                            durationDays: 30,
+                            price: 4500,
+                            isVegetarian: true,
+                            itemsDescription: '4 Butter Rotis, Dal Tadka, Seasonal Sabzi, Jeera Rice, Salad, Pickle'
+                        },
+                        {
+                            _id: 'plan-2',
+                            name: 'Weekly Student Budget Meal',
+                            restaurantName: 'Campus Dabbawala',
+                            mealType: 'Morning',
+                            durationDays: 7,
+                            price: 899,
+                            isVegetarian: true,
+                            itemsDescription: '3 Phulkas, Paneer/Veg Curry, Rice, Raita'
+                        },
+                        {
+                            _id: 'plan-3',
+                            name: 'Executive Deluxe Meal Box',
+                            restaurantName: 'Royal Spoon Kitchen',
+                            mealType: 'Both',
+                            durationDays: 15,
+                            price: 2999,
+                            isVegetarian: false,
+                            itemsDescription: 'Special Gravy (Chicken/Paneer), 4 Chapatis, Pulao, Sweet of the Day'
+                        }
+                    ]);
+                }
+            } catch (err) {
+                console.error('Error fetching tiffin plans', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchPlans();
+    }, []);
 
-    fetchOffers()
-  }, [])
-
-  return (
-    <div className="min-h-screen bg-white dark:bg-[#0a0a0a]">
-      {/* Banner Section */}
-      <div className="relative w-full overflow-hidden min-h-[25vh] md:min-h-[30vh]">
-        {/* Back Button */}
-        <button 
-          onClick={goBack}
-          className="absolute top-4 left-4 md:top-6 md:left-6 z-20 w-10 h-10 md:w-12 md:h-12 bg-gray-800/60 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-gray-800/80 transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5 md:h-6 md:w-6 text-white" />
-        </button>
-        
-        {/* Banner Image */}
-        <div className="absolute inset-0 z-0">
-          <img 
-            src={offerBanner} 
-            alt="Great Offers" 
-            className="w-full h-full object-cover"
-          />
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="px-4 sm:px-6 md:px-8 lg:px-10 py-6 md:py-8 lg:py-10 space-y-6 md:space-y-8">
-        <div className="max-w-7xl mx-auto space-y-6 md:space-y-8">
-        {/* Loading State */}
-        {showOffersSkeleton && <RestaurantGridSkeleton count={4} compact />}
-
-        {/* Error State */}
-        {error && !loading && (
-          <div className="flex flex-col items-center justify-center py-20">
-            <p className="text-red-500 dark:text-red-400 text-center">{error}</p>
-            <Button onClick={() => window.location.reload()} className="mt-4">Retry</Button>
-          </div>
-        )}
-
-        {/* Offers Sections */}
-        {!showOffersSkeleton && !error && (
-          <>
-            {/* Grouped Offers Sections */}
-            {Object.keys(groupedOffers).length > 0 && Object.entries(groupedOffers).map(([offerText, dishes]) => (
-              <section key={offerText}>
-                <h2 className="text-2xl sm:text-3xl font-black text-red-500 dark:text-red-400 text-center mb-4 tracking-wide">
-                  {offerText}
-                </h2>
-                
-                {/* Restaurant Cards - Grid Layout */}
-                <div 
-                  className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5 lg:gap-6"
+    return (
+        <div className="min-h-screen bg-gray-50 pb-24">
+            {/* Hero Header */}
+            <div className="relative bg-gradient-to-r from-[#9f1239] via-[#be123c] to-[#e11d48] text-white px-4 sm:px-6 py-8 rounded-b-3xl shadow-lg shadow-[#be123c]/20">
+                <button 
+                  onClick={goBack}
+                  className="absolute top-4 left-4 z-20 w-8 h-8 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/30 transition-colors"
                 >
-                  {dishes.slice(0, 8).map((dish) => (
-                    <Link 
-                      key={dish.id} 
-                      to={`/user/restaurants/${dish.restaurantSlug}`}
-                      className="w-full"
-                    >
-                      <div className="group">
-                        {/* Image Container */}
-                        <div className="relative h-32 sm:h-36 rounded-xl overflow-hidden mb-2">
-                          <img 
-                            src={dish.dishImage || dish.restaurantImage || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&h=300&fit=crop"} 
-                            alt={dish.dishName}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          {/* Offer Badge */}
-                          <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] sm:text-xs font-semibold px-2 py-1 rounded">
-                            {dish.offer}
-                          </div>
-                        </div>
-                        
-                        {/* Rating Badge */}
-                        <div className="flex items-center gap-1 mb-1">
-                          <div className="bg-green-600 text-white text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                            {dish.restaurantRating?.toFixed(1) || '0.0'}
-                            <Star className="h-2.5 w-2.5 fill-white" />
-                          </div>
-                        </div>
-                        
-                        {/* Restaurant Info */}
-                        <h3 className="font-semibold text-gray-900 dark:text-gray-100 text-sm line-clamp-1">
-                          {dish.restaurantName}
-                        </h3>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1 mb-1">
-                          {dish.dishName} - ₹{dish.discountedPrice}
-                        </p>
-                        <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400 text-xs">
-                          <Clock className="h-3 w-3" />
-                          <span>{dish.deliveryTime}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ))}
+                  <ArrowLeft className="h-4 w-4 text-white" />
+                </button>
 
-            {/* Coupon-style offers (admin created) */}
-            {Object.keys(groupedOffers).length === 0 && offers.length > 0 && (
-              <section className="space-y-4">
-                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  Available Coupons
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {offers.map((o) => (
-                    <Card key={o.id || o.offerId} className="border border-slate-200 shadow-sm">
-                      <CardContent className="p-4 space-y-2">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">Coupon</p>
-                            <p className="text-lg font-extrabold text-slate-900 dark:text-slate-100 tracking-wide">
-                              {o.couponCode || "-"}
-                            </p>
-                          </div>
-                          <span className="px-2 py-1 rounded-md text-xs font-semibold bg-blue-600 text-white">
-                            {o.title || "Offer"}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-700 dark:text-slate-300">
-                          <span className="font-semibold">Restaurant:</span>{" "}
-                          {o.restaurantName || "All Restaurants"}
-                        </p>
-                        {o.endDate && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Valid till: {new Date(o.endDate).toLocaleDateString()}
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
+                <div className="max-w-5xl mx-auto pt-6">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                            Daily Meal Subscriptions
+                        </span>
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-black mt-2">All Tiffin Plans</h1>
+                    <p className="text-white/90 text-xs sm:text-sm mt-1">Freshly cooked meals delivered to your door every morning (11 AM) & evening (7 PM).</p>
                 </div>
-              </section>
-            )}
+            </div>
 
-            {offers.length === 0 && !loading && (
-              <div className="text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">No offers available at the moment</p>
-              </div>
-            )}
-          </>
-        )}
+            {/* Why Tiffin Highlight */}
+            <div className="max-w-5xl mx-auto px-4 mt-6 mb-8">
+                <div className="grid grid-cols-3 gap-3 sm:gap-6">
+                    <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-center">
+                        <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-[#be123c] mx-auto mb-1.5" />
+                        <p className="text-xs sm:text-sm font-bold text-gray-800">Fixed Timings</p>
+                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">11 AM & 7 PM</p>
+                    </div>
+                    <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-center">
+                        <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-[#be123c] mx-auto mb-1.5" />
+                        <p className="text-xs sm:text-sm font-bold text-gray-800">Flexible Plans</p>
+                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">Pause anytime</p>
+                    </div>
+                    <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-center">
+                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-[#be123c] mx-auto mb-1.5" />
+                        <p className="text-xs sm:text-sm font-bold text-gray-800">Zero Surge</p>
+                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">Flat pricing</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Plan List */}
+            <div className="max-w-5xl mx-auto px-4 space-y-4">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Available Subscription Plans</h2>
+
+                {loading ? (
+                    <div className="flex justify-center p-10">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#be123c]"></div>
+                    </div>
+                ) : (
+                    plans.map((plan) => (
+                        <div
+                            key={plan._id}
+                            onClick={() => navigate(`/food/user/tiffin/plan/${plan._id}`, { state: { plan } })}
+                            className="bg-white rounded-3xl p-4 sm:p-5 border border-gray-200 shadow-sm hover:border-[#be123c] hover:shadow-md transition-all cursor-pointer active:scale-[0.99] group"
+                        >
+                            <div className="flex flex-col sm:flex-row gap-4 items-start">
+                                <div className="w-full sm:w-28 h-36 sm:h-28 rounded-2xl overflow-hidden bg-gray-900 shrink-0 relative shadow-sm">
+                                    <img
+                                        src={plan.image || '/food/tiffin/tiffin_box_default.png'}
+                                        alt={plan.name}
+                                        onError={(e) => {
+                                            e.target.src = '/food/tiffin/tiffin_box_default.png';
+                                        }}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                    <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-sm ${
+                                        plan.isVegetarian ? 'bg-green-600' : 'bg-red-600'
+                                    }`}>
+                                        {plan.isVegetarian ? 'Pure Veg' : 'Non-Veg'}
+                                    </span>
+                                </div>
+
+                                <div className="flex-1 w-full">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <span className="text-xs font-semibold text-gray-500">{plan.restaurantId?.restaurantName || plan.restaurantId?.name || plan.restaurantName || "Renuka's Kitchen"}</span>
+                                            <h3 className="font-bold text-gray-900 text-base group-hover:text-[#be123c] transition-colors">{plan.name}</h3>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-xl font-black text-gray-900">₹{plan.price}</span>
+                                            <p className="text-xs text-gray-500">/{plan.durationDays} Days</p>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2.5 rounded-xl border border-gray-100 line-clamp-2">
+                                        {plan.itemsDescription}
+                                    </p>
+
+                                    <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-gray-100">
+                                        <span className="text-xs font-bold text-[#be123c] bg-rose-50 px-2.5 py-1 rounded-lg">
+                                            {plan.mealType === 'Both' ? 'Morning (11 AM) & Evening (7 PM)' : `${plan.mealType} Only`}
+                                        </span>
+                                        <span className="text-xs font-bold text-gray-700 flex items-center gap-1 group-hover:text-[#be123c] transition-colors">
+                                            View Details <ChevronRight className="w-4 h-4" />
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
-      </div>
-    </div>
-  )
+    );
 }
 

@@ -177,7 +177,7 @@ export default function TiffinPlanDetails() {
                             </div>
 
                             <div className="flex-1 w-full text-left">
-                                <span className="text-[11px] font-bold text-[#be123c] bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-full">
+                                <span className="text-[11px] font-bold text-[#0cb884] bg-[#0cb884]/10 border border-[#0cb884]/20 px-2.5 py-1 rounded-full">
                                     Homestyle Daily Tiffin
                                 </span>
                                 <h2 className="text-xl sm:text-2xl font-black text-gray-900 mt-2">{plan.name}</h2>
@@ -194,7 +194,7 @@ export default function TiffinPlanDetails() {
                     <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm space-y-4">
                         <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                             <div className="flex items-center gap-2">
-                                <div className="p-2 bg-rose-50 text-[#be123c] rounded-xl">
+                                <div className="p-2 bg-[#0cb884]/10 text-[#0cb884] rounded-xl">
                                     <UtensilsCrossed className="w-4 h-4" />
                                 </div>
                                 <div>
@@ -202,7 +202,7 @@ export default function TiffinPlanDetails() {
                                     <p className="text-[11px] text-gray-500">Items included in every single meal</p>
                                 </div>
                             </div>
-                            <span className="text-xs font-bold text-[#be123c] bg-rose-50 px-2.5 py-1 rounded-lg">
+                            <span className="text-xs font-bold text-[#0cb884] bg-[#0cb884]/10 px-2.5 py-1 rounded-lg">
                                 {mealItems.length} Fresh Items
                             </span>
                         </div>
@@ -229,7 +229,7 @@ export default function TiffinPlanDetails() {
                                             <h4 className="text-xs sm:text-sm font-bold text-gray-900 truncate">{item.name}</h4>
                                         </div>
                                         {item.quantity && (
-                                            <span className="inline-block text-[10px] font-bold text-[#be123c] bg-rose-100/70 px-2 py-0.5 rounded mt-0.5">
+                                            <span className="inline-block text-[10px] font-bold text-[#0cb884] bg-[#0cb884]/20 px-2 py-0.5 rounded mt-0.5">
                                                 {item.quantity}
                                             </span>
                                         )}
@@ -245,7 +245,7 @@ export default function TiffinPlanDetails() {
                     {/* Duration Selector */}
                     <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm space-y-3">
                         <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-[#be123c]" /> Select Subscription Duration
+                            <Calendar className="w-4 h-4 text-[#0cb884]" /> Select Subscription Duration
                         </h3>
                         <div className="grid grid-cols-3 gap-2.5">
                             {[
@@ -258,7 +258,7 @@ export default function TiffinPlanDetails() {
                                     onClick={() => setSelectedDuration(d.days)}
                                     className={`py-3.5 px-2 rounded-2xl text-center border-2 transition-all font-bold text-xs active:scale-95 ${
                                         selectedDuration === d.days
-                                            ? 'border-[#be123c] bg-rose-50 text-[#be123c] shadow-sm'
+                                            ? 'border-[#0cb884] bg-[#0cb884]/10 text-[#0cb884] shadow-sm'
                                             : 'border-gray-200 hover:border-gray-300 text-gray-700 bg-white'
                                     }`}
                                 >
@@ -272,7 +272,7 @@ export default function TiffinPlanDetails() {
                     {/* Meal Timing Selector */}
                     <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm space-y-3">
                         <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-[#be123c]" /> Meal Timings
+                            <Clock className="w-4 h-4 text-[#0cb884]" /> Meal Timings
                         </h3>
                         <div className="space-y-2.5">
                             {[
@@ -285,7 +285,7 @@ export default function TiffinPlanDetails() {
                                     onClick={() => setSelectedTiming(timing.type)}
                                     className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border-2 cursor-pointer transition-all ${
                                         selectedTiming === timing.type
-                                            ? 'border-[#be123c] bg-rose-50/50 shadow-sm'
+                                            ? 'border-[#0cb884] bg-[#0cb884]/10 shadow-sm'
                                             : 'border-gray-200 hover:border-gray-300 bg-white'
                                     }`}
                                 >
@@ -295,11 +295,11 @@ export default function TiffinPlanDetails() {
                                             name="timing"
                                             checked={selectedTiming === timing.type}
                                             onChange={() => setSelectedTiming(timing.type)}
-                                            className="text-[#be123c] focus:ring-[#be123c] h-4 w-4"
+                                            className="text-[#0cb884] focus:ring-[#0cb884] h-4 w-4"
                                         />
                                         <div>
                                             <p className="text-xs sm:text-sm font-bold text-gray-900">{timing.label}</p>
-                                            <span className="text-[10px] font-semibold text-[#be123c] bg-rose-100/70 px-2 py-0.5 rounded">
+                                            <span className="text-[10px] font-semibold text-[#0cb884] bg-[#0cb884]/20 px-2 py-0.5 rounded">
                                                 {timing.tag}
                                             </span>
                                         </div>
@@ -329,7 +329,7 @@ export default function TiffinPlanDetails() {
                     </div>
                     <button
                         onClick={handleProceedToCheckout}
-                        className="flex-1 max-w-xs bg-gradient-to-r from-[#9f1239] via-[#be123c] to-[#e11d48] text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-[#be123c]/25 hover:opacity-95 active:scale-95 transition text-center"
+                        className="flex-1 max-w-xs bg-gradient-to-r from-[#088c64] via-[#0cb884] to-[#20d49f] text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-[#0cb884]/25 hover:opacity-95 active:scale-95 transition text-center"
                     >
                         Proceed to Checkout
                     </button>

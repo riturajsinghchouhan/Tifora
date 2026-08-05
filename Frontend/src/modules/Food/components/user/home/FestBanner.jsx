@@ -60,7 +60,7 @@ export default function FestBanner({ isVegMode, images = [], hideFoodImages = fa
       <motion.div 
       initial={false}
       id="fest-banner-root"
-      className={`relative px-4 pt-8 pb-4 overflow-hidden min-h-[140px] sm:min-h-[180px] transition-all duration-700 bg-transparent rounded-b-[2rem]`}
+      className={`relative px-4 pt-8 pb-4 overflow-hidden min-h-[150px] sm:min-h-[180px] transition-all duration-700 bg-transparent rounded-b-[2rem]`}
     >
       {hasBgImages && (
         <div className="absolute inset-0 z-0 bg-slate-900">
@@ -75,48 +75,52 @@ export default function FestBanner({ isVegMode, images = [], hideFoodImages = fa
               className="absolute inset-0 w-full h-full object-cover"
             />
           </AnimatePresence>
-          <div className="absolute inset-0 bg-black/35 z-10" />
+          <div className="absolute inset-0 bg-transparent z-10" />
         </div>
       )}
 
       <div className="relative z-10 flex flex-col items-center text-center space-y-4">
-        {/* Mission Text at Top */}
-        <motion.div
-          initial={{ y: -20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-sm font-bold"
-        >
-          <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Indian Bites Missions</span>
-        </motion.div>
+        {!hasBgImages && (
+          <>
+            {/* Mission Text at Top */}
+            <motion.div
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 shadow-sm font-bold"
+            >
+              <span className="text-[9px] font-black text-white uppercase tracking-[0.2em]">Indian Bites Missions</span>
+            </motion.div>
 
-        <motion.div
-          key={isVegMode ? 'veg-title' : 'nonveg-title'}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", damping: 10, stiffness: 100 }}
-        >
-          <h2 
-            className="text-2xl sm:text-3xl font-black text-[#fff200] italic tracking-tighter drop-shadow-md uppercase leading-none"
-            style={{ WebkitTextStroke: '0.5px rgba(255,255,255,0.3)' }}
-          >
-            {isVegMode ? 'VEGGIE DELIGHT' : 'FEAST BONANZA'}
-          </h2>
-        </motion.div>
-        
-        <motion.div 
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
-          className="flex items-center gap-2 px-4 py-1.5 bg-black/40 backdrop-blur-lg rounded-full border border-white/20 shadow-xl group cursor-pointer active:scale-95 transition-all text-white"
-        >
-          {isVegMode ? <Leaf className="h-3.5 w-3.5 text-emerald-400 fill-emerald-400" /> : <Flame className="h-3.5 w-3.5 text-[#fff200] fill-[#fff200] animate-bounce" />}
-          <span className="text-sm font-black uppercase tracking-[0.1em]">
-            {isVegMode ? 'PURE VEG MAGIC' : 'UPTO 60% OFF NOW'}
-          </span>
-          <ArrowRightCircle className="h-5 w-5 text-[#fff200] shadow-sm" />
-        </motion.div>
+            <motion.div
+              key={isVegMode ? 'veg-title' : 'nonveg-title'}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", damping: 10, stiffness: 100 }}
+            >
+              <h2 
+                className="text-2xl sm:text-3xl font-black text-[#fff200] italic tracking-tighter drop-shadow-md uppercase leading-none"
+                style={{ WebkitTextStroke: '0.5px rgba(255,255,255,0.3)' }}
+              >
+                {isVegMode ? 'VEGGIE DELIGHT' : 'FEAST BONANZA'}
+              </h2>
+            </motion.div>
+            
+            <motion.div 
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="flex items-center gap-2 px-4 py-1.5 bg-black/40 backdrop-blur-lg rounded-full border border-white/20 shadow-xl group cursor-pointer active:scale-95 transition-all text-white"
+            >
+              {isVegMode ? <Leaf className="h-3.5 w-3.5 text-emerald-400 fill-emerald-400" /> : <Flame className="h-3.5 w-3.5 text-[#fff200] fill-[#fff200] animate-bounce" />}
+              <span className="text-sm font-black uppercase tracking-[0.1em]">
+                {isVegMode ? 'PURE VEG MAGIC' : 'UPTO 60% OFF NOW'}
+              </span>
+              <ArrowRightCircle className="h-5 w-5 text-[#fff200] shadow-sm" />
+            </motion.div>
+          </>
+        )}
 
-        {hideFoodImages ? (
+        {hideFoodImages || hasBgImages ? (
           <div className="h-28 sm:h-36" />
         ) : (
           <div className="flex items-end justify-center gap-5 sm:gap-8 pt-10 relative w-full mb-2">

@@ -112,14 +112,14 @@ import exploreCollection from "@food/assets/explore more icons/collection.png";
 
 // Animated placeholder for search - moved outside component to prevent recreation
 const placeholders = [
-  'Search "burger"',
-  'Search "biryani"',
-  'Search "pizza"',
-  'Search "desserts"',
-  'Search "chinese"',
+  'Search "tiffin"',
   'Search "thali"',
-  'Search "momos"',
-  'Search "dosa"',
+  'Search "monthly plan"',
+  'Search "diet meal"',
+  'Search "home style veg"',
+  'Search "jain thali"',
+  'Search "dabba"',
+  'Search "healthy food"',
 ];
 
 const homePageCache = {
@@ -229,7 +229,7 @@ export default function Home() {
   const [hasScrolledPastBanner, setHasScrolledPastBanner] = useState(false);
   const [landingCategories, setLandingCategories] = useState([]);
   const [landingExploreMore, setLandingExploreMore] = useState(() => homePageCache.landingExploreMore || []);
-  const [exploreMoreHeading, setExploreMoreHeading] = useState(() => homePageCache.exploreMoreHeading || "Explore More");
+  const [exploreMoreHeading, setExploreMoreHeading] = useState(() => homePageCache.exploreMoreHeading || "Tiffin Specials");
   const [festBannerImages, setFestBannerImages] = useState(() => homePageCache.festBannerImages ?? []);
   const [bgIndex, setBgIndex] = useState(0);
   const [recommendedRestaurantIds, setRecommendedRestaurantIds] = useState(() => homePageCache.recommendedRestaurantIds || []);
@@ -459,22 +459,23 @@ export default function Home() {
 
   // Merge API explore items with fallback to ensure all 4 cards are shown
   const finalExploreItems = useMemo(() => {
+    const tiffinLabels = ["Monthly Plans", "Jain Meals", "Diet Boxes", "Special Orders"];
     const fallback = [
       {
         id: "offers",
-        label: "Offers",
+        label: "Monthly Plans",
         image: exploreOffers,
         href: "/food/user/offers",
       },
       {
         id: "gourmet",
-        label: "Gourmet",
+        label: "Jain Meals",
         image: exploreGourmet,
         href: "/food/user/gourmet",
       },
       {
         id: "collection",
-        label: "Collections",
+        label: "Diet Boxes",
         image: exploreCollection,
         href: "/food/user/profile/favorites",
       },
@@ -482,26 +483,20 @@ export default function Home() {
 
     if (!landingExploreMore || landingExploreMore.length === 0) return fallback;
 
-    return fallback.map((item) => {
-      const apiItem = landingExploreMore.find(
-        (ai) => ai.label?.toLowerCase() === item.label?.toLowerCase(),
-      );
-      if (apiItem) {
-        const href = apiItem.link
-          ? apiItem.link.startsWith("/")
-            ? apiItem.link
-            : `/${apiItem.link}`
-          : item.href;
-        return {
-          ...item,
-          image:
-            normalizeImageUrl(apiItem.imageUrl || apiItem.image || "") ||
-            item.image,
-          href,
-        };
-      }
-      return item;
-    });
+    return landingExploreMore.map((apiItem, index) => {
+      const href = apiItem.link
+        ? apiItem.link.startsWith("/")
+          ? apiItem.link
+          : `/${apiItem.link}`
+        : fallback[index]?.href || "/food/user/offers";
+        
+      return {
+        id: apiItem.id || `explore-${index}`,
+        label: tiffinLabels[index] || apiItem.label,
+        image: normalizeImageUrl(apiItem.imageUrl || apiItem.image || "") || fallback[index]?.image,
+        href,
+      };
+    }).slice(0, 4);
   }, [landingExploreMore, normalizeImageUrl]);
 
   const normalizedLandingCategories = useMemo(() => {
@@ -932,20 +927,19 @@ export default function Home() {
         setLandingExploreMore(exploreMoreData);
 
         const settingsData = settings || {};
-        const heading = settingsData.exploreMoreHeading || "Explore More";
-        setExploreMoreHeading(heading);
+        setExploreMoreHeading("Tiffin Specials");
         setRecommendedRestaurantIds(settingsData.recommendedRestaurantIds || []);
         setUnder250PriceLimit(Number(settingsData.under250PriceLimit) || 250);
 
         const recRest = settingsData.recommendedRestaurants || [];
         setRecommendedRestaurantsFromSettings(recRest);
 
-        const images = Array.isArray(settingsData.festBannerImages) ? settingsData.festBannerImages : [];
+        const rawImages = Array.isArray(settingsData.festBannerImages) ? settingsData.festBannerImages : [];
+        const images = rawImages.map(img => normalizeImageUrl(img)).filter(Boolean);
         setFestBannerImages(images);
 
-        // Update cache
         homePageCache.landingExploreMore = exploreMoreData;
-        homePageCache.exploreMoreHeading = heading;
+        homePageCache.exploreMoreHeading = "Tiffin Specials";
         homePageCache.recommendedRestaurantIds = settingsData.recommendedRestaurantIds || [];
         homePageCache.under250PriceLimit = Number(settingsData.under250PriceLimit) || 250;
         homePageCache.recommendedRestaurantsFromSettings = recRest;
@@ -956,7 +950,7 @@ export default function Home() {
       .catch(() => {
         if (!cancelled) {
           setLandingExploreMore([]);
-          setExploreMoreHeading("Explore More");
+          setExploreMoreHeading("Tiffin Specials");
           setRecommendedRestaurantsFromSettings([]);
           setFestBannerImages([]);
         }
@@ -1100,6 +1094,7 @@ export default function Home() {
     const calculateHeight = () => {
       const locEl = document.getElementById('home-header-loc-row');
       const searchEl = document.getElementById('home-header-search-row');
+      const tiffinEl = document.getElementById('tiffin-banner-wrapper');
       const festEl = document.getElementById('fest-banner-wrapper');
 
       let height = 0;
@@ -1111,6 +1106,9 @@ export default function Home() {
         let maxBottom = locEl.offsetTop + locEl.offsetHeight;
         if (searchEl) {
           maxBottom = Math.max(maxBottom, searchEl.offsetTop + searchEl.offsetHeight);
+        }
+        if (tiffinEl && activeTab === 'food') {
+          maxBottom = Math.max(maxBottom, tiffinEl.offsetTop + tiffinEl.offsetHeight);
         }
         if (festEl && activeTab === 'food') {
           maxBottom = Math.max(maxBottom, festEl.offsetTop + festEl.offsetHeight);
@@ -2255,14 +2253,33 @@ export default function Home() {
             />
 
             {activeTab === "food" && (
-              <div id="fest-banner-wrapper" className="w-full">
+              <div id="tiffin-banner-wrapper" className="px-4 mt-4 mb-2">
+                <Link to="/food/user/tiffin" className="block relative w-full rounded-2xl overflow-hidden shadow-lg border border-orange-200 bg-gradient-to-r from-orange-50 to-orange-100 p-4 transition-transform active:scale-95">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400 opacity-10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+                  <div className="flex items-center justify-between relative z-10">
+                    <div className="flex flex-col">
+                      <span className="text-orange-600 font-black text-xs uppercase tracking-widest mb-1">New</span>
+                      <h3 className="text-xl font-black text-gray-900 leading-tight">Subscribe to<br/>Daily Tiffins</h3>
+                      <p className="text-sm text-gray-600 mt-1 font-medium">Home-cooked meals, delivered fresh.</p>
+                    </div>
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md shrink-0 border border-orange-100">
+                      <span className="text-2xl">🍱</span>
+                    </div>
+                  </div>
+                </Link>
+              </div>
+            )}
+
+            {/* FestBanner restored below Tiffin Subscription banner */}
+            {activeTab === "food" && (
+              <div id="fest-banner-wrapper" className="w-full mt-2">
                 {festVideoActive ? (
-                  <div className="w-full h-[235px] sm:h-[245px]" />
+                  <div className="w-full h-20 sm:h-24" />
                 ) : (
                   <div className="pb-4 sm:pb-6">
                     <FestBanner
                       isVegMode={vegMode}
-                      images={[]}
+                      images={festBannerImages}
                       hideFoodImages={false}
                     />
                   </div>
@@ -2290,7 +2307,7 @@ export default function Home() {
                   className={`sticky top-[60px] z-[50] w-full transition-all duration-300 ${isCategoryStuck ? "bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] pb-2 pt-2 border-b border-white/50 dark:border-white/10 px-4" : "bg-transparent px-4 py-2.5"} space-y-3`}
                 >
                   <div className={`flex items-center gap-2 min-w-0 ${isCategoryStuck ? 'hidden' : ''}`}>
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white min-w-0 flex-shrink leading-tight">What's on your mind today?</h2>
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white min-w-0 flex-shrink leading-tight">Explore Tiffin Plans</h2>
                     <div className="h-[1px] bg-gray-100 dark:bg-gray-800 flex-1"></div>
                     <Link to="/food/user/categories" className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-0.5 whitespace-nowrap shrink-0 hover:text-gray-900 dark:hover:text-white transition-colors">
                       View All <ArrowDownUp className="h-3 w-3 rotate-90" />
@@ -2513,7 +2530,7 @@ export default function Home() {
             <div className="px-4 mb-3 lg:mb-4">
               <div className="flex flex-col gap-0.5 lg:gap-1">
                 <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
-                  {filteredRestaurants.length} Restaurants Delivering to You
+                  {filteredRestaurants.length} Tiffin Centers & Kitchens Near You
                 </h2>
                 <span className="text-base sm:text-lg lg:text-2xl text-gray-500 font-normal">
                   Featured

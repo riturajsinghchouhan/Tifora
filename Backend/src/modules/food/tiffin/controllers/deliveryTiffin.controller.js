@@ -160,22 +160,67 @@ export const getMyTiffinRoute = async (req, res) => {
     }
 };
 
+export const sendTiffinHandoverOtp = async (req, res) => {
+    try {
+        const { deliveryId } = req.params;
+
+        // Fetch delivery including verification config
+        const delivery = await TiffinDelivery.findById(deliveryId).select('+verification.otpExpected');
+        if (!delivery) {
+            return res.status(404).json({ success: false, message: 'Tiffin delivery record not found' });
+        }
+
+        // Generate 4 digit OTP
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+        
+        // Save to model
+        if (!delivery.verification) {
+            delivery.verification = {};
+        }
+        delivery.verification.otpExpected = otp;
+        await delivery.save();
+
+        // Emit to tracking room
+        const room = `tracking:${delivery.orderId}`;
+        const io = req.app.get('io');
+        if (io) {
+            io.to(room).emit('tiffin_handover_otp', {
+                deliveryId: delivery._id,
+                otp: otp
+            });
+            console.log(`[Tiffin] Emitted OTP ${otp} to room ${room}`);
+        }
+
+        res.status(200).json({ success: true, message: 'OTP sent to customer successfully' });
+    } catch (error) {
+        console.error('Error sending Tiffin OTP:', error);
+        res.status(500).json({ success: false, message: 'Server error sending OTP' });
+    }
+};
+
 export const updateDeliveryStatus = async (req, res) => {
     try {
         const { deliveryId } = req.params;
         const { status, otp, pictureUrl } = req.body;
 
-        const delivery = await TiffinDelivery.findById(deliveryId);
+        const delivery = await TiffinDelivery.findById(deliveryId).select('+verification.otpExpected');
         if (!delivery) {
             return res.status(404).json({ success: false, message: 'Tiffin delivery record not found' });
         }
 
         if (status === 'delivered') {
             if (delivery.verification?.otpRequired) {
-                // In demo/prod, accept '1234' or any valid 4-digit code
                 if (!otp || String(otp).trim().length < 4) {
                     return res.status(400).json({ success: false, message: 'Please enter a valid 4-digit OTP' });
                 }
+                
+                // If otpExpected exists (new flow), validate it. Otherwise fallback to accepting any 4 digits (legacy flow)
+                if (delivery.verification.otpExpected) {
+                    if (String(otp).trim() !== delivery.verification.otpExpected) {
+                        return res.status(400).json({ success: false, message: 'Incorrect OTP. Please try again.' });
+                    }
+                }
+
                 delivery.verification.isVerified = true;
                 delivery.verification.otpProvided = String(otp);
             }

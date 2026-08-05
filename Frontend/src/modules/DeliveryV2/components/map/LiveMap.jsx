@@ -70,9 +70,9 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
       mapTypeControl: false,
       scaleControl: false,
       streetViewControl: false,
-      rotateControl: true, // Enabled for front-view navigation
+      rotateControl: false, 
       fullscreenControl: false,
-      tilt: 45, // 3D Perspective
+      tilt: 60, // 3D Perspective
     });
     setMapInternal(mapInstance);
     if (onMapLoad) onMapLoad(mapInstance);
@@ -251,15 +251,14 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
     if (now - lastBoundsUpdateRef.current < 12000) return;
     lastBoundsUpdateRef.current = now;
 
-    if (!hasAnchors && parsedRiderLocation) {
+    if (parsedRiderLocation) {
+      map.setZoom(18);
       map.panTo(parsedRiderLocation);
-    } else {
+    } else if (hasAnchors) {
       const bounds = new window.google.maps.LatLngBounds();
       if (restaurantPoint) bounds.extend(restaurantPoint);
       if (customerPoint) bounds.extend(customerPoint);
-      if (parsedRiderLocation) bounds.extend(parsedRiderLocation);
-
-      map.fitBounds(bounds, { top: 20, right: 20, bottom: 80, left: 20 });
+      map.fitBounds(bounds, { top: 40, right: 40, bottom: 80, left: 40 });
     }
 
     if (parsedRiderLocation) {
@@ -325,7 +324,7 @@ export const LiveMap = ({ onMapClick, onMapLoad, onPathReceived, onPolylineRecei
         center={parsedRiderLocation || targetLocation || defaultCenter}
         zoom={zoom}
         heading={parsedRiderLocation?.heading || 0}
-        tilt={45}
+        tilt={60}
         onClick={(e) => onMapClick?.(e.latLng.lat(), e.latLng.lng())}
         options={mapOptions}
       >

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
-import { Tag, User, Home as HomeIcon, Package, ShoppingBag } from "lucide-react"
+import { Tag, User, Home as HomeIcon, Package, ShoppingBag, Leaf } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getPublicLandingSettings } from "@food/api"
 import { useAppLocation } from "@food/hooks/useAppLocation"
@@ -85,7 +85,7 @@ export default function BottomNavigation() {
           </span>
         </Link>
 
-        {/* Under 250 Tab */}
+        {/* Diet Box Tab */}
         <Link
           to="/food/user/under-250"
           className={`flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-[1.5rem] transition-all duration-300 ${isUnder250
@@ -93,9 +93,9 @@ export default function BottomNavigation() {
               : "text-slate-500 dark:text-gray-400"
             }`}
         >
-          <Tag className={`h-5 w-5 ${isUnder250 ? "text-primary" : "text-slate-500 dark:text-gray-400"}`} strokeWidth={isUnder250 ? 2.5 : 2} />
+          <Leaf className={`h-5 w-5 ${isUnder250 ? "text-primary" : "text-slate-500 dark:text-gray-400"}`} strokeWidth={isUnder250 ? 2.5 : 2} />
           <span className={`text-[10px] sm:text-xs font-bold ${isUnder250 ? "text-primary" : "text-slate-500 dark:text-gray-400 font-semibold"}`}>
-            Under ₹{under250PriceLimit}
+            Diet Box
           </span>
         </Link>
 

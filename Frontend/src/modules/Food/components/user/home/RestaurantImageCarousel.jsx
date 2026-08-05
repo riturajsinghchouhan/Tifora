@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 const WEBVIEW_SESSION_CACHE_BUSTER = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -220,21 +220,21 @@ const RestaurantImageCarousel = React.memo(
     }, [restaurant]);
 
     useEffect(() => {
-      if (!priority || bannerItems.length <= 1) return;
+      if (bannerItems.length <= 1) return;
       const interval = setInterval(() => {
         setCurrentItemIndex((prev) => (prev + 1) % bannerItems.length);
       }, 2000);
       return () => clearInterval(interval);
-    }, [priority, bannerItems.length]);
+    }, [bannerItems.length]);
 
-    // Auto-slide for restaurant images (priority cards only â€” reduces timer churn)
+    // Auto-slide for restaurant images
     useEffect(() => {
-      if (!priority || images.length <= 1) return;
+      if (images.length <= 1) return;
       const interval = setInterval(() => {
         setCurrentIndex((prev) => (prev + 1) % images.length);
       }, 3500);
       return () => clearInterval(interval);
-    }, [priority, images.length]);
+    }, [images.length]);
 
     const [loadedBySrc, setLoadedBySrc] = useState({});
     const [, setAttemptedSrcs] = useState({});

@@ -30,9 +30,10 @@ import {
 import {
     getMyTiffinDeliveries,
     getMyTiffinRoute,
-    completeTiffinDropoff,
+    getDeliveryDetails,
     updateDeliveryStatus,
-    getDeliveryDetails
+    completeTiffinDropoff,
+    sendTiffinHandoverOtp
 } from '../controllers/deliveryTiffin.controller.js';
 
 // Admin Controllers
@@ -160,6 +161,7 @@ router.get(['/delivery/deliveries', '/deliveries', '/delivery/my-route', '/my-ro
 router.get(['/delivery/details/:deliveryId', '/delivery/:deliveryId', '/details/:deliveryId'], deliveryAuth, getDeliveryDetails);
 router.post(['/delivery/:deliveryId/complete', '/:deliveryId/complete'], deliveryAuth, completeTiffinDropoff);
 router.put(['/delivery/:deliveryId/status', '/:deliveryId/status'], deliveryAuth, updateDeliveryStatus);
+router.post(['/delivery/:deliveryId/send-otp', '/:deliveryId/send-otp'], deliveryAuth, sendTiffinHandoverOtp);
 
 
 // --- Admin Tiffin Routes (Supports /admin/... and Direct Paths) ---

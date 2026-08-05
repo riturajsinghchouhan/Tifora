@@ -267,6 +267,7 @@ export const getMyTiffinDeliveriesUser = async (req, res) => {
             userId,
             date: { $gte: threeDaysAgo }
         })
+        .select('+verification.otpExpected')
         .populate('restaurantId', 'name address phone image logo')
         .populate('subscriptionId', 'planId') // To get plan details if needed
         .populate('assignedTo', 'name phone profileImage location')

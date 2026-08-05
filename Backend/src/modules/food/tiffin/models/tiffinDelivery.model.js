@@ -59,6 +59,7 @@ const tiffinDeliverySchema = new mongoose.Schema(
         },
         verification: {
             otpRequired: { type: Boolean, default: true },
+            otpExpected: { type: String, select: false },
             otpProvided: { type: String, select: false },
             isVerified: { type: Boolean, default: false },
             pictureUrl: { type: String, default: null } // Fallback if user is unavailable

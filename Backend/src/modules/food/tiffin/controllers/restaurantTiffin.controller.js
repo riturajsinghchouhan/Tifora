@@ -1,5 +1,6 @@
 import { TiffinPlan } from '../models/tiffinPlan.model.js';
 import { TiffinDelivery } from '../models/tiffinDelivery.model.js';
+import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
 import mongoose from 'mongoose';
 
 const getRestaurantId = (req) => {

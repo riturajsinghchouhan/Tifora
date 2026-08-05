@@ -64,7 +64,7 @@ export default function TiffinCheckout() {
                         contact: '9999999999'
                     },
                     theme: {
-                        color: '#be123c'
+                        color: '#0cb884'
                     },
                     handler: async function (paymentResponse) {
                         try {
@@ -117,7 +117,7 @@ export default function TiffinCheckout() {
                     <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
                         <div className="flex justify-between items-start">
                             <div>
-                                <span className="text-[11px] font-bold text-[#be123c] bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-100">
+                                <span className="text-[11px] font-bold text-[#0cb884] bg-[#0cb884]/10 px-2.5 py-0.5 rounded-lg border border-[#0cb884]/20">
                                     {plan.mealType === 'Both' ? 'Morning + Evening' : `${plan.mealType} Only`}
                                 </span>
                                 <h2 className="text-lg font-bold text-gray-900 mt-1.5">{plan.name}</h2>
@@ -131,11 +131,11 @@ export default function TiffinCheckout() {
 
                         <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-600">
                             <div className="flex items-center gap-1.5">
-                                <Calendar className="w-4 h-4 text-[#be123c]" />
+                                <Calendar className="w-4 h-4 text-[#0cb884]" />
                                 <span>Starts: <strong>{startDate}</strong></span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <Clock className="w-4 h-4 text-[#be123c]" />
+                                <Clock className="w-4 h-4 text-[#0cb884]" />
                                 <span>Daily Fresh Prep</span>
                             </div>
                         </div>
@@ -144,7 +144,7 @@ export default function TiffinCheckout() {
                     {/* Start Date Selector */}
                     <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-3">
                         <h3 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-[#be123c]" /> Select Subscription Start Date
+                            <Calendar className="w-4 h-4 text-[#0cb884]" /> Select Subscription Start Date
                         </h3>
                         <p className="text-xs text-gray-500">When should your daily tiffin service begin?</p>
                         <input
@@ -152,7 +152,7 @@ export default function TiffinCheckout() {
                             min={minDateStr}
                             value={startDate}
                             onChange={(e) => setStartDate(e.target.value)}
-                            className="w-full border border-gray-300 rounded-xl p-3 text-sm font-bold text-gray-800 outline-none focus:border-[#be123c] focus:ring-1 focus:ring-[#be123c]"
+                            className="w-full border border-gray-300 rounded-xl p-3 text-sm font-bold text-gray-800 outline-none focus:border-[#0cb884] focus:ring-1 focus:ring-[#0cb884]"
                         />
                     </div>
 
@@ -160,11 +160,11 @@ export default function TiffinCheckout() {
                     <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-2">
                         <div className="flex items-center justify-between">
                             <h3 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center gap-1.5">
-                                <MapPin className="w-4 h-4 text-[#be123c]" /> Delivery Address
+                                <MapPin className="w-4 h-4 text-[#0cb884]" /> Delivery Address
                             </h3>
                             <button
                                 onClick={() => navigate('/food/user/profile')}
-                                className="text-xs font-semibold text-[#be123c] hover:underline"
+                                className="text-xs font-semibold text-[#0cb884] hover:underline"
                             >
                                 Change
                             </button>
@@ -184,23 +184,23 @@ export default function TiffinCheckout() {
                             <label
                                 onClick={() => setPaymentMethod('razorpay')}
                                 className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition ${
-                                    paymentMethod === 'razorpay' ? 'border-[#be123c] bg-rose-50/50' : 'border-gray-200 hover:border-gray-300'
+                                    paymentMethod === 'razorpay' ? 'border-[#0cb884] bg-[#0cb884]/10' : 'border-gray-200 hover:border-gray-300'
                                 }`}
                             >
                                 <div className="flex items-center gap-3">
-                                    <CreditCard className="w-5 h-5 text-[#be123c]" />
+                                    <CreditCard className="w-5 h-5 text-[#0cb884]" />
                                     <div>
                                         <p className="text-xs font-bold text-gray-900">UPI / Card / NetBanking</p>
                                         <p className="text-[10px] text-gray-500">Pay securely via Razorpay</p>
                                     </div>
                                 </div>
-                                <input type="radio" checked={paymentMethod === 'razorpay'} onChange={() => {}} className="text-[#be123c]" />
+                                <input type="radio" checked={paymentMethod === 'razorpay'} onChange={() => {}} className="text-[#0cb884]" />
                             </label>
 
                             <label
                                 onClick={() => setPaymentMethod('wallet')}
                                 className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition ${
-                                    paymentMethod === 'wallet' ? 'border-[#be123c] bg-rose-50/50' : 'border-gray-200 hover:border-gray-300'
+                                    paymentMethod === 'wallet' ? 'border-[#0cb884] bg-[#0cb884]/10' : 'border-gray-200 hover:border-gray-300'
                                 }`}
                             >
                                 <div className="flex items-center gap-3">
@@ -210,7 +210,7 @@ export default function TiffinCheckout() {
                                         <p className="text-[10px] text-gray-500">Pay using available wallet balance</p>
                                     </div>
                                 </div>
-                                <input type="radio" checked={paymentMethod === 'wallet'} onChange={() => {}} className="text-[#be123c]" />
+                                <input type="radio" checked={paymentMethod === 'wallet'} onChange={() => {}} className="text-[#0cb884]" />
                             </label>
                         </div>
                     </div>
@@ -232,7 +232,7 @@ export default function TiffinCheckout() {
                         </div>
                         <div className="pt-2 border-t border-gray-100 flex justify-between text-sm font-black text-gray-900">
                             <span>Total Upfront Amount</span>
-                            <span className="text-[#be123c]">₹{plan.totalPrice}</span>
+                            <span className="text-[#0cb884]">₹{plan.totalPrice}</span>
                         </div>
                     </div>
                 </div>
@@ -244,7 +244,7 @@ export default function TiffinCheckout() {
                     <button
                         onClick={handleConfirmPayment}
                         disabled={submitting}
-                        className="w-full bg-gradient-to-r from-[#9f1239] via-[#be123c] to-[#e11d48] text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-[#be123c]/25 hover:opacity-95 active:scale-95 transition flex items-center justify-center gap-2"
+                        className="w-full bg-gradient-to-r from-[#088c64] via-[#0cb884] to-[#20d49f] text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-[#0cb884]/25 hover:opacity-95 active:scale-95 transition flex items-center justify-center gap-2"
                     >
                         {submitting ? 'Processing...' : `Pay ₹${plan.totalPrice} & Activate Plan`}
                     </button>

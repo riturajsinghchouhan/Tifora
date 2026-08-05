@@ -548,6 +548,9 @@ export default function OrderTracking() {
   // Rating states
   const [showRatingModal, setShowRatingModal] = useState(false)
   const [selectedRestaurantRating, setSelectedRestaurantRating] = useState(null)
+  // Sheet state
+  const [isSheetExpanded, setIsSheetExpanded] = useState(true)
+
   const [selectedDeliveryRating, setSelectedDeliveryRating] = useState(null)
   const [restaurantFeedbackText, setRestaurantFeedbackText] = useState("")
   const [deliveryFeedbackText, setDeliveryFeedbackText] = useState("")
@@ -1528,7 +1531,7 @@ export default function OrderTracking() {
     Boolean(order?.deliveredAt)
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-[#0a0a0a]">
+    <div className="h-screen w-full flex flex-col relative overflow-hidden bg-gray-100 dark:bg-[#0a0a0a]">
       {/* Order Confirmed Modal */}
       <AnimatePresence>
         {showConfirmation && (
@@ -1570,7 +1573,7 @@ export default function OrderTracking() {
 
       {/* Green Header */}
       <motion.div
-        className={`${currentStatus.color} text-white sticky top-0 z-40`}
+        className={`${currentStatus.color} text-white z-20 flex-shrink-0 relative shadow-md`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
@@ -1678,22 +1681,39 @@ export default function OrderTracking() {
       </motion.div>
 
       {/* Map Section */}
-      {!isDeliveredOrder && orderStatus !== 'cancelled' && orderStatus !== 'dead' && !(isScheduledOrder && ['placed', 'confirmed'].includes(orderStatus)) && (
-        <MapErrorBoundary>
-          <DeliveryMap
-            orderId={orderId}
-            order={order}
-            isVisible={order !== null}
-            fallbackCustomerCoords={fallbackCustomerCoords}
-            userLiveCoords={userLiveCoords}
-            userLocationAccuracy={userLiveLocation?.accuracy ?? null}
-            onEtaUpdate={handleEtaUpdate}
-          />
-        </MapErrorBoundary>
+      {!isDeliveredOrder && orderStatus !== 'cancelled' && orderStatus !== 'dead' && (
+        <div className="absolute inset-0 z-0">
+          <MapErrorBoundary>
+            <DeliveryMap
+              orderId={orderId}
+              order={order}
+              isVisible={order !== null}
+              fallbackCustomerCoords={fallbackCustomerCoords}
+              userLiveCoords={userLiveCoords}
+              userLocationAccuracy={userLiveLocation?.accuracy ?? null}
+              onEtaUpdate={handleEtaUpdate}
+            />
+          </MapErrorBoundary>
+        </div>
       )}
 
-      {/* Scrollable Content */}
-      <div className="max-w-4xl mx-auto px-4 md:px-6 lg:px-8 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 md:pb-32">
+      {/* Scrollable Content (Bottom Sheet) */}
+      <motion.div 
+          className="absolute bottom-0 left-0 right-0 z-20 bg-gray-50 dark:bg-[#141414] rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.1)] flex flex-col max-h-[65vh]"
+          initial={false}
+          animate={{ y: isSheetExpanded ? 0 : 'calc(100% - 48px)' }}
+          transition={{ type: "spring", damping: 25, stiffness: 250 }}
+      >
+        {/* Drag handle pill */}
+        <div 
+            className="w-full flex justify-center pt-4 pb-3 shrink-0 bg-transparent cursor-pointer"
+            onClick={() => setIsSheetExpanded(!isSheetExpanded)}
+        >
+          <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 lg:px-8 py-4 space-y-4 md:space-y-6 pb-24">
+          <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
         {/* Cancellation window removed as per user request to hide immediately after acceptance */}
 
         {customerDeliveryOtp && orderStatus !== 'delivered' && orderStatus !== 'cancelled' && orderStatus !== 'dead' && (
@@ -2098,7 +2118,9 @@ export default function OrderTracking() {
           </motion.div>
         )}
 
-      </div>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Cancel Order Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>

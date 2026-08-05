@@ -74,6 +74,13 @@ export const generateDailyDeliveries = async () => {
     }
 };
 
-// To run via cron:
-// import cron from 'node-cron';
-// cron.schedule('0 0 * * *', generateDailyDeliveries);
+import cron from 'node-cron';
+
+export const initTiffinScheduler = () => {
+    console.log('Initializing Tiffin Scheduler Cron Job...');
+    // Run every day at midnight (00:00)
+    cron.schedule('0 0 * * *', () => {
+        console.log('Cron triggered: Generating daily tiffin deliveries');
+        generateDailyDeliveries();
+    });
+};

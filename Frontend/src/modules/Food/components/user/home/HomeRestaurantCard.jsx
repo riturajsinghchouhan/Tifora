@@ -1,11 +1,12 @@
 import { Link } from "react-router-dom";
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState, useEffect } from "react";
 import {
   BadgePercent,
   Bookmark,
   Clock,
   Star,
   Timer,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent } from "@food/components/ui/card";
 import { Button } from "@food/components/ui/button";
@@ -41,6 +42,29 @@ function HomeRestaurantCard({
   onToggleFavorite,
   animateEntrance = false,
 }) {
+  const [currentMenuIndex, setCurrentMenuIndex] = useState(0);
+
+  const plansData = useMemo(() => {
+    if (restaurant?.plans?.length > 0) {
+      return restaurant.plans.map(p => ({
+        menu: `${p.name}: ${p.itemsDescription || "Dal, Roti, Sabzi"}`,
+        price: p.price || restaurant.monthlyPrice || "1500"
+      }));
+    }
+    return [
+      { menu: "Mini Tiffin: Dal, Rice, Sabzi, 2 Roti", price: "1200" },
+      { menu: "Regular Tiffin: Dal, 2 Sabzi, 4 Roti, Salad", price: "1500" },
+      { menu: "Special Box: Paneer, Veg, Pulao, 4 Roti, Sweet", price: "2500" }
+    ];
+  }, [restaurant?.plans, restaurant?.monthlyPrice]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentMenuIndex((prev) => (prev + 1) % plansData.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [plansData.length]);
+
   const { ref, outletTimings } = useDeferredOutletTimings(
     restaurant?.mongoId,
     restaurant?.outletTimings ?? null,
@@ -88,6 +112,8 @@ function HomeRestaurantCard({
                 backendOrigin={backendOrigin}
               />
 
+              {/* Removed Pure Veg Badge from Image */}
+
               <div className="absolute top-4 right-4 z-10 transform transition-transform duration-300 group-hover:scale-110">
                 <Button
                   variant="ghost"
@@ -107,76 +133,111 @@ function HomeRestaurantCard({
                   />
                 </Button>
               </div>
+
+              {/* Chef Avatar Overlapping Image Bottom */}
+              <div className="absolute -bottom-6 right-4 z-20">
+                <div className="h-16 w-16 rounded-full border-[3px] border-white bg-gray-200 overflow-hidden shadow-xl">
+                  <img 
+                    src={restaurant.chefAvatar || "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=100&h=100&fit=crop"} 
+                    alt="Chef"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="transform transition-transform duration-300 group-hover:-translate-y-1">
-              <CardContent className="p-3 sm:p-4 lg:p-5 pt-3 sm:pt-4 lg:pt-5 flex flex-col flex-grow">
-                <div className="flex items-start justify-between gap-2 mb-2 lg:mb-3">
+              <CardContent className="p-3 sm:p-4 lg:p-5 pt-8 sm:pt-8 lg:pt-8 flex flex-col flex-grow">
+                <div className="flex items-start justify-between gap-2 mb-1">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg lg:text-2xl font-bold text-gray-950 dark:text-white line-clamp-1 leading-tight tracking-tight transition-colors duration-300 group-hover:text-primary">
+                    <h3 
+                      className="text-xl lg:text-2xl font-extrabold text-gray-950 dark:text-white line-clamp-1 leading-tight tracking-tight transition-all duration-300 group-hover:scale-[1.02]"
+                      style={{
+                        fontFamily: "'Outfit', 'Poppins', sans-serif"
+                      }}
+                    >
                       {restaurant.name}
                     </h3>
-                    <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <span
-                        className={`inline-flex rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                          availability.isOpen
-                            ? "bg-primary text-white"
-                            : "bg-gray-400 text-white"
-                        }`}
-                      >
-                        {availability.isOpen ? "Open now" : "Offline"}
-                      </span>
-                      {availability.isOpen &&
-                        availability.closingCountdownLabel &&
-                        availability.openingTime &&
-                        availability.closingTime && (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-black uppercase tracking-widest">
-                            <Timer className="h-3 w-3 flex-shrink-0" strokeWidth={3} />
-                            <span>{availability.closingCountdownLabel}</span>
-                          </div>
-                        )}
+                    <div className="flex items-center gap-1.5 text-[11px] lg:text-xs text-gray-500 dark:text-gray-400 mt-1">
+                       <MapPin className="h-3.5 w-3.5 shrink-0" />
+                       <span className="truncate max-w-[120px]">{typeof restaurant.address === 'object' ? restaurant.address?.locality || restaurant.address?.city : restaurant.address || restaurant.locationName || "Nearby"}</span>
+                       <span className="mx-0.5">•</span>
+                       <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{restaurant.distance || restaurant.distanceText || ""}</span>
                     </div>
                   </div>
-                  <div className="flex-shrink-0 bg-green-600 text-white px-3 py-1.5 rounded-2xl flex items-center gap-1.5 shadow-md transform transition-transform duration-300 group-hover:scale-110">
-                    <span className="text-sm lg:text-lg font-black tracking-tight">
-                      {Number(restaurant.rating) > 0
-                        ? Number(restaurant.rating).toFixed(1)
-                        : "NEW"}
-                    </span>
-                    {Number(restaurant.rating) > 0 && (
-                      <Star
-                        className="h-3.5 w-3.5 lg:h-4.5 lg:w-4.5 fill-white text-white"
-                        strokeWidth={0}
-                      />
-                    )}
+                  <div className="flex items-center gap-2">
+                    {/* Veg/Non-Veg Icon */}
+                    <div className={`h-4 w-4 border-[1.5px] rounded-[3px] flex items-center justify-center shrink-0 shadow-sm ${restaurant.isVeg !== false ? 'border-green-600' : 'border-red-600'}`}>
+                      <div className={`h-2 w-2 rounded-full ${restaurant.isVeg !== false ? 'bg-green-600' : 'bg-red-600'}`} />
+                    </div>
+                    <div className="flex-shrink-0 bg-green-600 text-white px-2 py-1 rounded-xl flex items-center gap-1 shadow-sm transform transition-transform duration-300 group-hover:scale-105">
+                      <span className="text-xs font-bold tracking-tight">
+                        {Number(restaurant.rating) > 0
+                          ? Number(restaurant.rating).toFixed(1)
+                          : "NEW"}
+                      </span>
+                      {Number(restaurant.rating) > 0 && (
+                        <Star
+                          className="h-3 w-3 fill-white text-white"
+                          strokeWidth={0}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1 text-sm lg:text-base text-gray-500 mb-2 lg:mb-3 transition-opacity duration-300 opacity-70 group-hover:opacity-100">
-                  <Clock
-                    className="h-4 w-4 lg:h-5 lg:w-5 text-gray-500 dark:text-gray-400"
-                    strokeWidth={1.5}
-                  />
-                  <span className="font-medium dark:text-gray-300 text-gray-700">
-                    {restaurant.deliveryTime}
-                  </span>
-                  <span className="mx-1">|</span>
-                  <span className="font-medium dark:text-gray-300 text-gray-700">
-                    {restaurant.distance}
-                  </span>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                   <span className="inline-flex rounded bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 text-[10px] font-bold">
+                     Lunch & Dinner
+                   </span>
+                   {availability.isOpen ? (
+                     <span className="inline-flex rounded bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300 px-2 py-0.5 text-[10px] font-bold">
+                       Accepting Orders
+                     </span>
+                   ) : (
+                     <span className="inline-flex rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 px-2 py-0.5 text-[10px] font-bold">
+                       Currently Closed
+                     </span>
+                   )}
                 </div>
 
-                {restaurant.offer && (
-                  <div className="flex items-center gap-2 text-sm lg:text-base mt-auto transform transition-transform duration-300 group-hover:translate-x-1">
-                    <BadgePercent
-                      className="h-4 w-4 lg:h-5 lg:w-5 text-primary"
-                      strokeWidth={3}
-                    />
-                    <span className="text-primary dark:text-[#a05485] font-black uppercase text-[10px] tracking-wider">
-                      {restaurant.offer}
-                    </span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Starting at</p>
+                    <div className="overflow-hidden relative h-[28px] w-[120px]">
+                       <div 
+                          className="absolute w-full transition-transform duration-500 ease-in-out" 
+                          style={{ transform: `translateY(-${currentMenuIndex * 28}px)` }}
+                       >
+                          {plansData.map((plan, idx) => (
+                             <p key={idx} className="h-[28px] text-base lg:text-lg font-black text-gray-900 dark:text-white flex items-center">
+                               ₹{plan.price}<span className="text-xs font-medium text-gray-500 ml-1">/mo</span>
+                             </p>
+                          ))}
+                       </div>
+                    </div>
                   </div>
-                )}
+                  <div className="text-right">
+                    <div className="flex items-center justify-end gap-1 text-xs text-gray-500">
+                      <Clock className="h-3.5 w-3.5 text-gray-400" />
+                      <span className="font-medium">{restaurant.deliveryTime || "Daily"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="-mt-1 overflow-hidden relative h-[34px]">
+                   <div 
+                      className="absolute w-full transition-transform duration-500 ease-in-out" 
+                      style={{ transform: `translateY(-${currentMenuIndex * 34}px)` }}
+                   >
+                     {plansData.map((plan, idx) => (
+                       <p key={idx} className="h-[34px] text-xs text-gray-500 dark:text-gray-400 italic line-clamp-1 flex items-center">
+                         <span className="font-semibold text-gray-800 dark:text-gray-300 mr-1 shrink-0">Menu:</span> 
+                         <span className="truncate">{plan.menu}</span>
+                       </p>
+                     ))}
+                   </div>
+                </div>
               </CardContent>
             </div>
 
