@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
     MapPin, 
     Search, 
-    CheckCircle, 
+    CheckCircle2, 
     Loader2, 
     AlertCircle, 
     Layers, 
@@ -13,14 +13,17 @@ import {
     Square, 
     Bike, 
     Phone, 
-    Sparkles, 
     RefreshCw, 
     ChevronDown, 
     ChevronUp,
-    Filter
+    Filter,
+    Send,
+    X,
+    Info
 } from 'lucide-react';
 import api from '@food/api';
 import { toast } from 'sonner';
+import RestaurantPageShell from '@food/components/restaurant/RestaurantPageShell';
 
 export default function TiffinDispatchPanel() {
     const [deliveries, setDeliveries] = useState([]);
@@ -29,8 +32,8 @@ export default function TiffinDispatchPanel() {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [selectedPartner, setSelectedPartner] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedZone, setSelectedZone] = useState('all'); // 'all' or zoneName
-    const [selectedSlot, setSelectedSlot] = useState('all'); // 'all', 'Morning', 'Evening'
+    const [selectedZone, setSelectedZone] = useState('all');
+    const [selectedSlot, setSelectedSlot] = useState('all');
     const [collapsedZones, setCollapsedZones] = useState({});
     const [loading, setLoading] = useState(true);
     const [isAssigning, setIsAssigning] = useState(false);
@@ -53,7 +56,7 @@ export default function TiffinDispatchPanel() {
             }
         } catch (error) {
             console.error('Fetch dispatch error:', error);
-            toast?.error?.('Failed to load dispatch roster');
+            if (toast?.error) toast.error('Failed to load dispatch roster');
         } finally {
             setLoading(false);
         }
@@ -150,8 +153,7 @@ export default function TiffinDispatchPanel() {
     // Dispatch assignment action
     const handleAssign = async () => {
         if (selectedIds.size === 0 || !selectedPartner) {
-            if (toast?.error) toast.error('Please select at least one delivery and an active rider');
-            else alert('Please select at least one delivery and an active rider');
+            if (toast?.error) toast.error('Please select at least one delivery and a rider');
             return;
         }
 
@@ -164,9 +166,8 @@ export default function TiffinDispatchPanel() {
 
             if (res?.data?.success) {
                 const riderObj = partners.find(p => p._id === selectedPartner);
-                const msg = res.data.message || `Successfully dispatched ${selectedIds.size} tiffins to ${riderObj?.name || 'Rider'}! 🚀`;
+                const msg = res.data.message || `Dispatched ${selectedIds.size} tiffins to ${riderObj?.name || 'Rider'}`;
                 if (toast?.success) toast.success(msg);
-                else alert(msg);
 
                 setDeliveries(prev => prev.filter(d => !selectedIds.has(d._id)));
                 setSelectedIds(new Set());
@@ -174,12 +175,10 @@ export default function TiffinDispatchPanel() {
                 fetchDispatchData();
             } else {
                 if (toast?.error) toast.error(res?.data?.message || 'Assignment failed');
-                else alert(res?.data?.message || 'Assignment failed');
             }
         } catch (error) {
             console.error('Error assigning deliveries:', error);
             if (toast?.error) toast.error(error?.response?.data?.message || 'Failed to assign deliveries');
-            else alert('Failed to assign deliveries');
         } finally {
             setIsAssigning(false);
         }
@@ -197,505 +196,492 @@ export default function TiffinDispatchPanel() {
         return zoneCounts;
     }, [deliveries, selectedIds]);
 
+    const morningCount = deliveries.filter(d => d.type === 'Morning').length;
+    const eveningCount = deliveries.filter(d => d.type === 'Evening').length;
+
     return (
-        <div className="p-4 md:p-8 max-w-7xl mx-auto min-h-screen flex flex-col space-y-6 font-sans">
-            {/* Header banner */}
-            <div className="bg-gradient-to-r from-rose-900 via-[#be123c] to-amber-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-rose-900/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
-                <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-                <div className="space-y-2 relative z-10">
-                    <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider text-amber-200 border border-white/10 flex items-center gap-1.5">
-                            <Layers className="w-3.5 h-3.5 text-amber-300" /> Micro-Zone Batch Dispatch
-                        </span>
-                    </div>
-                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-2">
-                        Tiffin Dispatch & Route Panel
-                    </h1>
-                    <p className="text-sm text-rose-100 max-w-xl">
-                        Organize daily lunch & dinner tiffin boxes by local micro-zones, select batches in 1-click, and dispatch to route riders.
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-3 relative z-10 w-full md:w-auto justify-start md:justify-end">
-                    <button 
-                        onClick={fetchDispatchData} 
-                        disabled={loading}
-                        className="px-4 py-2.5 bg-white/15 hover:bg-white/25 active:scale-95 transition backdrop-blur-md border border-white/20 rounded-2xl text-xs font-bold text-white flex items-center gap-2"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh Roster
-                    </button>
-                    <div className="px-4 py-2.5 bg-white text-gray-900 rounded-2xl font-black text-sm shadow-md flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                        {deliveries.length} Tiffins Pending
-                    </div>
-                </div>
-            </div>
-
-            {/* Quick KPI Counters */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center justify-between">
+        <RestaurantPageShell>
+            <div className="space-y-6">
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-gray-200">
                     <div>
-                        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Total Pending</p>
-                        <p className="text-2xl font-black text-gray-900 mt-0.5">{deliveries.length}</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-[#be123c] flex items-center justify-center font-bold">
-                        <Navigation className="w-5 h-5" />
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Active Zones</p>
-                        <p className="text-2xl font-black text-blue-600 mt-0.5">{zonePills.length}</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                        <MapPin className="w-5 h-5" />
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Lunch (Morning)</p>
-                        <p className="text-2xl font-black text-amber-600 mt-0.5">
-                            {deliveries.filter(d => d.type === 'Morning').length}
-                        </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                        <Sun className="w-5 h-5" />
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center justify-between">
-                    <div>
-                        <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Dinner (Evening)</p>
-                        <p className="text-2xl font-black text-indigo-600 mt-0.5">
-                            {deliveries.filter(d => d.type === 'Evening').length}
-                        </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-                        <Moon className="w-5 h-5" />
-                    </div>
-                </div>
-            </div>
-
-            {/* Filter & Micro-Zone Pill Selector Bar */}
-            <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm space-y-4">
-                {/* Top filter row */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    {/* Meal Slot Tabs */}
-                    <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-2xl self-start">
-                        <button
-                            onClick={() => setSelectedSlot('all')}
-                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
-                                selectedSlot === 'all' 
-                                    ? 'bg-white text-gray-900 shadow-sm' 
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                        >
-                            All Slots ({deliveries.length})
-                        </button>
-                        <button
-                            onClick={() => setSelectedSlot('Morning')}
-                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                                selectedSlot === 'Morning' 
-                                    ? 'bg-amber-500 text-white shadow-sm' 
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                        >
-                            <Sun className="w-3.5 h-3.5" /> Lunch ({deliveries.filter(d => d.type === 'Morning').length})
-                        </button>
-                        <button
-                            onClick={() => setSelectedSlot('Evening')}
-                            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                                selectedSlot === 'Evening' 
-                                    ? 'bg-indigo-600 text-white shadow-sm' 
-                                    : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                        >
-                            <Moon className="w-3.5 h-3.5" /> Dinner ({deliveries.filter(d => d.type === 'Evening').length})
-                        </button>
-                    </div>
-
-                    {/* Search box */}
-                    <div className="relative flex-1 sm:max-w-xs">
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search customer, street, landmark..."
-                            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-2xl text-xs focus:ring-2 focus:ring-rose-500/20 focus:border-[#be123c] outline-none bg-gray-50/50 hover:bg-white transition"
-                        />
-                    </div>
-                </div>
-
-                {/* Micro-Zones Horizontal Pill Bar */}
-                <div className="pt-3 border-t border-gray-100 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                    <span className="text-xs font-bold text-gray-500 whitespace-nowrap flex items-center gap-1 pr-1">
-                        <Filter className="w-3.5 h-3.5 text-[#be123c]" /> Zones:
-                    </span>
-                    
-                    <button
-                        onClick={() => setSelectedZone('all')}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
-                            selectedZone === 'all'
-                                ? 'bg-gray-900 text-white shadow-sm'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                    >
-                        All Zones ({deliveries.length})
-                    </button>
-
-                    {zonePills.map(zp => (
-                        <button
-                            key={zp.name}
-                            onClick={() => setSelectedZone(zp.name)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 border ${
-                                selectedZone === zp.name
-                                    ? 'bg-rose-50 border-[#be123c] text-[#be123c] shadow-sm font-black'
-                                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                            }`}
-                        >
-                            <MapPin className="w-3 h-3 text-[#be123c]" />
-                            {zp.name}
-                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                                selectedZone === zp.name ? 'bg-[#be123c] text-white' : 'bg-gray-100 text-gray-600'
-                            }`}>
-                                {zp.count}
+                        <div className="flex items-center gap-2 mb-1">
+                            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Tiffin Dispatch & Routes</h1>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                {deliveries.length} Pending Dispatch
                             </span>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                            Group today's orders by delivery zones, select batches, and assign to riders.
+                        </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={fetchDispatchData} 
+                            disabled={loading}
+                            title="Refresh roster"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 shadow-sm transition disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
+                            <span>Refresh List</span>
                         </button>
-                    ))}
+                    </div>
                 </div>
-            </div>
 
-            {/* Main Content: Left Zone-Grouped Orders + Right Dispatch Panel */}
-            <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-                {/* Left Area: Zone Groups */}
-                <div className="flex-1 space-y-4">
-                    {/* Top Selection & Action Bar */}
-                    <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
+                {/* Metrics Summary Row */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                        <p className="text-xs font-medium text-gray-500">Total Pending</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{deliveries.length}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                        <p className="text-xs font-medium text-gray-500">Lunch Batch</p>
+                        <p className="text-2xl font-bold text-amber-600 mt-1">{morningCount}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                        <p className="text-xs font-medium text-gray-500">Dinner Batch</p>
+                        <p className="text-2xl font-bold text-indigo-600 mt-1">{eveningCount}</p>
+                    </div>
+                    <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                        <p className="text-xs font-medium text-gray-500">Active Zones</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{zonePills.length}</p>
+                    </div>
+                </div>
+
+                {/* Filters & Search Toolbar */}
+                <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm space-y-3">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                        {/* Slot Selector Tabs */}
+                        <div className="inline-flex p-1 bg-gray-100 rounded-lg text-xs font-medium self-start">
                             <button
-                                onClick={handleSelectAllGlobal}
-                                className="flex items-center gap-2 text-xs font-bold text-gray-700 hover:text-gray-900 transition"
+                                onClick={() => setSelectedSlot('all')}
+                                className={`px-3 py-1.5 rounded-md transition ${
+                                    selectedSlot === 'all' 
+                                        ? 'bg-white text-gray-900 font-semibold shadow-sm' 
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
                             >
-                                {filteredDeliveries.length > 0 && selectedIds.size === filteredDeliveries.length ? (
-                                    <CheckSquare className="w-4 h-4 text-[#be123c]" />
-                                ) : (
-                                    <Square className="w-4 h-4 text-gray-400" />
-                                )}
-                                <span>Select All Visible ({filteredDeliveries.length})</span>
+                                All Slots ({deliveries.length})
                             </button>
+                            <button
+                                onClick={() => setSelectedSlot('Morning')}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${
+                                    selectedSlot === 'Morning' 
+                                        ? 'bg-amber-500 text-white font-semibold shadow-sm' 
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                <Sun className="w-3.5 h-3.5" />
+                                Lunch ({morningCount})
+                            </button>
+                            <button
+                                onClick={() => setSelectedSlot('Evening')}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${
+                                    selectedSlot === 'Evening' 
+                                        ? 'bg-indigo-600 text-white font-semibold shadow-sm' 
+                                        : 'text-gray-600 hover:text-gray-900'
+                                }`}
+                            >
+                                <Moon className="w-3.5 h-3.5" />
+                                Dinner ({eveningCount})
+                            </button>
+                        </div>
 
-                            {selectedIds.size > 0 && (
+                        {/* Search bar */}
+                        <div className="relative flex-1 sm:max-w-xs">
+                            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search customer, phone, address..."
+                                className="w-full pl-9 pr-8 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#B80B3D] focus:ring-1 focus:ring-[#B80B3D] transition bg-gray-50/50 hover:bg-white"
+                            />
+                            {searchQuery && (
                                 <button
-                                    onClick={() => setSelectedIds(new Set())}
-                                    className="text-xs font-bold text-rose-600 hover:underline"
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                                 >
-                                    Clear Selection
+                                    <X className="w-3.5 h-3.5" />
                                 </button>
                             )}
                         </div>
-
-                        <div className="text-xs font-bold text-gray-500">
-                            Showing <span className="text-gray-900">{filteredDeliveries.length}</span> of {deliveries.length} tiffins
-                        </div>
                     </div>
 
-                    {/* Deliveries by Micro-Zone */}
-                    {loading ? (
-                        <div className="bg-white rounded-3xl p-16 border border-gray-200 text-center space-y-3">
-                            <Loader2 className="w-8 h-8 text-[#be123c] animate-spin mx-auto" />
-                            <p className="text-sm font-bold text-gray-600">Loading today's delivery route roster...</p>
-                        </div>
-                    ) : Object.keys(groupedByZone).length === 0 ? (
-                        <div className="bg-white rounded-3xl p-16 border border-gray-200 text-center space-y-3 shadow-sm">
-                            <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto" />
-                            <h3 className="text-base font-extrabold text-gray-900">All Tiffins Dispatched!</h3>
-                            <p className="text-xs text-gray-400 max-w-md mx-auto">
-                                No pending unassigned deliveries match your active filter. Great job!
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {Object.entries(groupedByZone).map(([zoneName, zoneItems]) => {
-                                const isCollapsed = collapsedZones[zoneName];
-                                const zoneIds = zoneItems.map(d => d._id);
-                                const allZoneSelected = zoneIds.every(id => selectedIds.has(id));
-                                const someZoneSelected = zoneIds.some(id => selectedIds.has(id)) && !allZoneSelected;
-                                const morningCount = zoneItems.filter(d => d.type === 'Morning').length;
-                                const eveningCount = zoneItems.filter(d => d.type === 'Evening').length;
+                    {/* Micro-Zones Pill Selector */}
+                    {zonePills.length > 0 && (
+                        <div className="pt-3 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                            <span className="font-semibold text-gray-500 whitespace-nowrap pr-1 flex items-center gap-1">
+                                <Filter className="w-3 h-3 text-gray-400" />
+                                Zones:
+                            </span>
+                            
+                            <button
+                                onClick={() => setSelectedZone('all')}
+                                className={`px-2.5 py-1 rounded-md whitespace-nowrap transition font-medium ${
+                                    selectedZone === 'all'
+                                        ? 'bg-gray-900 text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                            >
+                                All Zones ({deliveries.length})
+                            </button>
 
-                                return (
-                                    <div 
-                                        key={zoneName} 
-                                        className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md"
-                                    >
-                                        {/* Zone Header Banner */}
-                                        <div className="p-4 sm:p-5 bg-gradient-to-r from-gray-50 via-rose-50/30 to-amber-50/20 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => handleToggleZoneSelection(zoneName, zoneItems)}
-                                                    className="p-1 text-gray-400 hover:text-gray-700 transition"
-                                                    title={allZoneSelected ? 'Deselect Zone' : 'Select entire zone'}
-                                                >
-                                                    {allZoneSelected ? (
-                                                        <CheckSquare className="w-5 h-5 text-[#be123c]" />
-                                                    ) : someZoneSelected ? (
-                                                        <div className="w-5 h-5 rounded border-2 border-[#be123c] flex items-center justify-center bg-rose-100">
-                                                            <div className="w-2.5 h-2.5 bg-[#be123c] rounded-sm" />
-                                                        </div>
-                                                    ) : (
-                                                        <Square className="w-5 h-5 text-gray-300 hover:text-gray-400" />
-                                                    )}
-                                                </button>
-
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <h3 className="text-sm sm:text-base font-black text-gray-900 flex items-center gap-1.5">
-                                                            <MapPin className="w-4 h-4 text-[#be123c]" />
-                                                            {zoneName}
-                                                        </h3>
-                                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#be123c] text-white">
-                                                            {zoneItems.length} Tiffins
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-[11px] text-gray-500 mt-0.5 font-medium">
-                                                        {morningCount > 0 && <span>☀️ {morningCount} Lunch</span>}
-                                                        {morningCount > 0 && eveningCount > 0 && <span className="mx-1.5">•</span>}
-                                                        {eveningCount > 0 && <span>🌙 {eveningCount} Dinner</span>}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 self-end sm:self-center">
-                                                <button
-                                                    onClick={() => handleToggleZoneSelection(zoneName, zoneItems)}
-                                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
-                                                        allZoneSelected
-                                                            ? 'bg-rose-100 border-rose-200 text-[#be123c]'
-                                                            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
-                                                    }`}
-                                                >
-                                                    {allZoneSelected ? 'Deselect Zone' : `Select All in Zone (${zoneItems.length})`}
-                                                </button>
-
-                                                <button
-                                                    onClick={() => toggleCollapse(zoneName)}
-                                                    className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
-                                                >
-                                                    {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {/* Orders in this Zone */}
-                                        {!isCollapsed && (
-                                            <div className="p-3.5 sm:p-4 space-y-2.5 divide-y divide-gray-50">
-                                                {zoneItems.map(d => {
-                                                    const isSelected = selectedIds.has(d._id);
-                                                    const customerName = d?.userId?.name || d?.name || 'Valued Subscriber';
-                                                    const phone = d?.userId?.phone || d?.deliveryAddress?.phone || '9876543210';
-                                                    const street = d?.deliveryAddress?.fullAddress || d?.deliveryAddress?.street || d?.address || 'Indore';
-                                                    const landmark = d?.deliveryAddress?.landmark;
-                                                    const planName = d?.subscriptionId?.planId?.name || 'Homestyle Tiffin Thali';
-
-                                                    return (
-                                                        <div
-                                                            key={d._id}
-                                                            onClick={() => handleSelectSingle(d._id)}
-                                                            className={`p-3.5 sm:p-4 rounded-2xl cursor-pointer transition flex items-start gap-3.5 border ${
-                                                                isSelected
-                                                                    ? 'bg-rose-50/70 border-rose-300 shadow-sm'
-                                                                    : 'bg-gray-50/40 border-gray-100 hover:bg-gray-50 hover:border-gray-200'
-                                                            }`}
-                                                        >
-                                                            <div className="pt-0.5">
-                                                                {isSelected ? (
-                                                                    <CheckSquare className="w-4 h-4 text-[#be123c]" />
-                                                                ) : (
-                                                                    <Square className="w-4 h-4 text-gray-300" />
-                                                                )}
-                                                            </div>
-
-                                                            <div className="flex-1 min-w-0 space-y-1.5">
-                                                                {/* Top Row: Customer & Slot */}
-                                                                <div className="flex items-center justify-between gap-2">
-                                                                    <div className="flex items-center gap-2 truncate">
-                                                                        <span className="font-bold text-sm text-gray-900 truncate">
-                                                                            {customerName}
-                                                                        </span>
-                                                                        <span className="text-xs text-gray-400 font-normal flex items-center gap-1">
-                                                                            <Phone className="w-3 h-3" /> {phone}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider shrink-0 ${
-                                                                        d.type === 'Morning'
-                                                                            ? 'bg-amber-100 text-amber-800'
-                                                                            : 'bg-indigo-100 text-indigo-800'
-                                                                    }`}>
-                                                                        {d.type === 'Morning' ? '☀️ Lunch' : '🌙 Dinner'}
-                                                                    </span>
-                                                                </div>
-
-                                                                {/* Plan Name */}
-                                                                <p className="text-xs font-semibold text-rose-800/80 truncate">
-                                                                    🍱 {planName}
-                                                                </p>
-
-                                                                {/* Address & Landmark */}
-                                                                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                                                                    <span className="flex items-center gap-1 truncate text-gray-700">
-                                                                        <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                                                                        <span className="truncate">{street}</span>
-                                                                    </span>
-                                                                    {landmark && (
-                                                                        <span className="px-2 py-0.5 rounded-md bg-white border border-gray-200 text-[10px] font-bold text-gray-500">
-                                                                            🏢 {landmark}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                            {zonePills.map(zp => (
+                                <button
+                                    key={zp.name}
+                                    onClick={() => setSelectedZone(zp.name)}
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md whitespace-nowrap transition font-medium border ${
+                                        selectedZone === zp.name
+                                            ? 'bg-rose-50 border-[#B80B3D] text-[#B80B3D] font-semibold'
+                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <MapPin className="w-3 h-3" />
+                                    <span>{zp.name}</span>
+                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                                        selectedZone === zp.name ? 'bg-[#B80B3D] text-white' : 'bg-gray-100 text-gray-500'
+                                    }`}>
+                                        {zp.count}
+                                    </span>
+                                </button>
+                            ))}
                         </div>
                     )}
                 </div>
 
-                {/* Right Sticky Sidebar: Dispatch Action */}
-                <div className="w-full lg:w-88 flex flex-col gap-4">
-                    <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 space-y-5 sticky top-6">
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
-                            <h3 className="font-black text-gray-900 flex items-center gap-2 text-base">
-                                <Bike className="w-5 h-5 text-[#be123c]" />
-                                Dispatch to Partner
-                            </h3>
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-100">
-                                Live Riders
-                            </span>
-                        </div>
+                {/* Main Content Grid: Zone Deliveries (Left) + Rider Assignment (Right) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* Left Column: Zone Grouped Deliveries */}
+                    <div className="lg:col-span-8 space-y-4">
+                        {/* Global Selection Toolbar */}
+                        <div className="bg-white rounded-xl px-4 py-3 border border-gray-200 shadow-sm flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={handleSelectAllGlobal}
+                                    className="inline-flex items-center gap-2 font-medium text-gray-700 hover:text-gray-900 transition"
+                                >
+                                    {filteredDeliveries.length > 0 && selectedIds.size === filteredDeliveries.length ? (
+                                        <CheckSquare className="w-4 h-4 text-[#B80B3D]" />
+                                    ) : (
+                                        <Square className="w-4 h-4 text-gray-400" />
+                                    )}
+                                    <span>Select All Visible ({filteredDeliveries.length})</span>
+                                </button>
 
-                        {/* Selected Counter & Zone Breakdown */}
-                        <div className="bg-gradient-to-br from-rose-50 to-amber-50/50 p-4 rounded-2xl border border-rose-100 space-y-2">
-                            <div className="flex items-center justify-between text-xs font-bold text-gray-600">
-                                <span>Selected Tiffins:</span>
-                                <span className="text-xl font-black text-[#be123c]">{selectedIds.size}</span>
+                                {selectedIds.size > 0 && (
+                                    <button
+                                        onClick={() => setSelectedIds(new Set())}
+                                        className="font-medium text-[#B80B3D] hover:underline"
+                                    >
+                                        Clear Selection
+                                    </button>
+                                )}
                             </div>
 
-                            {selectedIds.size > 0 && (
-                                <div className="pt-2 border-t border-rose-100/80 space-y-1">
-                                    <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider block">
-                                        Zone Breakdown:
-                                    </span>
-                                    {Object.entries(selectedBreakdown).map(([zName, count]) => (
-                                        <div key={zName} className="flex items-center justify-between text-xs text-gray-700 font-semibold">
-                                            <span className="truncate pr-2">• {zName}</span>
-                                            <span className="font-bold text-[#be123c] shrink-0">{count}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            <div className="text-gray-500 font-medium">
+                                Showing <strong className="text-gray-900">{filteredDeliveries.length}</strong> of {deliveries.length}
+                            </div>
                         </div>
 
-                        {/* Rider Selection */}
-                        <div className="space-y-2">
-                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
-                                Choose Delivery Rider:
-                            </label>
+                        {/* Deliveries Content */}
+                        {loading ? (
+                            <div className="bg-white rounded-xl p-16 border border-gray-200 text-center space-y-2">
+                                <Loader2 className="w-6 h-6 text-[#B80B3D] animate-spin mx-auto" />
+                                <p className="text-xs text-gray-500 font-medium">Loading tiffin route roster...</p>
+                            </div>
+                        ) : Object.keys(groupedByZone).length === 0 ? (
+                            <div className="bg-white rounded-xl p-16 border border-gray-200 text-center space-y-2 shadow-sm">
+                                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
+                                <h3 className="text-base font-bold text-gray-900">All Tiffins Dispatched</h3>
+                                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                                    No unassigned tiffin deliveries matching the current filter.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {Object.entries(groupedByZone).map(([zoneName, zoneItems]) => {
+                                    const isCollapsed = collapsedZones[zoneName];
+                                    const zoneIds = zoneItems.map(d => d._id);
+                                    const allZoneSelected = zoneIds.every(id => selectedIds.has(id));
+                                    const someZoneSelected = zoneIds.some(id => selectedIds.has(id)) && !allZoneSelected;
+                                    const zoneMorning = zoneItems.filter(d => d.type === 'Morning').length;
+                                    const zoneEvening = zoneItems.filter(d => d.type === 'Evening').length;
 
-                            <div className="space-y-2">
-                                {partners.map(p => {
-                                    const isSelected = selectedPartner === p._id;
                                     return (
-                                        <div
-                                            key={p._id}
-                                            onClick={() => setSelectedPartner(p._id)}
-                                            className={`p-3 rounded-2xl border cursor-pointer transition flex items-center justify-between gap-3 ${
-                                                isSelected
-                                                    ? 'bg-rose-50 border-[#be123c] ring-1 ring-[#be123c]'
-                                                    : 'bg-white border-gray-200 hover:bg-gray-50'
-                                            }`}
+                                        <div 
+                                            key={zoneName} 
+                                            className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
                                         >
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm ${
-                                                    isSelected ? 'bg-[#be123c] text-white' : 'bg-gray-100 text-gray-700'
-                                                }`}>
-                                                    {p.name.charAt(0)}
+                                            {/* Zone Header */}
+                                            <div className="px-4 py-3.5 bg-gray-50/80 border-b border-gray-200 flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <button
+                                                        onClick={() => handleToggleZoneSelection(zoneName, zoneItems)}
+                                                        className="text-gray-400 hover:text-gray-600 transition shrink-0"
+                                                        title={allZoneSelected ? 'Deselect Zone' : 'Select entire zone'}
+                                                    >
+                                                        {allZoneSelected ? (
+                                                            <CheckSquare className="w-4 h-4 text-[#B80B3D]" />
+                                                        ) : someZoneSelected ? (
+                                                            <div className="w-4 h-4 rounded border border-[#B80B3D] flex items-center justify-center bg-rose-50">
+                                                                <div className="w-2 h-2 bg-[#B80B3D] rounded-xs" />
+                                                            </div>
+                                                        ) : (
+                                                            <Square className="w-4 h-4 text-gray-400" />
+                                                        )}
+                                                    </button>
+
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5 truncate">
+                                                                <MapPin className="w-3.5 h-3.5 text-[#B80B3D] shrink-0" />
+                                                                <span className="truncate">{zoneName}</span>
+                                                            </h3>
+                                                            <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-gray-200 text-gray-700">
+                                                                {zoneItems.length} orders
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[11px] text-gray-500 mt-0.5">
+                                                            {zoneMorning > 0 && <span>{zoneMorning} Lunch</span>}
+                                                            {zoneMorning > 0 && zoneEvening > 0 && <span className="mx-1.5">•</span>}
+                                                            {zoneEvening > 0 && <span>{zoneEvening} Dinner</span>}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-xs font-bold text-gray-900 truncate">{p.name}</p>
-                                                    <p className="text-[10px] text-gray-500 truncate">{p.vehicleType || 'Bike'}</p>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <button
+                                                        onClick={() => handleToggleZoneSelection(zoneName, zoneItems)}
+                                                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition border ${
+                                                            allZoneSelected
+                                                                ? 'bg-rose-50 border-rose-200 text-[#B80B3D]'
+                                                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                                                        }`}
+                                                    >
+                                                        {allZoneSelected ? 'Deselect' : `Select All (${zoneItems.length})`}
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => toggleCollapse(zoneName)}
+                                                        className="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-200/60 transition"
+                                                    >
+                                                        {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                                                    </button>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-2 h-2 rounded-full bg-green-500" title="Online" />
-                                                <input
-                                                    type="radio"
-                                                    name="selectedRiderRadio"
-                                                    checked={isSelected}
-                                                    onChange={() => setSelectedPartner(p._id)}
-                                                    className="text-[#be123c] focus:ring-[#be123c]"
-                                                />
-                                            </div>
+                                            {/* Deliveries in this Zone */}
+                                            {!isCollapsed && (
+                                                <div className="divide-y divide-gray-100 p-2 sm:p-3 space-y-1.5">
+                                                    {zoneItems.map(d => {
+                                                        const isSelected = selectedIds.has(d._id);
+                                                        const customerName = d?.userId?.name || d?.name || 'Customer';
+                                                        const phone = d?.userId?.phone || d?.deliveryAddress?.phone || '—';
+                                                        const street = d?.deliveryAddress?.fullAddress || d?.deliveryAddress?.street || d?.address || 'Indore';
+                                                        const landmark = d?.deliveryAddress?.landmark;
+                                                        const planName = d?.subscriptionId?.planId?.name || 'Standard Tiffin Meal';
+
+                                                        return (
+                                                            <div
+                                                                key={d._id}
+                                                                onClick={() => handleSelectSingle(d._id)}
+                                                                className={`p-3 rounded-lg cursor-pointer transition flex items-start gap-3 border ${
+                                                                    isSelected
+                                                                        ? 'bg-rose-50/60 border-rose-200 shadow-xs'
+                                                                        : 'bg-white border-gray-100 hover:border-gray-200 hover:bg-gray-50/50'
+                                                                }`}
+                                                            >
+                                                                <div className="pt-0.5 shrink-0">
+                                                                    {isSelected ? (
+                                                                        <CheckSquare className="w-4 h-4 text-[#B80B3D]" />
+                                                                    ) : (
+                                                                        <Square className="w-4 h-4 text-gray-300" />
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex-1 min-w-0 space-y-1">
+                                                                    {/* Row 1: Customer Name, Phone & Slot */}
+                                                                    <div className="flex items-center justify-between gap-2">
+                                                                        <div className="flex items-center gap-2 truncate">
+                                                                            <span className="font-semibold text-xs text-gray-900 truncate">
+                                                                                {customerName}
+                                                                            </span>
+                                                                            <span className="text-[11px] text-gray-400 flex items-center gap-1">
+                                                                                <Phone className="w-3 h-3 text-gray-400" />
+                                                                                {phone}
+                                                                            </span>
+                                                                        </div>
+
+                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
+                                                                            d.type === 'Morning'
+                                                                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                                : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                                                        }`}>
+                                                                            {d.type === 'Morning' ? 'Lunch' : 'Dinner'}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {/* Row 2: Plan Name */}
+                                                                    <p className="text-xs text-gray-600 font-medium truncate">
+                                                                        {planName}
+                                                                    </p>
+
+                                                                    {/* Row 3: Address and Landmark */}
+                                                                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-gray-500 pt-0.5">
+                                                                        <span className="truncate max-w-md">{street}</span>
+                                                                        {landmark && (
+                                                                            <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-gray-100 text-[10px] text-gray-600 font-medium">
+                                                                                Near {landmark}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
                             </div>
+                        )}
+                    </div>
 
-                            {partners.length === 0 && !loading && (
-                                <p className="text-xs text-amber-600 bg-amber-50 p-2.5 rounded-xl border border-amber-100 flex items-center gap-1.5">
-                                    <AlertCircle className="w-4 h-4 shrink-0" />
-                                    No riders online right now.
-                                </p>
-                            )}
-                        </div>
+                    {/* Right Column: Sticky Dispatch Action Box */}
+                    <div className="lg:col-span-4">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4 sticky top-6">
+                            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                                <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                                    <Bike className="w-4 h-4 text-[#B80B3D]" />
+                                    Assign Delivery Rider
+                                </h3>
+                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    Active Riders
+                                </span>
+                            </div>
 
-                        {/* Dispatch Action Button */}
-                        <button
-                            onClick={handleAssign}
-                            disabled={selectedIds.size === 0 || !selectedPartner || isAssigning}
-                            className={`w-full py-4 rounded-2xl font-black text-sm transition flex items-center justify-center gap-2 shadow-lg ${
-                                selectedIds.size > 0 && selectedPartner && !isAssigning
-                                    ? 'bg-gradient-to-r from-[#be123c] to-amber-600 text-white shadow-rose-900/20 hover:from-rose-800 hover:to-amber-700 active:scale-98'
-                                    : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
-                            }`}
-                        >
-                            {isAssigning ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Assigning & Notifying Rider...
-                                </>
-                            ) : (
-                                <>
-                                    <Navigation className="w-4 h-4" />
-                                    {selectedIds.size > 0 
-                                        ? `Dispatch ${selectedIds.size} Tiffins Now` 
-                                        : 'Select Tiffins & Rider'
-                                    }
-                                </>
-                            )}
-                        </button>
+                            {/* Selection Summary */}
+                            <div className="bg-gray-50 p-3.5 rounded-lg border border-gray-200/80 space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-gray-600 font-medium">Selected Tiffins:</span>
+                                    <span className="text-lg font-bold text-gray-900">{selectedIds.size}</span>
+                                </div>
 
-                        {/* Route optimization tip */}
-                        <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-[11px] text-gray-500 space-y-1">
-                            <span className="font-bold text-gray-700 flex items-center gap-1">
-                                <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Route Batching Tip:
-                            </span>
-                            <p>
-                                Select all tiffins of a single micro-zone (e.g. <em>Silicon City</em>) and assign them to one rider for the fastest delivery turnaround.
-                            </p>
+                                {selectedIds.size > 0 ? (
+                                    <div className="pt-2 border-t border-gray-200/60 space-y-1">
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                            Zone Breakdown:
+                                        </p>
+                                        {Object.entries(selectedBreakdown).map(([zName, count]) => (
+                                            <div key={zName} className="flex items-center justify-between text-xs text-gray-700">
+                                                <span className="truncate pr-2">• {zName}</span>
+                                                <span className="font-semibold text-gray-900 shrink-0">{count}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-[11px] text-gray-500">
+                                        Select orders from the list on the left to assign a batch.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Rider Selection List */}
+                            <div className="space-y-2">
+                                <label className="block text-xs font-semibold text-gray-700">
+                                    Available Riders ({partners.length}):
+                                </label>
+
+                                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                                    {partners.map(p => {
+                                        const isSelected = selectedPartner === p._id;
+                                        return (
+                                            <div
+                                                key={p._id}
+                                                onClick={() => setSelectedPartner(p._id)}
+                                                className={`p-2.5 rounded-lg border cursor-pointer transition flex items-center justify-between gap-3 text-xs ${
+                                                    isSelected
+                                                        ? 'bg-rose-50/70 border-[#B80B3D] ring-1 ring-[#B80B3D]'
+                                                        : 'bg-white border-gray-200 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                                        isSelected ? 'bg-[#B80B3D] text-white' : 'bg-gray-100 text-gray-600'
+                                                    }`}>
+                                                        {p.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-gray-900 truncate">{p.name}</p>
+                                                        <p className="text-[11px] text-gray-500 truncate">{p.vehicleType || 'Motorcycle'}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <input
+                                                        type="radio"
+                                                        name="selectedRiderRadio"
+                                                        checked={isSelected}
+                                                        onChange={() => setSelectedPartner(p._id)}
+                                                        className="text-[#B80B3D] focus:ring-[#B80B3D]"
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {partners.length === 0 && !loading && (
+                                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                                        <span>No delivery riders online currently.</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Dispatch Action Button */}
+                            <button
+                                onClick={handleAssign}
+                                disabled={selectedIds.size === 0 || !selectedPartner || isAssigning}
+                                className={`w-full py-2.5 px-4 rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2 shadow-sm ${
+                                    selectedIds.size > 0 && selectedPartner && !isAssigning
+                                        ? 'bg-[#B80B3D] text-white hover:bg-[#9a0933] active:scale-[0.99]'
+                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                }`}
+                            >
+                                {isAssigning ? (
+                                    <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Dispatching to Rider...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Navigation className="w-3.5 h-3.5" />
+                                        <span>
+                                            {selectedIds.size > 0 
+                                                ? `Dispatch ${selectedIds.size} Tiffins` 
+                                                : 'Select Orders & Rider'}
+                                        </span>
+                                    </>
+                                )}
+                            </button>
+
+                            {/* Route optimization note */}
+                            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200/60 text-[11px] text-gray-500 flex items-start gap-2">
+                                <Info className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                                <span>
+                                    Tip: Selecting all orders in a single zone (e.g. <em>Silicon City</em>) and assigning to one rider keeps delivery routes fast and organized.
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </RestaurantPageShell>
     );
 }
