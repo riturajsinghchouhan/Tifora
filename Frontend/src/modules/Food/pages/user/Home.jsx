@@ -37,6 +37,9 @@ import {
   Plus,
   Check,
   Share2,
+  Hotel,
+  Building2,
+  ChevronRight,
 } from "lucide-react";
 import outOfZoneBg from "@food/assets/out-of-zone-bg.png";
 import { motion, AnimatePresence } from "framer-motion";
@@ -109,6 +112,8 @@ import exploreOffers from "@food/assets/explore more icons/offers.png";
 import exploreGourmet from "@food/assets/explore more icons/gourmet.png";
 import exploreTop10 from "@food/assets/explore more icons/top 10.png";
 import exploreCollection from "@food/assets/explore more icons/collection.png";
+import foodCategoryIcon from "@food/assets/category-icons/food.png";
+import hotelCategoryIcon from "@food/assets/category-icons/hotel.png";
 
 // Animated placeholder for search - moved outside component to prevent recreation
 const placeholders = [
@@ -232,6 +237,79 @@ export default function Home() {
   const [exploreMoreHeading, setExploreMoreHeading] = useState(() => homePageCache.exploreMoreHeading || "Tiffin Specials");
   const [festBannerImages, setFestBannerImages] = useState(() => homePageCache.festBannerImages ?? []);
   const [bgIndex, setBgIndex] = useState(0);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+
+  const activeBanners = useMemo(() => {
+    if (heroBannerImages && heroBannerImages.length > 0) {
+      return heroBannerImages.map((img, idx) => ({
+        imageUrl: img,
+        data: heroBannersData?.[idx] || null,
+      }));
+    }
+    if (festBannerImages && festBannerImages.length > 0) {
+      return festBannerImages.map((img) => ({
+        imageUrl: img,
+        data: null,
+      }));
+    }
+    if (adsBannerImages && adsBannerImages.length > 0) {
+      return adsBannerImages.map((img, idx) => ({
+        imageUrl: img,
+        data: adsBannersData?.[idx] || null,
+      }));
+    }
+    return [
+      {
+        imageUrl: "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=1200&h=500&fit=crop&q=80",
+        title: "Flat 50% OFF on 1st Tiffin Subscription",
+        subtitle: "Homestyle Ghar Ka Khana • Free Delivery",
+        tag: "SPECIAL OFFER",
+        link: "/food/user/tiffin",
+      },
+      {
+        imageUrl: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=500&fit=crop&q=80",
+        title: "Delicious Daily Meals Starting @ ₹79",
+        subtitle: "Pure Veg & Non-Veg Options • Cancel Anytime",
+        tag: "TOP RATED",
+        link: "/food/user/tiffin",
+      },
+      {
+        imageUrl: "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=1200&h=500&fit=crop&q=80",
+        title: "Dine Out at Top Rated Hotels & Cafes",
+        subtitle: "Instant Table Booking • Exclusive Discounts",
+        tag: "DINE OUT",
+        link: "/food/user/dining",
+      }
+    ];
+  }, [heroBannerImages, heroBannersData, festBannerImages, adsBannerImages, adsBannersData]);
+
+  useEffect(() => {
+    if (activeBanners.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentBannerIndex((prev) => (prev + 1) % activeBanners.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [activeBanners.length]);
+
+  const handlePromoBannerClick = (banner) => {
+    if (!banner) return;
+    if (banner.link) {
+      navigate(banner.link);
+      return;
+    }
+    const linkedRestaurants = banner.data?.linkedRestaurants || [];
+    if (linkedRestaurants.length > 0) {
+      const first = linkedRestaurants[0];
+      const slug = first.slug || first.restaurantId || first._id;
+      navigate(`/food/user/restaurants/${slug}`);
+      return;
+    }
+    if (banner.data?.link) {
+      navigate(banner.data.link);
+      return;
+    }
+    navigate('/food/user/tiffin');
+  };
   const [recommendedRestaurantIds, setRecommendedRestaurantIds] = useState(() => homePageCache.recommendedRestaurantIds || []);
   const [under250PriceLimit, setUnder250PriceLimit] = useState(() => homePageCache.under250PriceLimit || 250);
   const [
@@ -1070,7 +1148,6 @@ export default function Home() {
 
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [activeTab, setActiveTab] = useState("food");
-  const [headerBgHeight, setHeaderBgHeight] = useState(0);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -1089,48 +1166,6 @@ export default function Home() {
 
     return () => observer.disconnect();
   }, []);
-
-  useEffect(() => {
-    const calculateHeight = () => {
-      const locEl = document.getElementById('home-header-loc-row');
-      const searchEl = document.getElementById('home-header-search-row');
-      const tiffinEl = document.getElementById('tiffin-banner-wrapper');
-      const festEl = document.getElementById('fest-banner-wrapper');
-
-      let height = 0;
-      if (locEl) height += locEl.offsetHeight;
-      if (searchEl) {
-      }
-      
-      if (locEl) {
-        let maxBottom = locEl.offsetTop + locEl.offsetHeight;
-        if (searchEl) {
-          maxBottom = Math.max(maxBottom, searchEl.offsetTop + searchEl.offsetHeight);
-        }
-        if (tiffinEl && activeTab === 'food') {
-          maxBottom = Math.max(maxBottom, tiffinEl.offsetTop + tiffinEl.offsetHeight);
-        }
-        if (festEl && activeTab === 'food') {
-          maxBottom = Math.max(maxBottom, festEl.offsetTop + festEl.offsetHeight);
-        }
-        
-        if (maxBottom > 0) {
-          setHeaderBgHeight(maxBottom); // Height perfectly matches wrapper, so the curved corners are exposed before the white category section starts
-        }
-      }
-    };
-
-    calculateHeight();
-    window.addEventListener('resize', calculateHeight);
-    const timeout = setTimeout(calculateHeight, 100);
-    const timeout2 = setTimeout(calculateHeight, 500);
-    
-    return () => {
-      window.removeEventListener('resize', calculateHeight);
-      clearTimeout(timeout);
-      clearTimeout(timeout2);
-    };
-  }, [activeTab]);
 
   // Simple filter toggle function
   const toggleFilter = (filterId) => {
@@ -2209,33 +2244,6 @@ export default function Home() {
         </div>
 
         <div className="md:hidden relative overflow-x-clip bg-white dark:bg-[#0a0a0a]">
-          {/* Brand Top Section (Dark) */}
-          {/* Decoupled Dark Background - Dynamic height based on actual components to prevent clipping sticky elements while covering properly */}
-          <div 
-             className="absolute top-0 left-0 right-0 overflow-hidden bg-gradient-to-b from-[#3a142c] to-[#1a0a14] rounded-b-[2rem] shadow-lg pointer-events-none z-0 transition-all duration-300 [transform:translateZ(0)] [mask-image:-webkit-radial-gradient(white,black)]"
-             style={{ height: festVideoActive ? '360px' : (headerBgHeight > 0 ? `${headerBgHeight}px` : (activeTab === 'food' ? '300px' : '140px')) }}
-          >
-            {festVideoActive && (
-              <div className="absolute inset-0 z-0 overflow-hidden rounded-b-[2rem] bg-slate-900 pointer-events-auto">
-                {festBannerImages.map((image, index) => (
-                  <img
-                    key={`hero-bg-${index}-${image}`}
-                    src={image}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out"
-                    style={{
-                      opacity: bgIndex === index ? 1 : 0,
-                      zIndex: bgIndex === index ? 2 : 1,
-                    }}
-                    loading={index === 0 ? "eager" : "lazy"}
-                    draggable={false}
-                  />
-                ))}
-                <div className="absolute inset-0 bg-black/20 z-[3]" />
-              </div>
-            )}
-          </div>
-
           {/* Unified Scroll Container so Sticky Search Bar works for the whole page */}
           <div className="relative z-10 w-full mb-2">
             <HomeHeader
@@ -2253,41 +2261,152 @@ export default function Home() {
             />
 
             {activeTab === "food" && (
-              <div id="tiffin-banner-wrapper" className="px-4 mt-4 mb-2">
-                <Link to="/food/user/tiffin" className="block relative w-full rounded-2xl overflow-hidden shadow-lg border border-orange-200 bg-gradient-to-r from-orange-50 to-orange-100 p-4 transition-transform active:scale-95">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-orange-400 opacity-10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-                  <div className="flex items-center justify-between relative z-10">
-                    <div className="flex flex-col">
-                      <span className="text-orange-600 font-black text-xs uppercase tracking-widest mb-1">New</span>
-                      <h3 className="text-xl font-black text-gray-900 leading-tight">Subscribe to<br/>Daily Tiffins</h3>
-                      <p className="text-sm text-gray-600 mt-1 font-medium">Home-cooked meals, delivered fresh.</p>
-                    </div>
-                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-md shrink-0 border border-orange-100">
-                      <span className="text-2xl">🍱</span>
-                    </div>
-                  </div>
-                </Link>
-              </div>
-            )}
+              <div id="tiffin-banner-wrapper" className="px-4 mt-3 mb-2 space-y-3.5">
+                {/* Promotional Banner (Top) */}
+                {activeBanners.length > 0 && (
+                  <div className="w-full">
+                    <div 
+                      className="relative w-full h-[140px] sm:h-[175px] rounded-2xl overflow-hidden shadow-md cursor-pointer group bg-gray-100 dark:bg-gray-800"
+                      onClick={() => handlePromoBannerClick(activeBanners[currentBannerIndex])}
+                    >
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.div
+                          key={currentBannerIndex}
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                          className="absolute inset-0 w-full h-full"
+                        >
+                          <img
+                            src={activeBanners[currentBannerIndex]?.imageUrl}
+                            alt="Promotional Banner"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                            onError={(e) => {
+                              e.currentTarget.src = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=500&fit=crop&q=80";
+                            }}
+                          />
+                          {/* Glossy Gradient Overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent pointer-events-none" />
 
-            {/* FestBanner restored below Tiffin Subscription banner */}
-            {activeTab === "food" && (
-              <div id="fest-banner-wrapper" className="w-full mt-2">
-                {festVideoActive ? (
-                  <div className="w-full h-20 sm:h-24" />
-                ) : (
-                  <div className="pb-4 sm:pb-6">
-                    <FestBanner
-                      isVegMode={vegMode}
-                      images={festBannerImages}
-                      hideFoodImages={false}
-                    />
+                          {/* Banner Content (if title/tag exists) */}
+                          {activeBanners[currentBannerIndex]?.title && (
+                            <div className="absolute bottom-3 left-3.5 right-12 z-10 text-white pointer-events-none">
+                              {activeBanners[currentBannerIndex]?.tag && (
+                                <span className="inline-block text-[9px] font-black uppercase tracking-wider bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/20 mb-1">
+                                  {activeBanners[currentBannerIndex].tag}
+                                </span>
+                              )}
+                              <h4 className="text-sm sm:text-base font-extrabold line-clamp-1 drop-shadow-md">
+                                {activeBanners[currentBannerIndex].title}
+                              </h4>
+                              {activeBanners[currentBannerIndex]?.subtitle && (
+                                <p className="text-[11px] text-white/90 font-medium line-clamp-1 drop-shadow-sm mt-0.5">
+                                  {activeBanners[currentBannerIndex].subtitle}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </motion.div>
+                      </AnimatePresence>
+
+                      {/* Shimmer Effect */}
+                      <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+                        <motion.div
+                          animate={{ x: ['-200%', '200%'] }}
+                          transition={{ duration: 3, repeat: Infinity, repeatDelay: 4, ease: "easeInOut" }}
+                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-20deg] w-[150%] h-full"
+                        />
+                      </div>
+
+                      {/* Pagination Dots */}
+                      {activeBanners.length > 1 && (
+                        <div className="absolute bottom-2.5 right-3 z-20 flex gap-1 px-2 py-1 bg-black/40 backdrop-blur-md rounded-full border border-white/20">
+                          {activeBanners.map((_, i) => (
+                            <div
+                              key={i}
+                              className={`h-1.5 rounded-full transition-all duration-300 ${
+                                i === currentBannerIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/40'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
+
+                {/* 2-Column Cards (Below Banner) */}
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Column 1: Tiffin Services (Green) */}
+                  <Link
+                    to="/food/user/tiffin"
+                    className="group relative flex flex-col justify-between h-[115px] sm:h-[125px] rounded-2xl overflow-hidden p-3.5 bg-gradient-to-br from-[#009b67] via-[#007a51] to-[#004e33] border border-white/10 shadow-[0_6px_20px_rgba(0,155,103,0.22)] hover:shadow-lg transition-all duration-300 active:scale-[0.97]"
+                  >
+                    {/* Top Icon Badge */}
+                    <div className="w-10 h-10 rounded-xl bg-white/95 backdrop-blur-md p-1.5 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+                      {foodCategoryIcon ? (
+                        <img
+                          src={foodCategoryIcon}
+                          alt="Tiffin Services"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.parentElement?.querySelector('.icon-fallback');
+                            if (fallback) fallback.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <UtensilsCrossed className="w-5 h-5 text-[#009b67] icon-fallback hidden" />
+                    </div>
+
+                    {/* Bottom Texts */}
+                    <div className="min-w-0 z-10">
+                      <h3 className="text-[15px] font-bold text-white leading-tight tracking-tight">
+                        Tiffin Services
+                      </h3>
+                      <p className="text-[11px] text-emerald-100/90 font-medium leading-tight mt-1 flex items-center gap-0.5">
+                        Healthy Meals <ChevronRight className="h-3 w-3 inline text-emerald-200" />
+                      </p>
+                    </div>
+                  </Link>
+
+                  {/* Column 2: Hotel Booking (Blue) */}
+                  <Link
+                    to="/food/user/hotel"
+                    className="group relative flex flex-col justify-between h-[115px] sm:h-[125px] rounded-2xl overflow-hidden p-3.5 bg-gradient-to-br from-[#1d4ed8] via-[#1e3a8a] to-[#0f172a] border border-white/10 shadow-[0_6px_20px_rgba(29,78,216,0.22)] hover:shadow-lg transition-all duration-300 active:scale-[0.97]"
+                  >
+                    {/* Top Icon Badge */}
+                    <div className="w-10 h-10 rounded-xl bg-white/95 backdrop-blur-md p-1.5 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+                      {hotelCategoryIcon ? (
+                        <img
+                          src={hotelCategoryIcon}
+                          alt="Hotel Booking"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const fallback = e.currentTarget.parentElement?.querySelector('.icon-fallback');
+                            if (fallback) fallback.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <Building2 className="w-5 h-5 text-[#1d4ed8] icon-fallback hidden" />
+                    </div>
+
+                    {/* Bottom Texts */}
+                    <div className="min-w-0 z-10">
+                      <h3 className="text-[15px] font-bold text-white leading-tight tracking-tight">
+                        Hotel Booking
+                      </h3>
+                      <p className="text-[11px] text-blue-100/90 font-medium leading-tight mt-1 flex items-center gap-0.5">
+                        Best Stays <ChevronRight className="h-3 w-3 inline text-blue-200" />
+                      </p>
+                    </div>
+                  </Link>
+                </div>
               </div>
             )}
-            
-            <div className="h-3 w-full" />
+            <div className="h-1 w-full" />
 
           <AnimatePresence mode="wait">
             {activeTab === "food" ? (
@@ -2297,14 +2416,14 @@ export default function Home() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
-                className="bg-transparent dark:bg-transparent"
+                className="bg-transparent dark:bg-transparent pt-2 sm:pt-4"
               >
 
                 {/* "What's on your mind today?" Section - Now with Sticky Logic */}
                 <div ref={categoryAnchorRef} className="h-0 w-full" />
                 <div
                   id="categories-section"
-                  className={`sticky top-[60px] z-[50] w-full transition-all duration-300 ${isCategoryStuck ? "bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] pb-2 pt-2 border-b border-white/50 dark:border-white/10 px-4" : "bg-transparent px-4 py-2.5"} space-y-3`}
+                  className={`sticky top-[60px] z-[50] w-full transition-all duration-300 ${isCategoryStuck ? "bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] pb-2 pt-2 border-b border-white/50 dark:border-white/10 px-4" : "bg-transparent px-4 py-3"} space-y-3`}
                 >
                   <div className={`flex items-center gap-2 min-w-0 ${isCategoryStuck ? 'hidden' : ''}`}>
                     <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white min-w-0 flex-shrink leading-tight">Explore Tiffin Plans</h2>

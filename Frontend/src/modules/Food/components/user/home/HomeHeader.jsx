@@ -121,7 +121,7 @@ export default function HomeHeader({
             </div>
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-1">
-                <span className="text-[15px] sm:text-[16px] font-bold text-white truncate tracking-tight">
+                <span className="text-[15px] sm:text-[16px] font-bold text-gray-900 dark:text-white truncate tracking-tight">
                   {(() => {
                     const area = location?.area || location?.subLocality || location?.mainTitle || location?.neighborhood;
                     const city = (location?.city || "").toLowerCase();
@@ -153,10 +153,10 @@ export default function HomeHeader({
                     return location?.area || location?.city || "Select Location";
                   })()}
                 </span>
-                <ChevronDown className="h-[16px] w-[16px] text-white flex-shrink-0" strokeWidth={2.5} />
+                <ChevronDown className="h-[16px] w-[16px] text-gray-900 dark:text-white flex-shrink-0" strokeWidth={2.5} />
               </div>
               
-              <span className="text-[11px] font-medium text-white/80 uppercase truncate leading-tight mt-0.5">
+              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase truncate leading-tight mt-0.5">
                 {(() => {
                   const addr = location?.formattedAddress || location?.address || "";
                   if (addr && addr.length > 5 && addr !== "Select location") {
@@ -181,8 +181,8 @@ export default function HomeHeader({
  
             <Popover>
               <PopoverTrigger asChild>
-                <div className="h-8 w-8 relative flex items-center justify-center rounded-full bg-white/20 backdrop-blur-md border border-white/20 cursor-pointer active:scale-90 transition-all">
-                  <Bell className="h-4 w-4 text-white" />
+                <div className="h-8 w-8 relative flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 cursor-pointer active:scale-90 transition-all">
+                  <Bell className="h-4 w-4 text-gray-700 dark:text-gray-200" />
                   {unreadCount > 0 && (
                     <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full border animate-pulse ${vegMode ? 'bg-orange-400 border-[#00b09b]' : 'bg-orange-400 border-primary'}`} />
                   )}
@@ -240,7 +240,7 @@ export default function HomeHeader({
         <div className="flex items-center gap-2.5 w-[96%] mx-auto pointer-events-auto">
           {/* Search Bar */}
           <div
-            className="relative bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-md rounded-2xl flex items-center px-3 shadow-[0_8px_24px_rgba(0,0,0,0.08)] border border-white/50 dark:border-white/10 cursor-pointer active:scale-[0.98] transition-all duration-300 flex-1 h-11"
+            className="relative bg-white dark:bg-[#1a1a1a] rounded-2xl flex items-center px-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.10)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)] border border-gray-200/90 dark:border-gray-800/90 cursor-pointer active:scale-[0.98] transition-all duration-300 flex-1 h-11"
             onClick={handleSearchFocus}
           >
             <Search className="h-[18px] w-[18px] text-primary mr-2 shrink-0" strokeWidth={2.5} />
@@ -261,7 +261,7 @@ export default function HomeHeader({
             </div>
 
             <div className="flex items-center gap-2 pl-2">
-              <div className="h-5 w-[1px] bg-gray-200" />
+              <div className="h-5 w-[1px] bg-gray-200 dark:bg-gray-700" />
               <Mic 
                 className="h-5 w-5 text-primary" 
                 onClick={(e) => {
@@ -274,7 +274,7 @@ export default function HomeHeader({
 
           {/* Veg Toggle (Stacked Pill Switch) */}
           <div 
-            className="flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform duration-300 shrink-0 px-2 bg-white/70 dark:bg-[#1a1a1a]/70 backdrop-blur-md rounded-2xl py-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)] border border-white/50 dark:border-white/10"
+            className="flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform duration-300 shrink-0 px-2.5 bg-white dark:bg-[#1a1a1a] rounded-2xl py-1 shadow-[0_8px_24px_rgba(0,0,0,0.10)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)] border border-gray-200/90 dark:border-gray-800/90"
             onClick={() => handleVegModeChange?.(!vegMode)}
           >
             <div className="text-[9px] font-black leading-tight text-gray-700 dark:text-gray-200 tracking-wider text-center drop-shadow-sm">

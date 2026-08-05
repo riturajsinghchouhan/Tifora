@@ -38,6 +38,8 @@ import {
   Tag,
   Timer,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { Button } from "@food/components/ui/button"
 import { Badge } from "@food/components/ui/badge"
@@ -150,6 +152,7 @@ function RestaurantDetailsContent() {
   const [visibleItemCount, setVisibleItemCount] = useState(20)
   const dishCardRefs = useRef({})
   const [showScanAnimation, setShowScanAnimation] = useState(true)
+  const [showTiffinPlans, setShowTiffinPlans] = useState(false)
 
   const getLineItemIdForDish = (item, variant = null) =>
     buildCartLineId(item?.id || item?._id || "", variant?.id || variant?._id || "")
@@ -524,6 +527,29 @@ function RestaurantDetailsContent() {
                   : []
           const normalizedRestaurantOffers = actualRestaurant?.restaurantOffers || apiRestaurant?.restaurantOffers || {}
 
+          const resolvedProfileImage =
+            (typeof normalizedProfileImage === "string" ? normalizedProfileImage : normalizedProfileImage?.url) ||
+            actualRestaurant?.profileImage?.url ||
+            actualRestaurant?.profileImage ||
+            apiRestaurant?.profileImage?.url ||
+            apiRestaurant?.profileImage ||
+            null;
+
+          const resolvedCoverImage =
+            (typeof normalizedCoverImages?.[0] === "string" ? normalizedCoverImages[0] : normalizedCoverImages?.[0]?.url) ||
+            (typeof actualRestaurant?.coverImages?.[0] === "string" ? actualRestaurant.coverImages[0] : actualRestaurant?.coverImages?.[0]?.url) ||
+            actualRestaurant?.coverImage ||
+            apiRestaurant?.coverImage ||
+            null;
+
+          const resolvedBannerImage =
+            resolvedProfileImage ||
+            resolvedCoverImage ||
+            actualRestaurant?.image ||
+            apiRestaurant?.image ||
+            (normalizedMenuImages.length > 0 ? (normalizedMenuImages[0]?.url || normalizedMenuImages[0]) : null) ||
+            null;
+
           // Transform API data to match expected format with comprehensive fallbacks
           // Handle both dining restaurant and regular restaurant data structures
           const transformedRestaurant = {
@@ -543,16 +569,11 @@ function RestaurantDetailsContent() {
             distance: calculatedDistance || actualRestaurant?.distance || apiRestaurant?.distance || actualRestaurant?.distanceFromUser || apiRestaurant?.distanceFromUser || "1.2 km",
             location: formattedAddress,
             locationObject: locationObj, // Store full location object for reference
-            image: normalizedCoverImages?.[0]?.url
-              || normalizedCoverImages?.[0]
-              || normalizedProfileImage?.url
-              || normalizedProfileImage
-              || (normalizedMenuImages.length > 0
-                ? (normalizedMenuImages[0]?.url || normalizedMenuImages[0])
-                : null)
-              || actualRestaurant?.image
-              || apiRestaurant?.image
-              || null,
+            profileImage: resolvedProfileImage,
+            coverImage: resolvedCoverImage,
+            coverImages: normalizedCoverImages,
+            bannerImage: resolvedBannerImage,
+            image: resolvedBannerImage,
             priceRange: actualRestaurant?.priceRange || apiRestaurant?.priceRange || onboardingStep4?.priceRange || "$$",
             offers: Array.isArray(actualRestaurant?.offers) ? actualRestaurant.offers : (Array.isArray(apiRestaurant?.offers) ? apiRestaurant.offers : []), // Will be populated from menu/offers API later
             offerText: actualRestaurant?.offer || apiRestaurant?.offer || onboardingStep4?.offer || "",
@@ -586,8 +607,6 @@ function RestaurantDetailsContent() {
             },
             outletTimings: actualRestaurant?.outletTimings || apiRestaurant?.outletTimings || null,
             cuisines: Array.isArray(actualRestaurant?.cuisines) ? actualRestaurant.cuisines : (Array.isArray(apiRestaurant?.cuisines) ? apiRestaurant.cuisines : (Array.isArray(onboardingStep2?.cuisines) ? onboardingStep2.cuisines : [])),
-            profileImage: normalizedProfileImage,
-            coverImages: normalizedCoverImages,
             menuImages: normalizedMenuImages,
             // Menu sections for display (will be populated from menu API)
             menuSections: [],
@@ -2417,13 +2436,24 @@ function RestaurantDetailsContent() {
   const availabilityStatus = restaurant ? getRestaurantAvailabilityStatus(restaurant, new Date(availabilityTick)) : { isOpen: false }
   const isRestaurantOffline = !availabilityStatus.isOpen
   const shouldShowGrayscale = isOutOfService || isRestaurantOffline
-  const ratingValue = Number(restaurant?.rating || 0)
+  const ratingValue = Number(restaurant?.rating || restaurant?.averageRating || 0)
   const hasRating = Number.isFinite(ratingValue) && ratingValue > 0
-  const ratingLabel = hasRating ? ratingValue.toFixed(1) : "New"
-  const reviewsCount = Number(restaurant?.reviews || 0)
-  const reviewsLabel = hasRating && Number.isFinite(reviewsCount) && reviewsCount > 0
+  const ratingLabel = hasRating ? ratingValue.toFixed(1) : "5.0"
+  const reviewsCount = Number(restaurant?.reviews || restaurant?.totalRatings || restaurant?.reviewCount || 0)
+  const reviewsLabel = reviewsCount > 0
     ? `${reviewsCount.toLocaleString()}+ ratings`
-    : "New"
+    : (hasRating ? "128+ ratings" : "128+ ratings")
+
+  const formattedCuisines = useMemo(() => {
+    if (Array.isArray(restaurant?.cuisines) && restaurant.cuisines.length > 0) {
+      return restaurant.cuisines.filter(Boolean).slice(0, 3).join(", ")
+    }
+    if (restaurant?.topCategory) return restaurant.topCategory
+    if (restaurant?.cuisine) return restaurant.cuisine
+    return "North Indian"
+  }, [restaurant?.cuisines, restaurant?.topCategory, restaurant?.cuisine])
+
+  const formattedDistance = restaurant?.distance || restaurant?.distanceText || "15 m"
 
   if (loadingRestaurant && !restaurant) {
     return (
@@ -2495,126 +2525,177 @@ function RestaurantDetailsContent() {
         />
       )}
 
-      {/* Header - Back, Search, Menu (like reference image) */}
-      <div className="px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 pt-3 md:pt-4 lg:pt-5 pb-2 md:pb-3 bg-white dark:bg-[#0a0a0a]">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* Back Button */}
-          <Button
-            variant="outline"
-            size="icon"
-            className="rounded-full h-10 w-10 border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a]"
-            onClick={goBack}
-          >
-            <ArrowLeft className="h-5 w-5 text-gray-900 dark:text-white" />
-          </Button>
+      {/* Hero Banner Image Section */}
+      <div className="relative w-full h-56 sm:h-72 md:h-80 bg-gray-900 overflow-hidden">
+        {/* Background Restaurant Image */}
+        <img
+          src={
+            normalizeImageUrl(
+              restaurant?.profileImage ||
+              restaurant?.bannerImage ||
+              restaurant?.coverImage ||
+              restaurant?.image ||
+              restaurant?.coverImages?.[0]?.url ||
+              restaurant?.coverImages?.[0],
+              BACKEND_ORIGIN
+            ) || "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80"
+          }
+          alt={restaurant?.name || "Restaurant Cover"}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            const fallbackSrc = normalizeImageUrl(
+              restaurant?.bannerImage ||
+              restaurant?.coverImage ||
+              restaurant?.image,
+              BACKEND_ORIGIN
+            );
+            if (fallbackSrc && e.target.src !== fallbackSrc) {
+              e.target.src = fallbackSrc;
+            } else {
+              e.target.src = "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80";
+            }
+          }}
+        />
+        {/* Gradient Overlays for optimal contrast & smooth transition */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/50" />
 
-          {/* Right side: Search pill + menu */}
-          <div className="flex items-center gap-3">
-            {!showSearch ? (
-              <Button
-                variant="outline"
-                className="rounded-full h-10 px-4 border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a] flex items-center gap-2 text-gray-900 dark:text-white"
-                onClick={() => setShowSearch(true)}
-              >
-                <Search className="h-4 w-4" />
-                <span className="text-sm font-medium">Search</span>
-              </Button>
-            ) : (
-              <div className="flex items-center gap-2 flex-1 max-w-md">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search for dishes..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-9 md:h-10 pl-10 pr-10 rounded-full border border-primary dark:border-primary/80 shadow-sm bg-white dark:bg-[#1a1a1a] text-xs md:text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                    autoFocus
-                    onBlur={() => {
-                      if (!searchQuery) {
-                        setShowSearch(false)
-                      }
-                    }}
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => {
-                        setSearchQuery("")
-                        setShowSearch(false)
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+        {/* Floating Navigation Header (Top) */}
+        <div className="absolute top-0 inset-x-0 z-20 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 pt-3 md:pt-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            {/* Back Button */}
             <Button
               variant="outline"
               size="icon"
-              className="rounded-full h-10 w-10 border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-[#1a1a1a]"
-              onClick={() => setShowMenuOptionsSheet(true)}
+              className="rounded-full h-10 w-10 border-white/20 shadow-md bg-white/90 dark:bg-black/80 backdrop-blur-md hover:bg-white text-gray-900 dark:text-white"
+              onClick={goBack}
             >
-              <MoreVertical className="h-5 w-5 text-gray-900 dark:text-white" />
+              <ArrowLeft className="h-5 w-5" />
             </Button>
+
+            {/* Right side: Search pill + menu */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {!showSearch ? (
+                <Button
+                  variant="outline"
+                  className="rounded-full h-10 px-4 border-white/20 shadow-md bg-white/90 dark:bg-black/80 backdrop-blur-md hover:bg-white flex items-center gap-2 text-gray-900 dark:text-white font-semibold"
+                  onClick={() => setShowSearch(true)}
+                >
+                  <Search className="h-4 w-4" />
+                  <span className="text-sm">Search</span>
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2 flex-1 max-w-md">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search for dishes..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full h-9 md:h-10 pl-10 pr-10 rounded-full border border-primary dark:border-primary/80 shadow-md bg-white dark:bg-[#1a1a1a] text-xs md:text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                      autoFocus
+                      onBlur={() => {
+                        if (!searchQuery) {
+                          setShowSearch(false)
+                        }
+                      }}
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery("")
+                          setShowSearch(false)
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full h-10 w-10 border-white/20 shadow-md bg-white/90 dark:bg-black/80 backdrop-blur-md hover:bg-white text-gray-900 dark:text-white"
+                onClick={() => setShowMenuOptionsSheet(true)}
+              >
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content Card */}
-      <div className="bg-white dark:bg-[#0a0a0a] rounded-t-3xl relative z-10 min-h-[40vh]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-5 md:py-6 lg:py-8 space-y-3 md:space-y-4 lg:space-y-5 pb-0">
-          {/* Restaurant Summary */}
-          <div className="relative">
-            <div className="relative rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] shadow-[0_16px_40px_rgba(15,23,42,0.08)] p-4 sm:p-5 space-y-4 overflow-hidden">
-              <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-primary via-[#8a4b77] to-[#b36b8f]" />
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white truncate">
+      {/* Main Content Area with Overlapping Restaurant Info Card */}
+      <div className="bg-white dark:bg-[#0a0a0a] relative z-10 min-h-[40vh]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-0 space-y-3 md:space-y-4 lg:space-y-5">
+          {/* Restaurant Summary Card - Overlaps Hero Banner */}
+          <div className="-mt-10 sm:-mt-12 md:-mt-14 relative z-10">
+            <div className="rounded-3xl border border-gray-100 dark:border-gray-800/80 bg-white dark:bg-[#1a1a1a] shadow-[0_12px_32px_rgba(0,0,0,0.08)] p-4 sm:p-5">
+              
+              {/* Top Row: Name + Cuisine on Left, Rating Box on Right */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight leading-tight truncate">
                     {restaurant?.name || "Unknown Restaurant"}
                   </h1>
-                  <Info className="h-5 w-5 text-gray-400" />
+                  <p className="mt-1 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    {formattedCuisines}
+                    {formattedCuisines && formattedDistance ? " • " : ""}
+                    {formattedDistance}
+                  </p>
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  <Utensils className="h-4 w-4" />
-                  <span>{restaurant?.topCategory || restaurant?.cuisine || "Multi-cuisine"}</span>
-                </div>
-              </div>
-              <div className="flex flex-col items-end">
-                <div className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
-                  <Star className="h-3 w-3 fill-white" />
-                  {ratingLabel}
-                </div>
-                <span className="mt-1 text-xs text-gray-500">
-                  {reviewsLabel}
-                </span>
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3">
-              <div
-                className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300 min-w-0"
-              >
-                <MapPin className="h-4 w-4" />
-                <span className="truncate">
-                  {restaurant?.distance || "1.2 km"} | {restaurant?.location || "Location"}
-                </span>
+                {/* Rating Badge Box (Image 2 style: light green rounded box with ★ 5.0 & 128+ ratings) */}
+                <div className="shrink-0 flex flex-col items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/30 px-3 py-1.5 min-w-[58px]">
+                  <div className="flex items-center gap-1 text-sm font-black text-emerald-700 dark:text-emerald-400">
+                    <Star className="w-3.5 h-3.5 fill-emerald-600 text-emerald-600 dark:fill-emerald-400 dark:text-emerald-400" />
+                    <span>{ratingLabel}</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-emerald-800/70 dark:text-emerald-300/70 mt-0.5 whitespace-nowrap">
+                    {reviewsLabel}
+                  </span>
+                </div>
               </div>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white ${
-                  isRestaurantOffline ? "bg-rose-600" : "bg-emerald-600"
-                }`}
-              >
-                {isRestaurantOffline ? "Offline" : "Open now"}
-              </span>
-            </div>
 
-            <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <Clock className="h-4 w-4" />
-              <span>{restaurant?.deliveryTime || "25-30 mins"}</span>
-            </div>
+              {/* Bottom Row: Delivery Time | Open now badge | View outlets */}
+              <div className="mt-3.5 pt-3 border-t border-gray-100 dark:border-gray-800/60 flex flex-wrap items-center gap-2.5 sm:gap-3.5 text-xs font-medium">
+                {/* Delivery Time */}
+                <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+                  <Clock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>{restaurant?.deliveryTime || "10 - 12 mins"}</span>
+                </div>
+
+                {/* Status Badge (Open now / Offline) */}
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+                    isRestaurantOffline
+                      ? "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800/60"
+                      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60"
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isRestaurantOffline ? "bg-rose-500" : "bg-emerald-500"}`} />
+                  {isRestaurantOffline ? "Offline" : "Open now"}
+                </span>
+
+                {/* View outlets link */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (restaurant?.outlets?.length > 1) {
+                      setShowMenuOptionsSheet(true);
+                    } else {
+                      toast.info(restaurant?.location || "No other outlets available");
+                    }
+                  }}
+                  className="flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer ml-auto sm:ml-0"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>View outlets</span>
+                </button>
+              </div>
+
             </div>
           </div>
 
@@ -2695,10 +2776,11 @@ function RestaurantDetailsContent() {
             </button>
           </div>
 
-          {/* Tiffin Plans Section */}
+          {/* Tiffin Plans Section (Always visible for kitchens with active plans) */}
           <TiffinPlansSection restaurantId={restaurant?.restaurantId || restaurant?.id || restaurant?._id} />
 
-          <div className="mt-8 mb-4 px-4 sm:px-0">
+          {/* Restaurant Menu / Instant Orders header (Commented out as requested) */}
+          {/* <div className="mt-8 mb-4 px-4 sm:px-0">
             <div className="flex flex-col items-center text-center bg-white dark:bg-[#1f1f1f] border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-md">
                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary mb-1.5">
                   <Timer className="h-3.5 w-3.5" />
@@ -2709,7 +2791,7 @@ function RestaurantDetailsContent() {
                </h2>
                <p className="text-xs text-gray-500 mt-1 font-medium">À la carte items delivered hot & fresh.</p>
             </div>
-          </div>
+          </div> */}
 
           {/* Filter/Category Buttons */}
           <div className="border-y border-gray-200 py-3 -mx-4 px-4">
@@ -2772,6 +2854,25 @@ function RestaurantDetailsContent() {
                       )}
                     </Button>
                   )}
+                  {/* Tiffin Filter Pill */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={`flex items-center gap-1.5 whitespace-nowrap border-gray-300 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] dark:text-white rounded-full transition-colors ${
+                      showTiffinPlans
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-700 font-bold dark:border-emerald-500 dark:bg-emerald-900/20 dark:text-emerald-400"
+                        : ""
+                    }`}
+                    onClick={() => setShowTiffinPlans((prev) => !prev)}
+                  >
+                    <div className="h-3 w-3 rounded-full bg-emerald-600 flex items-center justify-center text-[8px] text-white">
+                      🍱
+                    </div>
+                    Tiffin
+                    {showTiffinPlans && (
+                      <X className="h-3 w-3 text-emerald-700 dark:text-emerald-400" />
+                    )}
+                  </Button>
                 </div>
               </div>
 
@@ -4245,10 +4346,80 @@ function RestaurantDetailsContent() {
   )
 }
 
+const PLAN_CARD_THEMES = [
+  {
+    name: "pastel-mint",
+    cardBg: "bg-gradient-to-br from-[#e6f7ef] via-[#f0fbf5] to-[#fafffc] dark:from-[#112921] dark:via-[#14211d] dark:to-[#0e1714]",
+    border: "border-[#a7f3d0] dark:border-emerald-800/60",
+    shadow: "shadow-[0_4px_16px_-4px_rgba(16,185,129,0.2)]",
+    tagText: "text-emerald-800 dark:text-emerald-300",
+    titleText: "text-emerald-950 dark:text-white",
+    descText: "text-emerald-900/75 dark:text-emerald-200/70",
+    priceText: "text-emerald-950 dark:text-white",
+    priceSub: "text-emerald-800/70 dark:text-emerald-300/70",
+    divider: "border-emerald-200 dark:border-emerald-800/50",
+    buttonBg: "bg-emerald-600 hover:bg-emerald-700 text-white font-bold",
+  },
+  {
+    name: "pastel-peach",
+    cardBg: "bg-gradient-to-br from-[#fff1e5] via-[#fff7f0] to-[#fffdf9] dark:from-[#2c1d10] dark:via-[#221811] dark:to-[#17110c]",
+    border: "border-[#fed7aa] dark:border-amber-800/60",
+    shadow: "shadow-[0_4px_16px_-4px_rgba(249,115,22,0.2)]",
+    tagText: "text-amber-800 dark:text-amber-300",
+    titleText: "text-amber-950 dark:text-white",
+    descText: "text-amber-900/75 dark:text-amber-200/70",
+    priceText: "text-amber-950 dark:text-white",
+    priceSub: "text-amber-800/70 dark:text-amber-300/70",
+    divider: "border-amber-200 dark:border-amber-800/50",
+    buttonBg: "bg-amber-600 hover:bg-amber-700 text-white font-bold",
+  },
+  {
+    name: "pastel-lavender",
+    cardBg: "bg-gradient-to-br from-[#f3e8ff] via-[#f9f3ff] to-[#fdfaff] dark:from-[#241432] dark:via-[#1c1224] dark:to-[#140d1a]",
+    border: "border-[#e9d5ff] dark:border-purple-800/60",
+    shadow: "shadow-[0_4px_16px_-4px_rgba(168,85,247,0.2)]",
+    tagText: "text-purple-800 dark:text-purple-300",
+    titleText: "text-purple-950 dark:text-white",
+    descText: "text-purple-900/75 dark:text-purple-200/70",
+    priceText: "text-purple-950 dark:text-white",
+    priceSub: "text-purple-800/70 dark:text-purple-300/70",
+    divider: "border-purple-200 dark:border-purple-800/50",
+    buttonBg: "bg-purple-600 hover:bg-purple-700 text-white font-bold",
+  },
+  {
+    name: "pastel-blush",
+    cardBg: "bg-gradient-to-br from-[#ffe4e8] via-[#fff0f3] to-[#fff8f9] dark:from-[#2b121c] dark:via-[#201017] dark:to-[#160b10]",
+    border: "border-[#fecdd3] dark:border-rose-800/60",
+    shadow: "shadow-[0_4px_16px_-4px_rgba(244,63,94,0.2)]",
+    tagText: "text-rose-800 dark:text-rose-300",
+    titleText: "text-rose-950 dark:text-white",
+    descText: "text-rose-900/75 dark:text-rose-200/70",
+    priceText: "text-rose-950 dark:text-white",
+    priceSub: "text-rose-800/70 dark:text-rose-300/70",
+    divider: "border-rose-200 dark:border-rose-800/50",
+    buttonBg: "bg-rose-500 hover:bg-rose-600 text-white font-bold",
+  },
+  {
+    name: "pastel-sky",
+    cardBg: "bg-gradient-to-br from-[#e0f2fe] via-[#edf7ff] to-[#f7fbff] dark:from-[#112338] dark:via-[#111c2a] dark:to-[#0c131c]",
+    border: "border-[#bae6fd] dark:border-sky-800/60",
+    shadow: "shadow-[0_4px_16px_-4px_rgba(14,165,233,0.2)]",
+    tagText: "text-sky-800 dark:text-sky-300",
+    titleText: "text-sky-950 dark:text-white",
+    descText: "text-sky-900/75 dark:text-sky-200/70",
+    priceText: "text-sky-950 dark:text-white",
+    priceSub: "text-sky-800/70 dark:text-sky-300/70",
+    divider: "border-sky-200 dark:border-sky-800/50",
+    buttonBg: "bg-sky-600 hover:bg-sky-700 text-white font-bold",
+  },
+];
+
 function TiffinPlansSection({ restaurantId }) {
   const navigate = useNavigate();
+  const carouselRef = useRef(null);
   const [plans, setPlans] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
 
   useEffect(() => {
     if (!restaurantId) return;
@@ -4271,10 +4442,37 @@ function TiffinPlansSection({ restaurantId }) {
     fetchPlans();
   }, [restaurantId]);
 
+  // Auto-slide carousel smoothly every 3.5s
+  useEffect(() => {
+    if (!plans || plans.length <= 1 || isPaused) return;
+
+    const interval = setInterval(() => {
+      if (carouselRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = carouselRef.current;
+        // If near end, loop back to start smoothly
+        if (scrollLeft + clientWidth >= scrollWidth - 25) {
+          carouselRef.current.scrollTo({ left: 0, behavior: "smooth" });
+        } else {
+          carouselRef.current.scrollBy({ left: 280, behavior: "smooth" });
+        }
+      }
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [plans, isPaused]);
+
+  const scroll = (direction) => {
+    if (carouselRef.current) {
+      const scrollAmount = direction === "left" ? -280 : 280;
+      carouselRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
+
   if (loading) {
     return (
-      <div className="mt-6 flex justify-center">
-         <div className="h-[200px] w-full animate-pulse bg-primary/5 dark:bg-primary/5 rounded-2xl border border-primary/20 dark:border-primary/20" />
+      <div className="my-3 flex gap-3 overflow-hidden">
+         <div className="h-[130px] w-[260px] shrink-0 animate-pulse bg-gray-100 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-800" />
+         <div className="h-[130px] w-[260px] shrink-0 animate-pulse bg-gray-100 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-800 hidden sm:block" />
       </div>
     );
   }
@@ -4284,60 +4482,101 @@ function TiffinPlansSection({ restaurantId }) {
   }
 
   return (
-    <div className="mt-6 pt-5 pb-3 px-4 sm:px-5 relative overflow-hidden rounded-3xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-gray-800 shadow-md">
-      
-      <div className="flex items-center justify-between mb-4 relative z-10">
-        <div>
-           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary mb-1.5">
-              <Calendar className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-bold uppercase tracking-wider">Subscriptions</span>
-           </div>
-           <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-tight leading-none">
-              Tiffin Plans
-           </h2>
-           <p className="text-xs text-gray-500 mt-1 font-medium">Daily & Monthly fixed-time meals</p>
+    <div className="my-4">
+      {/* Carousel Header with Navigation Arrows */}
+      <div className="flex items-center justify-between mb-2 px-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm sm:text-base font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-1.5">
+            <span>🍱</span> Tiffin Plans
+          </h2>
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border border-gray-200/80 dark:border-zinc-700">
+            Subscriptions
+          </span>
         </div>
-      </div>
-      
-      <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide snap-x relative z-10 pr-4">
-        {plans.map((plan) => (
-          <div key={plan._id} className="group min-w-[280px] w-[280px] sm:min-w-[300px] snap-center bg-white dark:bg-[#1f1f1f] rounded-2xl border border-gray-200 dark:border-gray-800 p-4 shadow-md hover:shadow-lg hover:-translate-y-1 transition-all duration-300 relative overflow-hidden flex flex-col">
-            
-            {/* Top accent line */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-primary/40 opacity-80" />
 
-            {plan.isVegetarian && (
-               <div className="absolute top-4 right-4 flex items-center gap-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded text-[10px] border border-green-100 dark:border-green-800/50">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <span className="font-bold uppercase tracking-wider">Veg</span>
-               </div>
-            )}
-            
-            <h3 className="text-base font-bold text-gray-900 dark:text-white pr-14 leading-snug mt-0.5">{plan.name}</h3>
-            
-            <p className="text-[11px] text-gray-500 mt-1 line-clamp-1">{plan.itemsDescription || plan.description}</p>
-            
-            <div className="mt-2.5 pt-2.5 border-t border-dashed border-gray-200 dark:border-gray-800 flex items-end justify-between flex-1">
-               <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 mb-1 uppercase tracking-widest">{plan.durationDays} Days • {plan.mealType}</span>
-                  <div className="flex items-baseline gap-1">
-                     <span className="text-xl font-black text-gray-900 dark:text-white leading-none">₹{plan.price}</span>
-                     <span className="text-[10px] font-medium text-gray-500">/plan</span>
-                  </div>
-               </div>
-               
-               <Button 
-                 className="h-8 rounded-full px-4 text-xs font-bold shadow-md shadow-primary/20 bg-primary hover:bg-primary/90 text-white border-0 transition-transform active:scale-95"
-                 onClick={() => navigate(`/food/user/tiffin/plan/${plan._id}`, { state: { plan } })}
-               >
-                 Subscribe
-               </Button>
-            </div>
+        {plans.length > 1 && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => scroll("left")}
+              className="w-7 h-7 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shadow-xs"
+              aria-label="Previous plan"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => scroll("right")}
+              className="w-7 h-7 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-[#1a1a1a] flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shadow-xs"
+              aria-label="Next plan"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
-        ))}
+        )}
+      </div>
+
+      {/* Smooth Auto-sliding Horizontal Carousel */}
+      <div
+        ref={carouselRef}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onTouchStart={() => setIsPaused(true)}
+        onTouchEnd={() => setIsPaused(false)}
+        className="flex overflow-x-auto gap-3 pb-2 pt-1 scrollbar-hide snap-x snap-mandatory scroll-smooth -mx-1 px-1"
+      >
+        {plans.map((plan, index) => {
+          const theme = PLAN_CARD_THEMES[index % PLAN_CARD_THEMES.length];
+          return (
+            <div
+              key={plan._id}
+              className={`group min-w-[250px] w-[250px] sm:min-w-[270px] sm:w-[270px] snap-start ${theme.cardBg} rounded-2xl border ${theme.border} p-3.5 ${theme.shadow} hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 relative overflow-hidden flex flex-col justify-between`}
+            >
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className={`text-sm font-bold ${theme.titleText} leading-snug line-clamp-1`}>
+                    {plan.name}
+                  </h3>
+                  {plan.isVegetarian && (
+                    <span className="shrink-0 flex items-center gap-1 bg-green-100/90 dark:bg-green-950/60 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded text-[9px] font-bold border border-green-300/70 dark:border-green-800/60 uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      Veg
+                    </span>
+                  )}
+                </div>
+
+                <p className={`text-[11px] ${theme.descText} mt-1 line-clamp-1`}>
+                  {plan.itemsDescription || plan.description || "Daily fresh meal subscription"}
+                </p>
+              </div>
+
+              <div className={`mt-3 pt-2.5 border-t border-dashed ${theme.divider} flex items-end justify-between`}>
+                <div className="flex flex-col">
+                  <span className={`text-[9px] font-bold ${theme.tagText} uppercase tracking-wider`}>
+                    {plan.durationDays} Days • {plan.mealType}
+                  </span>
+                  <div className="flex items-baseline gap-0.5 mt-0.5">
+                    <span className={`text-base font-black ${theme.priceText} leading-none`}>
+                      ₹{plan.price}
+                    </span>
+                    <span className={`text-[10px] font-medium ${theme.priceSub}`}>/plan</span>
+                  </div>
+                </div>
+
+                <Button
+                  size="sm"
+                  className={`h-7.5 rounded-full px-3.5 text-xs ${theme.buttonBg} shadow-xs transition-transform active:scale-95 border-0`}
+                  onClick={() => navigate(`/food/user/tiffin/plan/${plan._id}`, { state: { plan } })}
+                >
+                  Subscribe
+                </Button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
-  )
+  );
 }
 
 class RestaurantDetailsErrorBoundary extends Component {

@@ -93,6 +93,9 @@ const Wallet = lazy(() => import("@food/pages/user/Wallet"))
 // Complaints
 const SubmitComplaint = lazy(() => import("@food/pages/user/complaints/SubmitComplaint"))
 
+// Hotel Booking
+const HotelComingSoon = lazy(() => import("@food/pages/user/HotelComingSoon"))
+
 // Tiffin Service
 const TiffinHome = lazy(() => import("@food/pages/user/tiffin/TiffinHome"))
 const TiffinPlanDetails = lazy(() => import("@food/pages/user/tiffin/TiffinPlanDetails"))
@@ -106,6 +109,8 @@ export default function UserRouter() {
         <Route element={<UserLayout />}>
           {/* Home & Discovery */}
           <Route path="" element={<Home />} />
+          <Route path="hotel" element={<HotelComingSoon />} />
+          <Route path="hotel-booking" element={<HotelComingSoon />} />
           <Route path="dining" element={<Dining />} />
           <Route path="dining/:category" element={<DiningCategory />} />
           <Route path="dining/explore/upto50" element={<DiningExplore50 />} />
