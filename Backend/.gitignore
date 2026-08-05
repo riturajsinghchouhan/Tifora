@@ -2,9 +2,10 @@
 node_modules/
 
 # uploads
-uploads/
-src/uploads/
+/uploads/
+/src/uploads/
 uploads.zip
+!src/modules/uploads/
 
 # environment variables
 .env
