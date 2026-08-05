@@ -17,6 +17,7 @@ import {
   Download,
   Sparkles,
 } from "lucide-react";
+import brandLogo from "@/assets/logo.png";
 
 export default function LandingNavbar({
   activeSection,
@@ -83,10 +84,14 @@ export default function LandingNavbar({
           {/* Logo */}
           <div
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group"
+            className="flex items-center gap-2.5 cursor-pointer group active:scale-95 transition-transform"
           >
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl bg-gradient-to-br from-[#00D09C] to-[#059669] flex items-center justify-center shadow-lg shadow-[#00D09C]/20 group-hover:scale-105 transition-transform">
-              <span className="text-[#061211] font-black text-lg sm:text-2xl tracking-tighter">T</span>
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden shadow-md shadow-[#00D09C]/20 border border-white/20 dark:border-white/10 shrink-0 bg-white dark:bg-black/40 flex items-center justify-center p-0.5 group-hover:scale-105 transition-transform">
+              <img
+                src={brandLogo}
+                alt="Tifora"
+                className="w-full h-full rounded-full object-cover"
+              />
             </div>
             <span
               className={`text-xl sm:text-2xl font-black tracking-tight ${
@@ -218,9 +223,19 @@ export default function LandingNavbar({
                   }`}
                 >
                   {/* Brand */}
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00D09C] to-[#059669] flex items-center justify-center shadow-md">
-                      <span className="text-[#061211] font-black text-lg">T</span>
+                  <div
+                    onClick={() => {
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                      setMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <div className="w-9 h-9 rounded-full overflow-hidden shadow-md border border-white/20 shrink-0 bg-white flex items-center justify-center p-0.5">
+                      <img
+                        src={brandLogo}
+                        alt="Tifora"
+                        className="w-full h-full rounded-full object-cover"
+                      />
                     </div>
                     <span
                       className={`text-lg font-black tracking-tight ${

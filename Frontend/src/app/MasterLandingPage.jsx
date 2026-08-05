@@ -17,6 +17,7 @@ export default function MasterLandingPage() {
   const [activeHeroTab, setActiveHeroTab] = useState("tiffin"); // 'tiffin' | 'hotel'
   const [activeServicesTab, setActiveServicesTab] = useState("tiffin");
   const [activePicksTab, setActivePicksTab] = useState("tiffins"); // 'tiffins' | 'hotels'
+  const [picksIndex, setPicksIndex] = useState(0);
   const [searchLocation, setSearchLocation] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newsletterEmail, setNewsletterEmail] = useState("");

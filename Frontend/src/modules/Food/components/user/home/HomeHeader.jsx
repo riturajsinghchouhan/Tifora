@@ -13,6 +13,7 @@ import foodIcon from "@food/assets/category-icons/food.png";
 import quickIcon from "@food/assets/category-icons/quick.png";
 import taxiIcon from "@food/assets/category-icons/taxi.png";
 import hotelIcon from "@food/assets/category-icons/hotel.png";
+import brandLogo from "@/assets/logo.png";
 import useNotificationInbox from "@food/hooks/useNotificationInbox";
 
 const ICON_MAP = {
@@ -109,75 +110,86 @@ export default function HomeHeader({
 
         {/* Main Header Content */}
         <div className="relative z-10 space-y-2.5">
-          {/* Row 1: Location, Toggle, and Notifications */}
-        <div className="flex items-center justify-between gap-3">
-          {/* Location Selector */}
-          <div
-            className="flex items-center gap-2 cursor-pointer group min-w-0 flex-1"
-            onClick={handleLocationClick}
-          >
-            <div className="flex-shrink-0 flex items-center justify-center">
-              <MapPin className="h-[26px] w-[26px] text-[#e11d48]" strokeWidth={2.5} />
-            </div>
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-1">
-                <span className="text-[15px] sm:text-[16px] font-bold text-gray-900 dark:text-white truncate tracking-tight">
-                  {(() => {
-                    const area = location?.area || location?.subLocality || location?.mainTitle || location?.neighborhood;
-                    const city = (location?.city || "").toLowerCase();
-                    const state = (location?.state || "").toLowerCase();
+          {/* Row 1: Logo, Location Selector, and Notifications */}
+          <div className="flex items-center justify-between gap-2.5">
+            {/* Brand Logo */}
+            <Link to="/food/user" className="shrink-0 flex items-center active:scale-95 transition-transform">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden shadow-sm border border-gray-200/80 dark:border-gray-700 shrink-0 bg-white dark:bg-gray-800 flex items-center justify-center p-0.5">
+                <img 
+                  src={brandLogo} 
+                  alt="Tifora" 
+                  className="w-full h-full rounded-full object-cover drop-shadow-sm" 
+                />
+              </div>
+            </Link>
 
-                    if (area && !/^-?\d+(\.\d+)?$/.test(area.trim())) {
-                      const areaLower = area.toLowerCase();
-                      if (areaLower !== city && areaLower !== state) {
-                        return area;
-                      }
-                    }
-                    
-                    // Fallback to a part of the address if area is missing or redundant
-                    if (location?.address && location.address !== "Select location") {
-                      const parts = location.address.split(',').map(p => p.trim());
-                      // Take the first part that isn't city or state
-                      for (const part of parts) {
-                        const partLower = part.toLowerCase();
-                        if (partLower && 
-                            partLower !== city && 
-                            partLower !== state && 
-                            !/^-?\d/.test(part) &&
-                            part.length > 2) {
-                          return part;
+            {/* Location Selector */}
+            <div
+              className="flex items-center gap-1.5 cursor-pointer group min-w-0 flex-1 pl-1"
+              onClick={handleLocationClick}
+            >
+              <div className="flex-shrink-0 flex items-center justify-center">
+                <MapPin className="h-[22px] w-[22px] text-[#e11d48]" strokeWidth={2.5} />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <div className="flex items-center gap-1">
+                  <span className="text-[13px] sm:text-[15px] font-bold text-gray-900 dark:text-white truncate tracking-tight">
+                    {(() => {
+                      const area = location?.area || location?.subLocality || location?.mainTitle || location?.neighborhood;
+                      const city = (location?.city || "").toLowerCase();
+                      const state = (location?.state || "").toLowerCase();
+
+                      if (area && !/^-?\d+(\.\d+)?$/.test(area.trim())) {
+                        const areaLower = area.toLowerCase();
+                        if (areaLower !== city && areaLower !== state) {
+                          return area;
                         }
                       }
+                      
+                      // Fallback to a part of the address if area is missing or redundant
+                      if (location?.address && location.address !== "Select location") {
+                        const parts = location.address.split(',').map(p => p.trim());
+                        // Take the first part that isn't city or state
+                        for (const part of parts) {
+                          const partLower = part.toLowerCase();
+                          if (partLower && 
+                              partLower !== city && 
+                              partLower !== state && 
+                              !/^-?\d/.test(part) &&
+                              part.length > 2) {
+                            return part;
+                          }
+                        }
+                      }
+                      
+                      return location?.area || location?.city || "Select Location";
+                    })()}
+                  </span>
+                  <ChevronDown className="h-[14px] w-[14px] text-gray-900 dark:text-white flex-shrink-0" strokeWidth={2.5} />
+                </div>
+                
+                <span className="text-[10px] sm:text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase truncate leading-tight mt-0.5">
+                  {(() => {
+                    const addr = location?.formattedAddress || location?.address || "";
+                    if (addr && addr.length > 5 && addr !== "Select location") {
+                       return addr;
                     }
                     
-                    return location?.area || location?.city || "Select Location";
+                    const state = location?.state || "";
+                    const pincode = location?.pincode || "";
+                    
+                    if (state && pincode) return `${state}, ${pincode}`;
+                    if (state) return state;
+                    if (pincode) return pincode;
+                    
+                    return "Pinpoint location";
                   })()}
                 </span>
-                <ChevronDown className="h-[16px] w-[16px] text-gray-900 dark:text-white flex-shrink-0" strokeWidth={2.5} />
               </div>
-              
-              <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase truncate leading-tight mt-0.5">
-                {(() => {
-                  const addr = location?.formattedAddress || location?.address || "";
-                  if (addr && addr.length > 5 && addr !== "Select location") {
-                     return addr;
-                  }
-                  
-                  const state = location?.state || "";
-                  const pincode = location?.pincode || "";
-                  
-                  if (state && pincode) return `${state}, ${pincode}`;
-                  if (state) return state;
-                  if (pincode) return pincode;
-                  
-                  return "Pinpoint location";
-                })()}
-              </span>
             </div>
-          </div>
 
-          {/* Right Actions: Bell */}
-          <div className="flex items-center gap-2.5">
+            {/* Right Actions: Bell */}
+            <div className="flex items-center gap-2 shrink-0">
  
             <Popover>
               <PopoverTrigger asChild>

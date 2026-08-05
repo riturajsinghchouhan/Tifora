@@ -1,5 +1,6 @@
 import React from "react";
 import { ArrowRight } from "lucide-react";
+import brandLogo from "@/assets/logo.png";
 
 export default function LandingFooter({
   scrollToSection,
@@ -15,8 +16,12 @@ export default function LandingFooter({
           {/* Col 1: Brand & Socials (full width on mobile, 4 cols on desktop) */}
           <div className="col-span-2 md:col-span-3 lg:col-span-4 space-y-3 sm:space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#00D09C] to-[#059669] flex items-center justify-center">
-                <span className="text-[#061211] font-black text-lg">T</span>
+              <div className="w-9 h-9 rounded-full overflow-hidden shadow-md border border-white/20 shrink-0 bg-white flex items-center justify-center p-0.5">
+                <img
+                  src={brandLogo}
+                  alt="Tifora"
+                  className="w-full h-full rounded-full object-cover"
+                />
               </div>
               <span className="text-xl font-black text-white">Tifora</span>
             </div>
