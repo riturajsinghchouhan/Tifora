@@ -2505,9 +2505,9 @@ export default function Home() {
 
 
                 {/* Filters Sticky Sidebar Header */}
-                <section className="bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md sticky top-0 z-[40] -mx-4 w-[calc(100%+2rem)] mt-4 mb-3 border-y border-gray-100 dark:border-white/5 shadow-sm transition-colors duration-300">
+                <section className="bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md sticky top-0 z-[40] w-full px-4 my-3 border-y border-gray-100 dark:border-white/5 shadow-sm transition-colors duration-300">
                   <div
-                    className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide px-4 py-3"
+                    className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide py-2.5"
                     style={{
                       scrollbarWidth: "none",
                       msOverflowStyle: "none",
