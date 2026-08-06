@@ -1,4 +1,5 @@
 import { TiffinDelivery } from '../models/tiffinDelivery.model.js';
+import { ensureTodayDeliveriesSync } from '../scripts/tiffinScheduler.js';
 import mongoose from 'mongoose';
 
 // Helper to extract partner ID from various auth header formats
@@ -27,6 +28,8 @@ const calculateDistanceInMeters = (lat1, lon1, lat2, lon2) => {
 
 export const getMyTiffinRoute = async (req, res) => {
     try {
+        await ensureTodayDeliveriesSync();
+
         let partnerId = getPartnerId(req);
         const riderLat = Number(req.query.latitude || req.query.lat);
         const riderLng = Number(req.query.longitude || req.query.lng);
@@ -242,6 +245,29 @@ export const updateDeliveryStatus = async (req, res) => {
 
         await delivery.save();
 
+        // Emit socket notification to user
+        try {
+            const { getIO, rooms } = await import('../../../../config/socket.js');
+            const io = getIO();
+            if (io && delivery.userId) {
+                const userRoom = rooms.user(delivery.userId.toString());
+                const payload = {
+                    deliveryId: delivery._id,
+                    _id: delivery._id,
+                    status: delivery.status,
+                    type: delivery.type,
+                    date: delivery.date,
+                    deliveredAt: delivery.deliveredAt,
+                    verification: delivery.verification,
+                    timestamp: new Date().toISOString()
+                };
+                io.to(userRoom).emit('tiffin_status_update', payload);
+                console.log(`📡 [Socket] Emitted tiffin_status_update to user room ${userRoom}: status=${delivery.status}`);
+            }
+        } catch (socketErr) {
+            console.warn('[updateDeliveryStatus] Socket error:', socketErr.message);
+        }
+
         res.status(200).json({
             success: true,
             data: delivery,
@@ -258,7 +284,7 @@ export const getDeliveryDetails = async (req, res) => {
         const { deliveryId } = req.params;
         const delivery = await TiffinDelivery.findById(deliveryId)
             .populate('subscriptionId')
-            .populate('restaurantId', 'name address phone image logo')
+            .populate('restaurantId', 'name address phone image logo location')
             .populate('userId', 'name phone email');
 
         if (!delivery) {

@@ -131,17 +131,28 @@ export default function TiffinUserTrackingMap() {
                         }
                         
                         // Set initial rider coords from delivery's current location if available
-                        const rLoc = found.assignedTo?.currentLocation || found.riderLocation;
+                        const rLoc = found.assignedTo?.currentLocation || found.assignedTo?.location || found.riderLocation;
+                        
+                        // Extract restaurant coords for fallback
+                        let restCoords = { lat: 22.7196, lng: 75.8577 };
+                        const rstCoordsArr = found.restaurantId?.location?.coordinates || found.restaurantId?.address?.location?.coordinates;
+                        if (rstCoordsArr && rstCoordsArr.length === 2) {
+                            restCoords = { lat: rstCoordsArr[1], lng: rstCoordsArr[0] };
+                        }
+                        setRestaurantCoords(restCoords);
+
                         if (rLoc) {
                             const rLat = rLoc.lat || (rLoc.coordinates && rLoc.coordinates[1]);
                             const rLng = rLoc.lng || (rLoc.coordinates && rLoc.coordinates[0]);
                             if (rLat && rLng) {
                                 setRiderCoords({ lat: Number(rLat), lng: Number(rLng), heading: rLoc.heading || 0 });
+                            } else {
+                                setRiderCoords(restCoords); // Fallback if rLoc exists but empty
                             }
+                        } else if (found.status === 'assigned' || found.status === 'out_for_delivery') {
+                            // If active delivery but no rider location yet, show rider at restaurant
+                            setRiderCoords(restCoords);
                         }
-                        
-                        // Fallback restaurant coords
-                        setRestaurantCoords({ lat: 22.7196, lng: 75.8577 });
                     }
                 }
             } catch (error) {
@@ -169,6 +180,11 @@ export default function TiffinUserTrackingMap() {
         if (!trackingIds.length) return undefined;
 
         const handleLocationUpdate = (data) => {
+            console.log('📍 [TiffinTracking] Location update received via socket:', data);
+            
+            // Only process updates for this specific delivery
+            if (data.orderId && data.orderId !== deliveryId) return;
+
             const lat = Number(data?.lat ?? data?.boy_lat ?? data?.location?.lat ?? data?.location?.coordinates?.[1]);
             const lng = Number(data?.lng ?? data?.boy_lng ?? data?.location?.lng ?? data?.location?.coordinates?.[0]);
 

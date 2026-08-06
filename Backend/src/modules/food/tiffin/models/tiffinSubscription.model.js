@@ -14,10 +14,21 @@ const deliveryAddressSchema = new mongoose.Schema(
         city: { type: String, required: true, trim: true },
         state: { type: String, required: true, trim: true },
         zipCode: { type: String, default: '', trim: true },
+        phone: { type: String, default: '', trim: true },
         location: {
             type: { type: String, enum: ['Point'], default: 'Point' },
             coordinates: { type: [Number], default: [75.8577, 22.7196] }
         }
+    },
+    { _id: false }
+);
+
+const skippedDateSchema = new mongoose.Schema(
+    {
+        date: { type: String, required: true }, // 'YYYY-MM-DD'
+        mealSlot: { type: String, enum: ['Morning', 'Evening', 'Both'], default: 'Both' },
+        reason: { type: String, default: 'User requested off' },
+        skippedAt: { type: Date, default: Date.now }
     },
     { _id: false }
 );
@@ -58,6 +69,19 @@ const tiffinSubscriptionSchema = new mongoose.Schema(
             enum: ['active', 'paused', 'cancelled', 'expired'],
             default: 'active',
             index: true
+        },
+        skippedDates: {
+            type: [skippedDateSchema],
+            default: []
+        },
+        deliveryInstructions: {
+            type: String,
+            default: '',
+            trim: true
+        },
+        customPreferences: {
+            spiceLevel: { type: String, enum: ['Mild', 'Medium', 'Spicy'], default: 'Medium' },
+            specialNotes: { type: String, default: '', trim: true }
         },
         paymentId: {
             type: mongoose.Schema.Types.ObjectId,

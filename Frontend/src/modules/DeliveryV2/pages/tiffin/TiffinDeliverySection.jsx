@@ -237,21 +237,21 @@ export default function TiffinDeliverySection() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50/70 pb-28 pt-14 font-sans">
-            {/* Top Navigation & Status Header */}
-            <div className="bg-gradient-to-r from-[#075985] via-[#0284c7] to-[#0ea5e9] text-white p-5 sm:p-6 shadow-lg shadow-sky-900/15">
+        <div className="min-h-screen bg-white pb-28 pt-14 font-sans text-black">
+            {/* Top Navigation & Status Header - White Background & Black Accents */}
+            <div className="bg-white text-black p-5 sm:p-6 border-b-2 border-black">
                 <div className="max-w-3xl mx-auto space-y-4">
                     {/* Header Top Row */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                            <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
-                                <Layers className="w-5 h-5 text-sky-200" />
+                            <div className="w-10 h-10 rounded-2xl bg-black flex items-center justify-center text-white shadow-md">
+                                <Layers className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
+                                <h1 className="text-lg sm:text-xl font-black tracking-tight text-black flex items-center gap-2">
                                     Tiffin Delivery Route
                                 </h1>
-                                <p className="text-[11px] text-sky-100 font-medium">
+                                <p className="text-[11px] text-zinc-600 font-bold">
                                     Nearest-drop auto-routing for your assigned batch
                                 </p>
                             </div>
@@ -261,7 +261,7 @@ export default function TiffinDeliverySection() {
                         <button
                             onClick={updateRiderLocation}
                             disabled={refreshing}
-                            className="p-2.5 bg-white/15 hover:bg-white/25 active:scale-95 transition backdrop-blur-md border border-white/20 rounded-2xl text-xs font-bold text-white flex items-center gap-1.5 shadow-sm"
+                            className="p-2.5 bg-black hover:bg-zinc-800 active:scale-95 transition rounded-2xl text-xs font-bold text-white flex items-center gap-1.5 shadow-sm"
                             title="Refresh GPS Proximity"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
@@ -269,42 +269,42 @@ export default function TiffinDeliverySection() {
                         </button>
                     </div>
 
-                    {/* Live Progress Card */}
-                    <div className="bg-black/20 backdrop-blur-md border border-white/15 rounded-3xl p-4 sm:p-5 space-y-3 shadow-inner">
+                    {/* Live Progress Card - White with crisp Black border */}
+                    <div className="bg-zinc-50 border-2 border-black rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm">
                         <div className="flex items-center justify-between text-xs font-bold">
-                            <span className="flex items-center gap-1.5 text-sky-200 uppercase tracking-wider text-[10px] font-black">
+                            <span className="flex items-center gap-1.5 text-black uppercase tracking-wider text-[10px] font-black">
                                 {summary.activeSlot === 'Morning' ? (
-                                    <><Sun className="w-3.5 h-3.5 text-amber-300" /> Lunch Batch</>
+                                    <><Sun className="w-3.5 h-3.5 text-black" /> Lunch Batch</>
                                 ) : (
-                                    <><Moon className="w-3.5 h-3.5 text-indigo-300" /> Dinner Batch</>
+                                    <><Moon className="w-3.5 h-3.5 text-black" /> Dinner Batch</>
                                 )}
                             </span>
-                            <span className="text-white text-sm font-black">
+                            <span className="text-black text-sm font-black">
                                 {summary.completedCount} of {summary.totalAssigned} Delivered ({summary.progressPercent}%)
                             </span>
                         </div>
 
                         {/* Progress Bar */}
-                        <div className="w-full bg-white/20 h-2.5 rounded-full overflow-hidden p-0.5">
+                        <div className="w-full bg-zinc-200 h-2.5 rounded-full overflow-hidden p-0.5 border border-zinc-300">
                             <div 
-                                className="bg-gradient-to-r from-amber-400 to-emerald-400 h-full rounded-full transition-all duration-500 shadow-sm"
+                                className="bg-black h-full rounded-full transition-all duration-500 shadow-sm"
                                 style={{ width: `${summary.progressPercent}%` }}
                             />
                         </div>
 
                         {/* 3 Metric Pills */}
                         <div className="grid grid-cols-3 gap-2 pt-1">
-                            <div className="bg-white/10 rounded-2xl p-2.5 text-center">
-                                <span className="text-[10px] text-sky-100/80 font-bold block uppercase tracking-wider">Total</span>
-                                <span className="text-base font-black text-white">{summary.totalAssigned}</span>
+                            <div className="bg-white border border-zinc-300 rounded-2xl p-2.5 text-center shadow-xs">
+                                <span className="text-[10px] text-zinc-500 font-bold block uppercase tracking-wider">Total</span>
+                                <span className="text-base font-black text-black">{summary.totalAssigned}</span>
                             </div>
-                            <div className="bg-white/10 rounded-2xl p-2.5 text-center">
-                                <span className="text-[10px] text-amber-200/90 font-bold block uppercase tracking-wider">Pending</span>
-                                <span className="text-base font-black text-amber-300">{summary.pendingCount}</span>
+                            <div className="bg-white border border-zinc-300 rounded-2xl p-2.5 text-center shadow-xs">
+                                <span className="text-[10px] text-zinc-500 font-bold block uppercase tracking-wider">Pending</span>
+                                <span className="text-base font-black text-black">{summary.pendingCount}</span>
                             </div>
-                            <div className="bg-white/10 rounded-2xl p-2.5 text-center">
-                                <span className="text-[10px] text-emerald-200/90 font-bold block uppercase tracking-wider">Delivered</span>
-                                <span className="text-base font-black text-emerald-300">{summary.completedCount}</span>
+                            <div className="bg-white border border-zinc-300 rounded-2xl p-2.5 text-center shadow-xs">
+                                <span className="text-[10px] text-zinc-500 font-bold block uppercase tracking-wider">Delivered</span>
+                                <span className="text-base font-black text-black">{summary.completedCount}</span>
                             </div>
                         </div>
                     </div>
@@ -314,16 +314,16 @@ export default function TiffinDeliverySection() {
             {/* Main Content Area */}
             <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-5 space-y-4">
                 {/* Tabs Switcher */}
-                <div className="flex items-center p-1.5 bg-gray-200/70 rounded-2xl shadow-inner gap-1">
+                <div className="flex items-center p-1.5 bg-zinc-100 rounded-2xl border-2 border-black shadow-sm gap-1">
                     <button
                         onClick={() => setActiveTab('pending')}
                         className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
                             activeTab === 'pending'
-                                ? 'bg-white text-gray-900 shadow-md scale-100'
-                                : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-black text-white shadow-md scale-100'
+                                : 'text-zinc-600 hover:text-black font-bold'
                         }`}
                     >
-                        <Compass className="w-4 h-4 text-[#0ea5e9]" />
+                        <Compass className="w-4 h-4" />
                         Pending Stops ({pendingDeliveries.length})
                     </button>
 
@@ -331,11 +331,11 @@ export default function TiffinDeliverySection() {
                         onClick={() => setActiveTab('completed')}
                         className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
                             activeTab === 'completed'
-                                ? 'bg-white text-emerald-700 shadow-md scale-100'
-                                : 'text-gray-600 hover:text-gray-900'
+                                ? 'bg-black text-white shadow-md scale-100'
+                                : 'text-zinc-600 hover:text-black font-bold'
                         }`}
                     >
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <CheckCircle2 className="w-4 h-4" />
                         Delivered ({completedDeliveries.length})
                     </button>
                 </div>
@@ -344,17 +344,17 @@ export default function TiffinDeliverySection() {
                 {activeTab === 'pending' && (
                     <div className="space-y-3">
                         {loading ? (
-                            <div className="bg-white rounded-3xl p-12 text-center space-y-3 border border-gray-200/80 shadow-sm">
-                                <Loader2 className="w-8 h-8 text-[#0ea5e9] animate-spin mx-auto" />
-                                <p className="text-xs font-bold text-gray-600">Calculating shortest route from your live GPS...</p>
+                            <div className="bg-white rounded-3xl p-12 text-center space-y-3 border-2 border-black shadow-sm">
+                                <Loader2 className="w-8 h-8 text-black animate-spin mx-auto" />
+                                <p className="text-xs font-bold text-zinc-700">Calculating shortest route from your live GPS...</p>
                             </div>
                         ) : pendingDeliveries.length === 0 ? (
-                            <div className="bg-white rounded-3xl p-12 text-center space-y-3 border border-gray-200/80 shadow-sm">
-                                <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mx-auto">
+                            <div className="bg-white rounded-3xl p-12 text-center space-y-3 border-2 border-black shadow-sm">
+                                <div className="w-14 h-14 bg-black rounded-full flex items-center justify-center text-white mx-auto">
                                     <CheckCircle2 className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-base font-black text-gray-900">All Tiffins Delivered! 🎉</h3>
-                                <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                                <h3 className="text-base font-black text-black">All Tiffins Delivered!</h3>
+                                <p className="text-xs text-zinc-600 max-w-sm mx-auto font-medium">
                                     You have completed all assigned tiffins in this batch. Great job on the quick route delivery!
                                 </p>
                             </div>
@@ -372,10 +372,10 @@ export default function TiffinDeliverySection() {
                                 return (
                                     <div
                                         key={delivery._id}
-                                        className={`bg-white rounded-3xl p-5 border transition-all duration-200 space-y-4 shadow-sm hover:shadow-md ${
+                                        className={`bg-white rounded-3xl p-5 border-2 transition-all duration-200 space-y-4 shadow-sm hover:shadow-md ${
                                             isNextStop 
-                                                ? 'border-[#0ea5e9]/50 ring-2 ring-[#0ea5e9]/20 shadow-sky-900/5' 
-                                                : 'border-gray-200/80'
+                                                ? 'border-black ring-2 ring-black/15 shadow-lg' 
+                                                : 'border-zinc-300'
                                         }`}
                                     >
                                         {/* Stop Header */}
@@ -383,25 +383,25 @@ export default function TiffinDeliverySection() {
                                             <div className="flex items-center gap-1.5 flex-wrap">
                                                 <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
                                                     isNextStop 
-                                                        ? 'bg-[#0ea5e9] text-white shadow-sm shadow-sky-900/20' 
-                                                        : 'bg-gray-100 text-gray-700'
+                                                        ? 'bg-black text-white shadow-sm' 
+                                                        : 'bg-zinc-100 text-black border border-zinc-300'
                                                 }`}>
-                                                    {isNextStop ? '🚀 Next Stop #1' : `Stop #${idx + 1}`}
+                                                    {isNextStop ? 'Next Stop #1' : `Stop #${idx + 1}`}
                                                 </span>
 
-                                                <span className="px-2 py-1 rounded-xl bg-blue-50 border border-blue-200/60 text-blue-700 text-[10px] font-black flex items-center gap-1">
-                                                    <Navigation className="w-3 h-3" />
+                                                <span className="px-2 py-1 rounded-xl bg-zinc-100 border border-zinc-300 text-black text-[10px] font-black flex items-center gap-1">
+                                                    <Navigation className="w-3 h-3 text-black" />
                                                     {dist.text}
                                                 </span>
 
                                                 {dist.eta && (
-                                                    <span className="px-2 py-1 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-700 text-[10px] font-bold">
+                                                    <span className="px-2 py-1 rounded-xl bg-zinc-100 border border-zinc-300 text-black text-[10px] font-bold">
                                                         ⏱ {dist.eta}
                                                     </span>
                                                 )}
                                             </div>
 
-                                            <span className="text-[9px] font-bold text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 max-w-[100px] truncate">
+                                            <span className="text-[9px] font-bold text-black bg-zinc-100 px-2 py-1 rounded-lg border border-zinc-300 max-w-[100px] truncate">
                                                 📍 {zone}
                                             </span>
                                         </div>
@@ -409,29 +409,29 @@ export default function TiffinDeliverySection() {
                                         {/* Customer Details & Call Button */}
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="space-y-1 min-w-0">
-                                                <h3 className="text-base font-black text-gray-900 truncate">
+                                                <h3 className="text-base font-black text-black truncate">
                                                     {customerName}
                                                 </h3>
-                                                <p className="text-xs font-semibold text-sky-800 truncate">
+                                                <p className="text-xs font-bold text-zinc-700 truncate">
                                                     🍱 {planName}
                                                 </p>
-                                                <p className="text-xs text-gray-600 flex items-start gap-1 leading-relaxed pt-0.5">
-                                                    <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                                                <p className="text-xs text-zinc-700 flex items-start gap-1 leading-relaxed pt-0.5">
+                                                    <MapPin className="w-3.5 h-3.5 text-black shrink-0 mt-0.5" />
                                                     <span className="line-clamp-2">{address}</span>
                                                 </p>
                                                 {landmark && (
-                                                    <p className="text-[11px] font-bold text-gray-500 pl-4.5">
-                                                        🏢 <span className="text-gray-700">{landmark}</span>
+                                                    <p className="text-[11px] font-bold text-black pl-4.5">
+                                                        🏢 <span className="text-black">{landmark}</span>
                                                     </p>
                                                 )}
                                             </div>
 
                                             <a
                                                 href={`tel:${phone}`}
-                                                className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0 active:scale-90 transition shadow-sm"
+                                                className="w-10 h-10 rounded-2xl bg-black text-white hover:bg-zinc-800 flex items-center justify-center shrink-0 active:scale-90 transition shadow-sm"
                                                 title="Call Customer"
                                             >
-                                                <Phone className="w-4 h-4" />
+                                                <Phone className="w-4 h-4 text-white" />
                                             </a>
                                         </div>
 
@@ -439,21 +439,17 @@ export default function TiffinDeliverySection() {
                                         <div className="grid grid-cols-2 gap-2.5 pt-1">
                                             <button
                                                 onClick={() => openInAppMap(delivery)}
-                                                className="py-3 px-4 rounded-2xl bg-[#0ea5e9]/10 hover:bg-[#0ea5e9]/20 active:scale-98 transition text-xs font-bold text-[#0ea5e9] flex items-center justify-center gap-1.5 border border-[#0ea5e9]/30"
+                                                className="py-3 px-4 rounded-2xl bg-zinc-100 hover:bg-zinc-200 active:scale-98 transition text-xs font-bold text-black flex items-center justify-center gap-1.5 border border-zinc-400"
                                             >
-                                                <Navigation className="w-3.5 h-3.5" />
+                                                <Navigation className="w-3.5 h-3.5 text-black" />
                                                 Go to Map
                                             </button>
 
                                             <button
                                                 onClick={() => handleStartDropoff(delivery)}
-                                                className={`py-3 px-4 rounded-2xl font-black text-xs transition flex items-center justify-center gap-1.5 shadow-md active:scale-98 ${
-                                                    isNextStop
-                                                        ? 'bg-gradient-to-r from-[#0ea5e9] to-[#0284c7] text-white shadow-sky-900/20'
-                                                        : 'bg-gray-900 text-white'
-                                                }`}
+                                                className="py-3 px-4 rounded-2xl font-black text-xs transition flex items-center justify-center gap-1.5 shadow-md active:scale-98 bg-black text-white hover:bg-zinc-800"
                                             >
-                                                <CheckSquare className="w-3.5 h-3.5" />
+                                                <CheckSquare className="w-3.5 h-3.5 text-white" />
                                                 Deliver Tiffin
                                             </button>
                                         </div>
@@ -468,10 +464,10 @@ export default function TiffinDeliverySection() {
                 {activeTab === 'completed' && (
                     <div className="space-y-3">
                         {completedDeliveries.length === 0 ? (
-                            <div className="bg-white rounded-3xl p-12 text-center space-y-2 border border-gray-200/80 shadow-sm">
-                                <Clock className="w-8 h-8 text-gray-300 mx-auto" />
-                                <h3 className="text-sm font-black text-gray-700">No Tiffins Delivered Yet</h3>
-                                <p className="text-xs text-gray-400">Delivered tiffins in this batch will appear here.</p>
+                            <div className="bg-white rounded-3xl p-12 text-center space-y-2 border-2 border-black shadow-sm">
+                                <Clock className="w-8 h-8 text-black mx-auto" />
+                                <h3 className="text-sm font-black text-black">No Tiffins Delivered Yet</h3>
+                                <p className="text-xs text-zinc-600 font-medium">Delivered tiffins in this batch will appear here.</p>
                             </div>
                         ) : (
                             completedDeliveries.map((delivery, idx) => {
@@ -486,37 +482,33 @@ export default function TiffinDeliverySection() {
                                 return (
                                     <div
                                         key={delivery._id || idx}
-                                        className="bg-white rounded-3xl p-4.5 border border-gray-200/80 shadow-sm flex items-start gap-3.5"
+                                        className="bg-white rounded-3xl p-4.5 border-2 border-black shadow-sm flex items-start gap-3.5"
                                     >
-                                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-                                            <CheckCircle2 className="w-5 h-5" />
+                                        <div className="w-10 h-10 rounded-2xl bg-black text-white flex items-center justify-center shrink-0 mt-0.5">
+                                            <CheckCircle2 className="w-5 h-5 text-white" />
                                         </div>
 
                                         <div className="flex-1 min-w-0 space-y-1">
                                             <div className="flex items-center justify-between gap-2">
-                                                <h4 className="text-sm font-black text-gray-900 truncate">
+                                                <h4 className="text-sm font-black text-black truncate">
                                                     {customerName}
                                                 </h4>
-                                                <span className="text-[10px] font-bold text-gray-400 shrink-0">
+                                                <span className="text-[10px] font-bold text-zinc-600 shrink-0">
                                                     🕒 {deliveredTime}
                                                 </span>
                                             </div>
 
-                                            <p className="text-xs text-gray-500 truncate">
+                                            <p className="text-xs text-zinc-700 font-semibold truncate">
                                                 🍱 {planName}
                                             </p>
 
-                                            <p className="text-xs text-gray-600 truncate">
+                                            <p className="text-xs text-zinc-700 truncate">
                                                 📍 {address}
                                             </p>
 
                                             <div className="pt-1 flex items-center gap-2">
-                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 ${
-                                                    isOtp
-                                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                                        : 'bg-blue-50 text-blue-800 border border-blue-200'
-                                                }`}>
-                                                    <ShieldCheck className="w-3 h-3" />
+                                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 bg-zinc-100 text-black border border-zinc-300">
+                                                    <ShieldCheck className="w-3 h-3 text-black" />
                                                     {isOtp ? 'OTP Verified Handover' : 'Photo Proof Drop-off'}
                                                 </span>
                                             </div>
@@ -529,48 +521,48 @@ export default function TiffinDeliverySection() {
                 )}
             </div>
 
-            {/* ─── INTERACTIVE DELIVERY DROP-OFF MODAL / BOTTOM SHEET ─── */}
+            {/* ─── INTERACTIVE DELIVERY DROP-OFF MODAL / BOTTOM SHEET (B&W THEME) ─── */}
             {selectedDelivery && (
                 <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
-                    <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-5 duration-200">
+                    <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 space-y-5 max-h-[90vh] overflow-y-auto border-2 border-black animate-in slide-in-from-bottom-5 duration-200 text-black">
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                        <div className="flex items-center justify-between pb-3 border-b-2 border-black">
                             <div>
-                                <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
-                                    <Layers className="w-5 h-5 text-[#0ea5e9]" />
+                                <h3 className="text-lg font-black text-black flex items-center gap-2">
+                                    <Layers className="w-5 h-5 text-black" />
                                     Complete Tiffin Drop-off
                                 </h3>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-zinc-600 font-bold">
                                     {selectedDelivery.deliveryAddress?.name || 'Customer'} • {selectedDelivery.distanceText || 'Nearby'}
                                 </p>
                             </div>
 
                             <button
                                 onClick={() => setSelectedDelivery(null)}
-                                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition"
+                                className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-black hover:bg-zinc-200 border border-zinc-300 transition"
                             >
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
 
                         {/* Customer & Address Quick Card */}
-                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
+                        <div className="bg-zinc-50 rounded-2xl p-4 border border-zinc-300 space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-gray-900">
+                                <span className="text-xs font-bold text-black">
                                     {selectedDelivery.deliveryAddress?.name}
                                 </span>
                                 <a
                                     href={`tel:${selectedDelivery.deliveryAddress?.phone || selectedDelivery.userId?.phone}`}
-                                    className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 flex items-center gap-1"
+                                    className="text-xs font-bold text-white bg-black px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-sm"
                                 >
-                                    <Phone className="w-3 h-3" /> Call Customer
+                                    <Phone className="w-3 h-3 text-white" /> Call Customer
                                 </a>
                             </div>
-                            <p className="text-xs text-gray-600 leading-relaxed">
+                            <p className="text-xs text-zinc-700 leading-relaxed font-medium">
                                 {selectedDelivery.deliveryAddress?.fullAddress || selectedDelivery.deliveryAddress?.street}
                             </p>
                             {selectedDelivery.deliveryAddress?.landmark && (
-                                <p className="text-xs font-semibold text-gray-700">
+                                <p className="text-xs font-bold text-black">
                                     🏢 Landmark: {selectedDelivery.deliveryAddress?.landmark}
                                 </p>
                             )}
@@ -578,25 +570,25 @@ export default function TiffinDeliverySection() {
                             {/* Navigate in-app */}
                             <button
                                 onClick={() => openInAppMap(selectedDelivery)}
-                                className="w-full py-2 bg-[#0ea5e9]/10 rounded-xl border border-[#0ea5e9]/30 text-xs font-bold text-[#0ea5e9] flex items-center justify-center gap-1.5 hover:bg-[#0ea5e9]/20 transition mt-1"
+                                className="w-full py-2 bg-zinc-100 rounded-xl border border-zinc-300 text-xs font-bold text-black flex items-center justify-center gap-1.5 hover:bg-zinc-200 transition mt-1"
                             >
-                                <Navigation className="w-3.5 h-3.5" /> Open In-App Route Map
+                                <Navigation className="w-3.5 h-3.5 text-black" /> Open In-App Route Map
                             </button>
                         </div>
 
                         {/* Delivery Guidelines / Policy Note */}
-                        <div className="p-3 bg-sky-50/70 rounded-2xl border border-sky-100 text-[11px] text-sky-900 space-y-1">
-                            <span className="font-bold flex items-center gap-1 text-[#0ea5e9]">
-                                <ShieldCheck className="w-3.5 h-3.5" /> Delivery Handover Guidelines:
+                        <div className="p-3 bg-zinc-100 rounded-2xl border border-zinc-300 text-[11px] text-black space-y-1">
+                            <span className="font-black flex items-center gap-1 text-black">
+                                <ShieldCheck className="w-3.5 h-3.5 text-black" /> Delivery Handover Guidelines:
                             </span>
-                            <p className="text-sky-800/90 leading-relaxed">
+                            <p className="text-zinc-700 leading-relaxed font-medium">
                                 Hand over the tiffin container directly to the customer. If the customer is unreachable, contact them via phone before leaving at door/guard with photo proof.
                             </p>
                         </div>
 
                         {/* Verification Mode Switcher */}
                         <div className="space-y-2">
-                            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <label className="block text-xs font-black text-black uppercase tracking-wider">
                                 Verification Method:
                             </label>
 
@@ -604,10 +596,10 @@ export default function TiffinDeliverySection() {
                                 <button
                                     type="button"
                                     onClick={() => setVerifyMode('otp')}
-                                    className={`py-2.5 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                                    className={`py-2.5 rounded-2xl text-xs transition flex items-center justify-center gap-1.5 border-2 ${
                                         verifyMode === 'otp'
-                                            ? 'bg-sky-50 border-[#0ea5e9] text-[#0ea5e9] font-black shadow-sm'
-                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                            ? 'bg-black text-white font-black shadow-sm border-black'
+                                            : 'bg-white border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50'
                                     }`}
                                 >
                                     <ShieldCheck className="w-4 h-4" /> Customer 4-Digit OTP
@@ -616,10 +608,10 @@ export default function TiffinDeliverySection() {
                                 <button
                                     type="button"
                                     onClick={() => setVerifyMode('photo')}
-                                    className={`py-2.5 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${
+                                    className={`py-2.5 rounded-2xl text-xs transition flex items-center justify-center gap-1.5 border-2 ${
                                         verifyMode === 'photo'
-                                            ? 'bg-sky-50 border-[#0ea5e9] text-[#0ea5e9] font-black shadow-sm'
-                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                            ? 'bg-black text-white font-black shadow-sm border-black'
+                                            : 'bg-white border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50'
                                     }`}
                                 >
                                     <Camera className="w-4 h-4" /> Unattended Photo Drop
@@ -630,8 +622,8 @@ export default function TiffinDeliverySection() {
                         {/* Mode 1: OTP Input */}
                         {verifyMode === 'otp' ? (
                             <div className="space-y-3">
-                                <p className="text-xs text-gray-500 text-center">
-                                    Ask the customer for their 4-digit handover code (Default: <strong className="text-gray-900">1234</strong>)
+                                <p className="text-xs text-zinc-700 font-medium text-center">
+                                    Ask the customer for their 4-digit handover code (Default: <strong className="text-black font-black">1234</strong>)
                                 </p>
 
                                 <div className="flex items-center justify-center gap-3">
@@ -645,7 +637,7 @@ export default function TiffinDeliverySection() {
                                             value={otpDigits[i]}
                                             onChange={(e) => handleOtpChange(i, e.target.value)}
                                             onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                                            className="w-12 h-14 text-center text-xl font-black rounded-2xl border-2 border-gray-200 focus:border-[#0ea5e9] focus:ring-2 focus:ring-sky-500/20 outline-none transition bg-gray-50/50 hover:bg-white"
+                                            className="w-12 h-14 text-center text-xl font-black rounded-2xl border-2 border-zinc-400 focus:border-black focus:ring-2 focus:ring-black/20 outline-none transition bg-zinc-50 text-black hover:bg-white"
                                         />
                                     ))}
                                 </div>
@@ -654,42 +646,42 @@ export default function TiffinDeliverySection() {
                             /* Mode 2: Unattended Photo Drop */
                             <div className="space-y-3">
                                 {/* Confirmation checkbox */}
-                                <label className="flex items-start gap-2.5 cursor-pointer bg-amber-50/60 p-3 rounded-2xl border border-amber-200/60">
+                                <label className="flex items-start gap-2.5 cursor-pointer bg-zinc-50 p-3 rounded-2xl border border-zinc-300">
                                     <input
                                         type="checkbox"
                                         checked={callConfirmed}
                                         onChange={(e) => setCallConfirmed(e.target.checked)}
-                                        className="mt-0.5 rounded text-[#0ea5e9] focus:ring-[#0ea5e9]"
+                                        className="mt-0.5 rounded text-black focus:ring-black"
                                     />
-                                    <span className="text-xs text-amber-900 font-medium leading-snug">
+                                    <span className="text-xs text-black font-semibold leading-snug">
                                         I have called the customer to confirm placing the tiffin at their door/gate.
                                     </span>
                                 </label>
 
                                 {/* Photo capture */}
-                                <div className="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center space-y-2 hover:border-[#0ea5e9] transition">
+                                <div className="border-2 border-dashed border-zinc-400 rounded-2xl p-4 text-center space-y-2 hover:border-black transition bg-zinc-50">
                                     {photoPreview ? (
                                         <div className="space-y-2">
                                             <img
                                                 src={photoPreview}
                                                 alt="Drop-off Proof"
-                                                className="w-full h-36 object-cover rounded-xl shadow-sm"
+                                                className="w-full h-36 object-cover rounded-xl shadow-sm border border-zinc-300"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setPhotoPreview(null)}
-                                                className="text-xs font-bold text-red-600 hover:underline"
+                                                className="text-xs font-bold text-black hover:underline"
                                             >
                                                 Retake Picture
                                             </button>
                                         </div>
                                     ) : (
                                         <label className="cursor-pointer block space-y-1 py-3">
-                                            <Camera className="w-8 h-8 text-gray-400 mx-auto" />
-                                            <span className="text-xs font-bold text-gray-700 block">
+                                            <Camera className="w-8 h-8 text-black mx-auto" />
+                                            <span className="text-xs font-bold text-black block">
                                                 Take Photo Proof of Placed Tiffin
                                             </span>
-                                            <span className="text-[10px] text-gray-400 block">
+                                            <span className="text-[10px] text-zinc-500 font-medium block">
                                                 Click to capture using device camera
                                             </span>
                                             <input
@@ -707,7 +699,7 @@ export default function TiffinDeliverySection() {
 
                         {/* Error Alert */}
                         {modalError && (
-                            <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-100 flex items-center gap-1.5 font-semibold">
+                            <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200 flex items-center gap-1.5 font-bold">
                                 <AlertCircle className="w-4 h-4 shrink-0" />
                                 {modalError}
                             </p>
@@ -719,7 +711,7 @@ export default function TiffinDeliverySection() {
                                 type="button"
                                 onClick={() => setSelectedDelivery(null)}
                                 disabled={isSubmitting}
-                                className="py-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700 transition"
+                                className="py-3.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-xs font-bold text-black transition"
                             >
                                 Cancel
                             </button>
@@ -728,16 +720,16 @@ export default function TiffinDeliverySection() {
                                 type="button"
                                 onClick={handleSubmitDelivery}
                                 disabled={isSubmitting}
-                                className="py-3.5 rounded-2xl bg-gradient-to-r from-[#0ea5e9] to-[#0284c7] text-white font-black text-xs shadow-lg shadow-sky-900/20 hover:from-[#0284c7] hover:to-[#0369a1] active:scale-98 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                className="py-3.5 rounded-2xl bg-black hover:bg-zinc-800 text-white font-black text-xs shadow-xl active:scale-98 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
                             >
                                 {isSubmitting ? (
                                     <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <Loader2 className="w-4 h-4 animate-spin text-white" />
                                         Verifying...
                                     </>
                                 ) : (
                                     <>
-                                        <Check className="w-4 h-4" />
+                                        <Check className="w-4 h-4 text-white" />
                                         Confirm Drop-off
                                     </>
                                 )}

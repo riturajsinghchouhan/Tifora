@@ -2,6 +2,7 @@ import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
 import { TiffinDelivery } from '../models/tiffinDelivery.model.js';
 import { TiffinPlan } from '../models/tiffinPlan.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
+import { ensureTodayDeliveriesSync } from '../scripts/tiffinScheduler.js';
 import mongoose from 'mongoose';
 
 /**
@@ -9,6 +10,8 @@ import mongoose from 'mongoose';
  */
 export const getAdminTiffinOverview = async (req, res) => {
     try {
+        await ensureTodayDeliveriesSync();
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
@@ -260,6 +263,8 @@ export const adminDeletePlan = async (req, res) => {
  */
 export const getTodayDeliveries = async (req, res) => {
     try {
+        await ensureTodayDeliveriesSync();
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);

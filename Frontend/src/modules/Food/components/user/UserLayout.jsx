@@ -11,6 +11,7 @@ import AppIntroSplash from "./AppIntroSplash"
 import { LocationProvider } from "@food/context/LocationProvider"
 import { useAppLocation } from "@food/hooks/useAppLocation"
 import LocationGuard from "./LocationGuard"
+import TiffinFloatingTrackingCard from "./TiffinFloatingTrackingCard"
 
 const debugWarn = (...args) => {}
 
@@ -130,6 +131,7 @@ function UserLayoutShell() {
         </main>
       </LocationGuard>
       {showBottomNav && <BottomNavigation />}
+      <TiffinFloatingTrackingCard hasBottomNav={showBottomNav} />
     </>
   )
 }

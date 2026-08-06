@@ -113,6 +113,7 @@ export default function TiffinNavigationPage() {
     const { emitLocation } = useDeliveryNotificationContext();
     const watchIdRef = useRef(null);
     const lastEmitRef = useRef(0);
+    const boundsFittedRef = useRef(false);
 
     // Get rider GPS — use watchPosition for continuous tracking
     useEffect(() => {
@@ -142,10 +143,11 @@ export default function TiffinNavigationPage() {
                 };
                 setRiderCoords(newCoords);
 
-                // Emit location via socket every 10 seconds
+                // Emit location via socket every 3 seconds (for faster local testing feedback)
                 const now = Date.now();
-                if (now - lastEmitRef.current >= 10000 && id) {
+                if (now - lastEmitRef.current >= 3000 && id) {
                     lastEmitRef.current = now;
+                    console.log('📡 [TiffinNav] Emitting live location:', newCoords);
                     emitLocation({
                         orderId: id, // deliveryId is the tracking room ID
                         lat: newCoords.lat,
@@ -161,7 +163,33 @@ export default function TiffinNavigationPage() {
             { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
         );
 
+        // Force emit every 3 seconds to ensure socket is pulsing even if stationary
+        const forceInterval = setInterval(() => {
+            if (id) {
+                setRiderCoords(prev => {
+                    if (prev) {
+                        const now = Date.now();
+                        if (now - lastEmitRef.current >= 3000) {
+                            lastEmitRef.current = now;
+                            console.log('📡 [TiffinNav] Forced pulse emitting live location:', prev);
+                            emitLocation({
+                                orderId: id,
+                                lat: prev.lat,
+                                lng: prev.lng,
+                                heading: prev.heading,
+                                speed: prev.speed,
+                                accuracy: prev.accuracy,
+                                status: 'on_the_way',
+                            });
+                        }
+                    }
+                    return prev;
+                });
+            }
+        }, 3000);
+
         return () => {
+            clearInterval(forceInterval);
             if (watchIdRef.current != null) {
                 navigator.geolocation.clearWatch(watchIdRef.current);
             }
@@ -178,11 +206,18 @@ export default function TiffinNavigationPage() {
         return null;
     }, [delivery]);
 
-    // Fetch driving directions imperatively — much more reliable than <DirectionsService> component
+    // Fetch driving directions
+    const lastDirectionsFetchRef = useRef(0);
+    
     useEffect(() => {
         if (!riderCoords || !customerCoords || !mapsReady) return;
-        if (directionsCalledRef.current) return;
+        
+        const now = Date.now();
+        // Only calculate directions if we haven't done it yet, or 5 seconds have passed (for fast testing feedback)
+        if (directionsCalledRef.current && now - lastDirectionsFetchRef.current < 5000) return;
+        
         directionsCalledRef.current = true;
+        lastDirectionsFetchRef.current = now;
 
         const service = new window.google.maps.DirectionsService();
         service.route(
@@ -203,9 +238,10 @@ export default function TiffinNavigationPage() {
                         }));
                         setSimPath(path);
                     }
-                    // Auto-fit the map to show the full route
-                    if (mapRef.current && result.routes?.[0]?.bounds) {
+                    // Auto-fit the map only on first load
+                    if (mapRef.current && result.routes?.[0]?.bounds && !boundsFittedRef.current) {
                         mapRef.current.fitBounds(result.routes[0].bounds, { top: 140, right: 40, bottom: 160, left: 40 });
+                        boundsFittedRef.current = true; // Mark that we've fitted bounds once
                     }
                 } else {
                     console.warn('[TiffinNav] Directions failed:', status);
@@ -515,27 +551,27 @@ export default function TiffinNavigationPage() {
             </div>
 
             {/* Bottom Action Bar */}
-            <div className="bg-white shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-4 pt-4 pb-8 space-y-3 z-20">
+            <div className="bg-white text-black shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-4 pt-4 pb-8 space-y-3 z-20 border-t-2 border-black">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center shrink-0">
-                        <Package className="w-5 h-5 text-[#0ea5e9]" />
+                    <div className="w-10 h-10 rounded-2xl bg-black flex items-center justify-center text-white shrink-0">
+                        <Package className="w-5 h-5 text-white" />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-xs font-black text-gray-900 truncate">{customerName}</p>
-                        <p className="text-[11px] text-gray-500 truncate">{customerAddress || 'Check address above'}</p>
+                        <p className="text-xs font-black text-black truncate">{customerName}</p>
+                        <p className="text-[11px] text-zinc-600 truncate">{customerAddress || 'Check address above'}</p>
                     </div>
                     {customerPhone && (
-                        <a href={`tel:${customerPhone}`} className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0 active:scale-90 transition">
-                            <Phone className="w-4 h-4" />
+                        <a href={`tel:${customerPhone}`} className="w-10 h-10 rounded-2xl bg-black text-white hover:bg-zinc-800 flex items-center justify-center shrink-0 active:scale-90 transition shadow-sm">
+                            <Phone className="w-4 h-4 text-white" />
                         </a>
                     )}
                 </div>
 
                 <button
                     onClick={() => setShowDropoff(true)}
-                    className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#0ea5e9] to-[#0284c7] text-white font-black text-sm shadow-lg shadow-sky-900/25 flex items-center justify-center gap-2 active:scale-[0.98] transition"
+                    className="w-full py-4 rounded-2xl bg-black text-white font-black text-sm shadow-xl flex items-center justify-center gap-2 active:scale-[0.98] transition hover:bg-zinc-800"
                 >
-                    <CheckSquare className="w-5 h-5" />
+                    <CheckSquare className="w-5 h-5 text-white" />
                     Deliver Tiffin
                 </button>
             </div>
@@ -543,50 +579,54 @@ export default function TiffinNavigationPage() {
             {/* ─── DROP-OFF MODAL ─── */}
             {showDropoff && (
                 <div className="fixed inset-0 z-[200] flex items-end justify-center bg-black/60 backdrop-blur-sm">
-                    <div className="bg-white w-full max-w-lg rounded-t-3xl shadow-2xl p-6 space-y-5 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom-5 duration-200">
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                    <div className="bg-white w-full max-w-lg rounded-t-3xl shadow-2xl p-6 space-y-5 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom-5 duration-200 border-t-2 border-black text-black">
+                        <div className="flex items-center justify-between pb-3 border-b-2 border-black">
                             <div>
-                                <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
-                                    <Layers className="w-5 h-5 text-[#0ea5e9]" /> Complete Tiffin Drop-off
+                                <h3 className="text-lg font-black text-black flex items-center gap-2">
+                                    <Layers className="w-5 h-5 text-black" /> Complete Tiffin Drop-off
                                 </h3>
-                                <p className="text-xs text-gray-500">{customerName}</p>
+                                <p className="text-xs text-zinc-600 font-bold">{customerName}</p>
                             </div>
-                            <button onClick={() => setShowDropoff(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition">
+                            <button onClick={() => setShowDropoff(false)} className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-black hover:bg-zinc-200 border border-zinc-300 transition">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
 
-                        <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 space-y-2">
+                        <div className="bg-zinc-50 rounded-2xl p-4 border border-zinc-300 space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-gray-900">{customerName}</span>
+                                <span className="text-xs font-black text-black">{customerName}</span>
                                 {customerPhone && (
-                                    <a href={`tel:${customerPhone}`} className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-200 flex items-center gap-1">
-                                        <Phone className="w-3 h-3" /> Call
+                                    <a href={`tel:${customerPhone}`} className="text-xs font-bold text-white bg-black px-2.5 py-1 rounded-xl flex items-center gap-1 shadow-sm">
+                                        <Phone className="w-3 h-3 text-white" /> Call
                                     </a>
                                 )}
                             </div>
-                            <p className="text-xs text-gray-600 leading-relaxed">{customerAddress}</p>
-                            {customerLandmark && <p className="text-xs font-semibold text-gray-700">🏢 {customerLandmark}</p>}
+                            <p className="text-xs text-zinc-700 leading-relaxed font-medium">{customerAddress}</p>
+                            {customerLandmark && <p className="text-xs font-bold text-black">🏢 {customerLandmark}</p>}
                         </div>
 
-                        <div className="p-3 bg-sky-50/70 rounded-2xl border border-sky-100 text-[11px] text-sky-900 space-y-1">
-                            <span className="font-bold flex items-center gap-1 text-[#0ea5e9]">
-                                <ShieldCheck className="w-3.5 h-3.5" /> Delivery Handover Guidelines:
+                        <div className="p-3 bg-zinc-100 rounded-2xl border border-zinc-300 text-[11px] text-black space-y-1">
+                            <span className="font-black flex items-center gap-1 text-black">
+                                <ShieldCheck className="w-3.5 h-3.5 text-black" /> Delivery Handover Guidelines:
                             </span>
-                            <p className="text-sky-800/90 leading-relaxed">
+                            <p className="text-zinc-700 leading-relaxed font-medium">
                                 Hand over the tiffin directly to the customer. If unreachable, call them first. If still unreachable, leave at door/gate with photo proof.
                             </p>
                         </div>
 
                         <div className="space-y-2">
-                            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">Verification Method:</label>
+                            <label className="block text-xs font-black text-black uppercase tracking-wider">Verification Method:</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {[['otp', ShieldCheck, 'Customer OTP'], ['photo', Camera, 'Photo Drop']].map(([mode, Icon, label]) => (
                                     <button
                                         key={mode}
                                         type="button"
                                         onClick={() => setVerifyMode(mode)}
-                                        className={`py-2.5 rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 border ${verifyMode === mode ? 'bg-sky-50 border-[#0ea5e9] text-[#0ea5e9] shadow-sm' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                        className={`py-2.5 rounded-2xl text-xs transition flex items-center justify-center gap-1.5 border-2 ${
+                                            verifyMode === mode 
+                                                ? 'bg-black text-white font-black shadow-sm border-black' 
+                                                : 'bg-white border-zinc-300 text-zinc-700 font-bold hover:bg-zinc-50'
+                                        }`}
                                     >
                                         <Icon className="w-4 h-4" /> {label}
                                     </button>
@@ -596,7 +636,7 @@ export default function TiffinNavigationPage() {
 
                         {verifyMode === 'otp' ? (
                             <div className="space-y-3">
-                                <p className="text-xs text-gray-500 text-center">Ask the customer for their 4-digit handover OTP</p>
+                                <p className="text-xs text-zinc-600 font-medium text-center">Ask the customer for their 4-digit handover OTP</p>
                                 <div className="flex items-center justify-center gap-3">
                                     {[0, 1, 2, 3].map(i => (
                                         <input
@@ -608,7 +648,7 @@ export default function TiffinNavigationPage() {
                                             value={otpDigits[i]}
                                             onChange={(e) => handleOtpChange(i, e.target.value)}
                                             onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                                            className="w-12 h-14 text-center text-xl font-black rounded-2xl border-2 border-gray-200 focus:border-[#0ea5e9] focus:ring-2 focus:ring-sky-500/20 outline-none transition bg-gray-50/50 hover:bg-white"
+                                            className="w-12 h-14 text-center text-xl font-black rounded-2xl border-2 border-zinc-400 focus:border-black focus:ring-2 focus:ring-black/20 outline-none transition bg-zinc-50 text-black hover:bg-white"
                                         />
                                     ))}
                                 </div>
@@ -617,30 +657,30 @@ export default function TiffinNavigationPage() {
                                         type="button" 
                                         onClick={handleSendOtp} 
                                         disabled={sendingOtp}
-                                        className="py-2 px-4 bg-sky-100 hover:bg-sky-200 text-sky-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 w-full max-w-[200px]"
+                                        className="py-2 px-4 bg-black hover:bg-zinc-800 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-2 w-full max-w-[200px] shadow-sm"
                                     >
-                                        {sendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                                        {sendingOtp ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <ShieldCheck className="w-4 h-4 text-white" />}
                                         {sendingOtp ? 'Sending...' : 'Send OTP to Customer'}
                                     </button>
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                <label className="flex items-start gap-2.5 cursor-pointer bg-amber-50/60 p-3 rounded-2xl border border-amber-200/60">
-                                    <input type="checkbox" checked={callConfirmed} onChange={(e) => setCallConfirmed(e.target.checked)} className="mt-0.5 rounded text-[#0ea5e9]" />
-                                    <span className="text-xs text-amber-900 font-medium leading-snug">I have called the customer to confirm placing the tiffin at their door/gate.</span>
+                                <label className="flex items-start gap-2.5 cursor-pointer bg-zinc-50 p-3 rounded-2xl border border-zinc-300">
+                                    <input type="checkbox" checked={callConfirmed} onChange={(e) => setCallConfirmed(e.target.checked)} className="mt-0.5 rounded text-black focus:ring-black" />
+                                    <span className="text-xs text-black font-semibold leading-snug">I have called the customer to confirm placing the tiffin at their door/gate.</span>
                                 </label>
-                                <div className="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center space-y-2 hover:border-[#0ea5e9] transition">
+                                <div className="border-2 border-dashed border-zinc-400 rounded-2xl p-4 text-center space-y-2 hover:border-black transition bg-zinc-50">
                                     {photoPreview ? (
                                         <div className="space-y-2">
-                                            <img src={photoPreview} alt="Drop-off Proof" className="w-full h-36 object-cover rounded-xl shadow-sm" />
-                                            <button type="button" onClick={() => setPhotoPreview(null)} className="text-xs font-bold text-red-600">Retake Picture</button>
+                                            <img src={photoPreview} alt="Drop-off Proof" className="w-full h-36 object-cover rounded-xl shadow-sm border border-zinc-300" />
+                                            <button type="button" onClick={() => setPhotoPreview(null)} className="text-xs font-bold text-black hover:underline">Retake Picture</button>
                                         </div>
                                     ) : (
                                         <label className="cursor-pointer block space-y-1 py-3">
-                                            <Camera className="w-8 h-8 text-gray-400 mx-auto" />
-                                            <span className="text-xs font-bold text-gray-700 block">Take Photo Proof</span>
-                                            <span className="text-[10px] text-gray-400 block">Click to capture using camera</span>
+                                            <Camera className="w-8 h-8 text-black mx-auto" />
+                                            <span className="text-xs font-bold text-black block">Take Photo Proof</span>
+                                            <span className="text-[10px] text-zinc-500 font-medium block">Click to capture using camera</span>
                                             <input type="file" accept="image/*" capture="environment" onChange={handlePhotoSelect} className="hidden" />
                                         </label>
                                     )}
@@ -649,17 +689,17 @@ export default function TiffinNavigationPage() {
                         )}
 
                         {modalError && (
-                            <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-100 flex items-center gap-1.5 font-semibold">
+                            <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200 flex items-center gap-1.5 font-bold">
                                 <AlertCircle className="w-4 h-4 shrink-0" /> {modalError}
                             </p>
                         )}
 
                         <div className="grid grid-cols-2 gap-3 pt-2">
-                            <button type="button" onClick={() => setShowDropoff(false)} disabled={isSubmitting} className="py-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-xs font-bold text-gray-700 transition">
+                            <button type="button" onClick={() => setShowDropoff(false)} disabled={isSubmitting} className="py-3.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-xs font-bold text-black transition">
                                 Cancel
                             </button>
-                            <button type="button" onClick={handleSubmitDelivery} disabled={isSubmitting} className="py-3.5 rounded-2xl bg-gradient-to-r from-[#0ea5e9] to-[#0284c7] text-white font-black text-xs shadow-lg shadow-sky-900/20 active:scale-98 transition flex items-center justify-center gap-1.5 disabled:opacity-50">
-                                {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : <><Check className="w-4 h-4" /> Confirm Drop-off</>}
+                            <button type="button" onClick={handleSubmitDelivery} disabled={isSubmitting} className="py-3.5 rounded-2xl bg-black hover:bg-zinc-800 text-white font-black text-xs shadow-xl active:scale-98 transition flex items-center justify-center gap-1.5 disabled:opacity-50">
+                                {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin text-white" /> Verifying...</> : <><Check className="w-4 h-4 text-white" /> Confirm Drop-off</>}
                             </button>
                         </div>
                     </div>

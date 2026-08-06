@@ -24,6 +24,7 @@ import {
   MapPin,
   Share2,
   Utensils,
+  UtensilsCrossed,
   Trash2,
   Bell,
 } from "lucide-react";
@@ -47,7 +48,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@food/components/ui/dialog";
-import { authAPI, userAPI, notificationAPI } from "@food/api";
+import { authAPI, userAPI, notificationAPI, tiffinAPI } from "@food/api";
 import { firebaseAuth } from "@food/firebase";
 import { clearModuleAuth } from "@food/utils/auth";
 import { toast } from "sonner";
@@ -94,6 +95,23 @@ export default function Profile() {
   const [deleteCaptcha, setDeleteCaptcha] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTestingNotification, setIsTestingNotification] = useState(false);
+  const [tiffinSummary, setTiffinSummary] = useState(null);
+
+  // Fetch active tiffin subscriptions for profile badge & quick info
+  useEffect(() => {
+    tiffinAPI.getMySubscriptions()
+      .then((res) => {
+        if (res?.data?.success && res.data.data?.length > 0) {
+          const active = res.data.data.find((s) => s.status === "active") || res.data.data[0];
+          setTiffinSummary({
+            count: res.data.data.length,
+            activeSub: active,
+            hasActive: !!active && active.status === "active"
+          });
+        }
+      })
+      .catch(() => null);
+  }, []);
 
   // Trigger web push registration when profile mounts to ensure FCM token is saved
   useEffect(() => {
@@ -909,6 +927,56 @@ export default function Profile() {
           </Link>
         </div>
         */}
+
+        {/* Tiffin Meal Subscriptions Section */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-4 bg-emerald-600 rounded"></div>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                Tiffin Subscriptions
+              </h3>
+            </div>
+            {tiffinSummary?.hasActive && (
+              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800">
+                Active Schedule ●
+              </span>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Link to="/food/user/tiffin/my-subscriptions" className="block">
+              <motion.div
+                whileHover={{ x: 4, scale: 1.01 }}
+                transition={{ duration: 0.2, type: "spring", stiffness: 300 }}>
+                <Card className="bg-white dark:bg-[#1a1a1a] py-0 rounded-xl shadow-xs border border-slate-200/80 dark:border-gray-800 cursor-pointer overflow-hidden">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+                        <Utensils className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-base font-semibold text-gray-900 dark:text-white truncate block">
+                          {tiffinSummary?.activeSub?.planId?.name || "Daily Tiffin Plans & Schedule"}
+                        </span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5 font-medium">
+                          {tiffinSummary?.hasActive
+                            ? `Kitchen: ${tiffinSummary.activeSub.restaurantId?.name || "Homestyle Kitchen"} • Tap to manage off-days & address`
+                            : "Configure meal schedules, mark off-days (+1 day ext.) & edit delivery address"}
+                        </p>
+                      </div>
+                    </div>
+                    <motion.div
+                      whileHover={{ x: 4 }}
+                      transition={{ duration: 0.2 }}
+                      className="shrink-0 ml-2">
+                      <ChevronRight className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                    </motion.div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </Link>
+          </div>
+        </div>
 
         {/* Food Orders Section */}
         <div className="mb-3">

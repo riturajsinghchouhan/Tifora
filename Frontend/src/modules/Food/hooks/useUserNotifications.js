@@ -178,16 +178,67 @@ export const useUserNotifications = () => {
       dispatchNotificationInboxRefresh();
     };
 
+    const onTiffinAssigned = (payload) => {
+      debugLog('🍱 Tiffin delivery assigned notification:', payload);
+      const deliveryId = payload?.deliveryId || payload?._id;
+      const title = payload?.title || '🍱 Tiffin Dispatched!';
+      const message = payload?.message || `Your ${payload?.type || ''} tiffin is on its way!`;
+
+      // Show toast if not already on the tracking map
+      const isTrackingPage = typeof window !== 'undefined' && String(window.location?.pathname || '').includes('/tiffin-tracking');
+      if (!isTrackingPage) {
+        toast.message(title, {
+          description: message,
+          duration: 8000,
+          action: deliveryId ? {
+            label: 'Track',
+            onClick: () => {
+              if (typeof window !== 'undefined') {
+                window.location.href = `/food/user/tiffin-tracking/${deliveryId}`;
+              }
+            }
+          } : undefined
+        });
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('tiffinStatusNotification', {
+          detail: {
+            ...payload,
+            deliveryId,
+            timestamp: new Date().toISOString(),
+          }
+        })
+      );
+    };
+
+    const onTiffinStatus = (payload) => {
+      debugLog('🍱 Tiffin status update received:', payload);
+      window.dispatchEvent(
+        new CustomEvent('tiffinStatusNotification', {
+          detail: {
+            ...payload,
+            deliveryId: payload?.deliveryId || payload?._id,
+            timestamp: new Date().toISOString(),
+          }
+        })
+      );
+    };
+
     sock.on('order_status_update', onOrderStatus);
     sock.on('order_state', onOrderState);
     sock.on('delivery_drop_otp', onDropOtp);
     sock.on('admin_notification', onAdminNotification);
+    sock.on('tiffin_delivery_assigned', onTiffinAssigned);
+    sock.on('tiffin_status_update', onTiffinStatus);
 
     return () => {
       sock.off('order_status_update', onOrderStatus);
       sock.off('order_state', onOrderState);
       sock.off('delivery_drop_otp', onDropOtp);
       sock.off('admin_notification', onAdminNotification);
+      sock.off('tiffin_delivery_assigned', onTiffinAssigned);
+      sock.off('tiffin_status_update', onTiffinStatus);
       unsubConnection();
       socketRef.current = null;
       releaseUserSocket();
@@ -196,3 +247,4 @@ export const useUserNotifications = () => {
 
   return { isConnected };
 };
+

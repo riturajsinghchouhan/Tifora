@@ -191,7 +191,7 @@ export const initSocket = async (server) => {
         socket.on('join-tracking', (orderId) => {
             if (!orderId) return;
             const role = socket.user?.role;
-            if (role !== 'USER' && role !== 'RESTAURANT' && role !== 'DELIVERY_PARTNER') return;
+            if (role !== 'USER' && role !== 'RESTAURANT' && role !== 'DELIVERY_PARTNER' && role !== 'ADMIN' && role !== 'SUPER_ADMIN') return;
             const room = roomNames.tracking(orderId);
             socket.join(room);
             logger.info(`Socket ${socket.id} (${role}:${userId}) joined tracking room ${room}`);
@@ -203,7 +203,8 @@ export const initSocket = async (server) => {
         const _lastLocationBroadcast = {};
         const _lastPolylineBroadcast = {}; // Separate throttle for heavy polyline data
         socket.on('update-location', async (data) => {
-            if (socket.user?.role !== 'DELIVERY_PARTNER') return;
+            const role = socket.user?.role;
+            if (role !== 'DELIVERY_PARTNER' && role !== 'RESTAURANT' && role !== 'ADMIN' && role !== 'SUPER_ADMIN') return;
             if (!data || !data.orderId) return;
 
             const lat = Number(data.lat);
@@ -215,11 +216,11 @@ export const initSocket = async (server) => {
             const speed = Number.isFinite(Number(data.speed)) ? Number(data.speed) : 0;
             const accuracy = Number.isFinite(Number(data.accuracy)) ? Number(data.accuracy) : null;
 
-            // Throttle: max one broadcast per 5s per orderId
-            // (aligned with frontend 10s emit — reduces server→client events by ~60%)
+            // Throttle: max one broadcast per 2s per orderId
+            // (aligned with frontend 3s emit — reduces server→client events by ~60%)
             const now = Date.now();
             const lastTS = _lastLocationBroadcast[data.orderId] || 0;
-            if (now - lastTS < 5000) return;
+            if (now - lastTS < 2000) return;
             _lastLocationBroadcast[data.orderId] = now;
 
             // ── MINIFIED tracking payload (sent to users watching the map) ──
@@ -255,6 +256,7 @@ export const initSocket = async (server) => {
 
             // Broadcast to tracking room (all users watching this order)
             const trackingRoom = roomNames.tracking(data.orderId);
+            logger.info(`[DeliverySocket] Broadcasting location-update to tracking room ${trackingRoom} (lat: ${lat}, lng: ${lng})`);
             socket.to(trackingRoom).emit('location-update', trackingPayload);
 
             // Also emit to the specific user room if userId is provided

@@ -1,6 +1,7 @@
 import { TiffinPlan } from '../models/tiffinPlan.model.js';
 import { TiffinDelivery } from '../models/tiffinDelivery.model.js';
 import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
+import { generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
 import mongoose from 'mongoose';
 
 const getRestaurantId = (req) => {
@@ -96,6 +97,8 @@ export const getDailyPrepDashboard = async (req, res) => {
         const restaurantId = getRestaurantId(req);
         console.log('[getDailyPrepDashboard] Fetching for restaurantId:', restaurantId);
         
+        await generateDailyDeliveries();
+        
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -172,6 +175,9 @@ export const getDailyPrepDashboard = async (req, res) => {
 export const getUnassignedDeliveries = async (req, res) => {
     try {
         const restaurantId = getRestaurantId(req);
+        
+        await generateDailyDeliveries();
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -311,6 +317,49 @@ export const assignDeliveriesToPartner = async (req, res) => {
             }
         );
 
+        // Fetch updated deliveries to broadcast real-time notifications to users
+        try {
+            const { getIO, rooms } = await import('../../../../config/socket.js');
+            const io = getIO();
+            if (io) {
+                const assignedDeliveries = await TiffinDelivery.find(filter)
+                    .populate('restaurantId', 'name profileImage logo address')
+                    .populate('assignedTo', 'name phone profileImage vehicleType')
+                    .populate({
+                        path: 'subscriptionId',
+                        populate: { path: 'planId', select: 'name mealType' }
+                    })
+                    .lean();
+
+                for (const del of assignedDeliveries) {
+                    if (del.userId) {
+                        const userRoom = rooms.user(del.userId.toString());
+                        const payload = {
+                            deliveryId: del._id,
+                            _id: del._id,
+                            status: 'assigned',
+                            type: del.type,
+                            date: del.date,
+                            restaurant: del.restaurantId,
+                            restaurantName: del.restaurantId?.name || 'Tiffin Kitchen',
+                            assignedTo: del.assignedTo,
+                            partnerName: del.assignedTo?.name || 'Delivery Partner',
+                            subscription: del.subscriptionId,
+                            title: 'Tiffin Dispatched! 🍱',
+                            message: `Your ${del.type} tiffin has been assigned to ${del.assignedTo?.name || 'a delivery partner'}.`,
+                            timestamp: new Date().toISOString()
+                        };
+
+                        io.to(userRoom).emit('tiffin_status_update', payload);
+                        io.to(userRoom).emit('tiffin_delivery_assigned', payload);
+                        console.log(`📡 [Socket] Emitted tiffin_delivery_assigned to user room: ${userRoom}`);
+                    }
+                }
+            }
+        } catch (socketErr) {
+            console.warn('[assignDeliveriesToPartner] Socket broadcast error:', socketErr.message);
+        }
+
         res.status(200).json({
             success: true,
             message: `${result.modifiedCount || deliveryIds.length} tiffins dispatched to rider successfully! 🚀`
@@ -320,3 +369,4 @@ export const assignDeliveriesToPartner = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error assigning deliveries' });
     }
 };
+

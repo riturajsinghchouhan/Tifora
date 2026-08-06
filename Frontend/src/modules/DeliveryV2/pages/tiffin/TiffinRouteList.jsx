@@ -86,32 +86,32 @@ export default function TiffinRouteList() {
     const remainingCount = deliveries.length - completedCount;
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-20">
-            {/* Top Bar */}
-            <div className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10 shadow-sm">
+        <div className="min-h-screen bg-white pb-20 font-sans text-black">
+            {/* Top Bar - White Background & Black Accents */}
+            <div className="bg-white text-black border-b-2 border-black px-4 py-4 sticky top-0 z-10">
                 <div className="flex justify-between items-center mb-2">
                     <div>
-                        <h1 className="text-xl font-bold text-gray-900">Tiffin Delivery Route</h1>
-                        <p className="text-xs text-gray-500">Sorted by closest drop-off</p>
+                        <h1 className="text-xl font-black text-black">Tiffin Delivery Route</h1>
+                        <p className="text-xs text-zinc-600 font-medium">Sorted by closest drop-off</p>
                     </div>
-                    <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full">
+                    <span className="bg-black text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">
                         {deliveries[0]?.type || 'Morning'} Batch
                     </span>
                 </div>
 
                 {/* Progress Card */}
-                <div className="bg-gray-100 rounded-xl p-3 flex justify-between items-center mt-2">
-                    <div className="text-center flex-1 border-r border-gray-200">
-                        <span className="text-xs text-gray-500 font-medium">Total</span>
-                        <p className="text-lg font-black text-gray-900">{deliveries.length}</p>
+                <div className="bg-zinc-50 border-2 border-black rounded-2xl p-3 flex justify-between items-center mt-2 shadow-sm">
+                    <div className="text-center flex-1 border-r border-zinc-300">
+                        <span className="text-xs text-zinc-600 font-bold">Total</span>
+                        <p className="text-lg font-black text-black">{deliveries.length}</p>
                     </div>
-                    <div className="text-center flex-1 border-r border-gray-200">
-                        <span className="text-xs text-yellow-600 font-medium">Remaining</span>
-                        <p className="text-lg font-black text-yellow-600">{remainingCount}</p>
+                    <div className="text-center flex-1 border-r border-zinc-300">
+                        <span className="text-xs text-zinc-600 font-bold">Remaining</span>
+                        <p className="text-lg font-black text-black">{remainingCount}</p>
                     </div>
                     <div className="text-center flex-1">
-                        <span className="text-xs text-green-600 font-medium">Delivered</span>
-                        <p className="text-lg font-black text-green-600">{completedCount}</p>
+                        <span className="text-xs text-zinc-600 font-bold">Delivered</span>
+                        <p className="text-lg font-black text-black">{completedCount}</p>
                     </div>
                 </div>
             </div>
@@ -120,13 +120,13 @@ export default function TiffinRouteList() {
             <div className="p-4 space-y-3">
                 {loading ? (
                     <div className="flex justify-center p-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black"></div>
                     </div>
                 ) : deliveries.length === 0 ? (
-                    <div className="text-center p-10 bg-white rounded-xl border border-gray-200">
-                        <Clock className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                        <h3 className="font-bold text-gray-800">No Tiffins Assigned</h3>
-                        <p className="text-sm text-gray-500 mt-1">Check back once the restaurant assigns your batch.</p>
+                    <div className="text-center p-10 bg-white rounded-2xl border-2 border-black">
+                        <Clock className="w-12 h-12 text-black mx-auto mb-3" />
+                        <h3 className="font-black text-black">No Tiffins Assigned</h3>
+                        <p className="text-sm text-zinc-600 mt-1">Check back once the restaurant assigns your batch.</p>
                     </div>
                 ) : (
                     deliveries.map((item, index) => {
@@ -135,40 +135,40 @@ export default function TiffinRouteList() {
                             <div
                                 key={item._id}
                                 onClick={() => !isDone && navigate(`/food/delivery/tiffin-dropoff/${item._id}`, { state: { delivery: item, index: index + 1 } })}
-                                className={`bg-white rounded-2xl p-4 border transition-all ${
+                                className={`bg-white rounded-2xl p-4 border-2 transition-all ${
                                     isDone 
-                                        ? 'border-green-200 opacity-60 bg-green-50/30' 
-                                        : 'border-gray-200 shadow-sm hover:border-blue-500 active:scale-[0.99] cursor-pointer'
+                                        ? 'border-zinc-300 opacity-60 bg-zinc-50' 
+                                        : 'border-zinc-300 shadow-sm hover:border-black active:scale-[0.99] cursor-pointer'
                                 }`}
                             >
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                                            isDone ? 'bg-green-100 text-green-700' : 'bg-blue-600 text-white'
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${
+                                            isDone ? 'bg-zinc-200 text-black' : 'bg-black text-white'
                                         }`}>
-                                            {isDone ? <CheckCircle2 className="w-5 h-5" /> : index + 1}
+                                            {isDone ? <CheckCircle2 className="w-5 h-5 text-black" /> : index + 1}
                                         </div>
                                         <div>
-                                            <h3 className="font-bold text-gray-900 text-base">{item.deliveryAddress?.name}</h3>
-                                            <p className="text-xs text-gray-500">{item.distanceKm || 'Nearby'}</p>
+                                            <h3 className="font-black text-black text-base">{item.deliveryAddress?.name}</h3>
+                                            <p className="text-xs text-zinc-600 font-bold">{item.distanceKm || 'Nearby'}</p>
                                         </div>
                                     </div>
-                                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize ${
-                                        isDone ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'
+                                    <span className={`text-xs font-black px-2.5 py-0.5 rounded-full capitalize ${
+                                        isDone ? 'bg-zinc-100 text-black border border-zinc-300' : 'bg-black text-white'
                                     }`}>
                                         {isDone ? 'Delivered' : 'Pending'}
                                     </span>
                                 </div>
 
-                                <div className="mt-3 flex items-start gap-2 text-sm text-gray-600 bg-gray-50 p-2.5 rounded-xl">
-                                    <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                                    <span className="line-clamp-2 text-xs">{item.deliveryAddress?.fullAddress}</span>
+                                <div className="mt-3 flex items-start gap-2 text-sm text-zinc-700 bg-zinc-50 p-2.5 rounded-xl border border-zinc-200">
+                                    <MapPin className="w-4 h-4 text-black shrink-0 mt-0.5" />
+                                    <span className="line-clamp-2 text-xs font-medium">{item.deliveryAddress?.fullAddress}</span>
                                 </div>
 
                                 {!isDone && (
-                                    <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center text-xs font-bold text-blue-600">
+                                    <div className="mt-3 pt-3 border-t border-zinc-200 flex justify-between items-center text-xs font-black text-black">
                                         <span>Tap to Start Delivery</span>
-                                        <ArrowRight className="w-4 h-4" />
+                                        <ArrowRight className="w-4 h-4 text-black" />
                                     </div>
                                 )}
                             </div>

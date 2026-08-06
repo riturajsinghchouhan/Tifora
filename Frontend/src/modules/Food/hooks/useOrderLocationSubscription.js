@@ -20,9 +20,16 @@ function useFoodUserId(enabled) {
         const response = await userAPI.getProfile();
         const user = response.data?.data?.user;
         const id = user?._id?.toString() || user?.userId || user?.id;
-        if (!cancelled && id) setUserId(String(id));
+        if (!cancelled && id) {
+          setUserId(String(id));
+        } else if (!cancelled) {
+          setUserId('guest_' + Math.random().toString(36).substring(7));
+        }
       } catch {
-        // guest / logged out
+        if (!cancelled) {
+          // Allow tracking for guests / restaurant testers
+          setUserId('guest_' + Math.random().toString(36).substring(7));
+        }
       }
     })();
 

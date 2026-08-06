@@ -56,6 +56,18 @@ export const api = {
   delete: (_url, _config) => emptyDataStub(),
 };
 
+export const tiffinAPI = {
+  getMySubscriptions: () => userClient.get('/user/tiffin/my-subscriptions'),
+  getMyDeliveries: () => userClient.get('/user/tiffin/user/deliveries'),
+  pauseSubscription: (id) => userClient.post(`/user/tiffin/${id}/pause`),
+  resumeSubscription: (id) => userClient.post(`/user/tiffin/${id}/resume`),
+  updateAddress: (id, data) => userClient.put(`/user/tiffin/${id}/address`, data),
+  skipDay: (id, data) => userClient.post(`/user/tiffin/${id}/skip-day`, data),
+  unskipDay: (id, data) => userClient.post(`/user/tiffin/${id}/unskip-day`, data),
+  updatePreferences: (id, data) => userClient.patch(`/user/tiffin/${id}/preferences`, data),
+  getAvailablePlans: () => userClient.get('/user/tiffin/user/plans/available')
+};
+
 /** Single in-flight + short cache for user /auth/me - avoids duplicate calls. */
 let userMeInFlight = null;
 let userMeCached = null;

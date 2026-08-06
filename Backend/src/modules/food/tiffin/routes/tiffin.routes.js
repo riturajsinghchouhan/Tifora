@@ -23,7 +23,11 @@ import {
     getMySubscriptions,
     pauseSubscription,
     resumeSubscription,
-    getMyTiffinDeliveriesUser
+    getMyTiffinDeliveriesUser,
+    updateSubscriptionAddress,
+    skipSubscriptionDay,
+    unskipSubscriptionDay,
+    updateSubscriptionPreferences
 } from '../controllers/userTiffin.controller.js';
 
 // Delivery Controllers
@@ -137,7 +141,13 @@ router.post('/user/:subscriptionId/pause', authMiddleware, requireRoles('USER'),
 router.post('/user/:subscriptionId/resume', authMiddleware, requireRoles('USER'), resumeSubscription);
 router.post('/:subscriptionId/pause', authMiddleware, requireRoles('USER'), pauseSubscription);
 router.post('/:subscriptionId/resume', authMiddleware, requireRoles('USER'), resumeSubscription);
-router.get('/user/deliveries', authMiddleware, requireRoles('USER'), getMyTiffinDeliveriesUser);
+router.get(['/user/deliveries', '/deliveries'], authMiddleware, requireRoles('USER'), getMyTiffinDeliveriesUser);
+router.put(['/user/:subscriptionId/address', '/:subscriptionId/address'], authMiddleware, requireRoles('USER'), updateSubscriptionAddress);
+router.patch(['/user/:subscriptionId/address', '/:subscriptionId/address'], authMiddleware, requireRoles('USER'), updateSubscriptionAddress);
+router.post(['/user/:subscriptionId/skip-day', '/:subscriptionId/skip-day'], authMiddleware, requireRoles('USER'), skipSubscriptionDay);
+router.post(['/user/:subscriptionId/unskip-day', '/:subscriptionId/unskip-day'], authMiddleware, requireRoles('USER'), unskipSubscriptionDay);
+router.patch(['/user/:subscriptionId/preferences', '/:subscriptionId/preferences'], authMiddleware, requireRoles('USER'), updateSubscriptionPreferences);
+router.put(['/user/:subscriptionId/preferences', '/:subscriptionId/preferences'], authMiddleware, requireRoles('USER'), updateSubscriptionPreferences);
 
 const deliveryAuth = (req, res, next) => {
     try {

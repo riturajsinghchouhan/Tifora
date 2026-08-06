@@ -272,6 +272,22 @@ export default function UserRouter() {
             }
           />
           <Route
+            path="profile/tiffin"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <MySubscriptions />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="profile/tiffin-subscriptions"
+            element={
+              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+                <MySubscriptions />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="profile/about"
             element={
               <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
