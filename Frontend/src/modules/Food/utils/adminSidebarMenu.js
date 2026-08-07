@@ -68,17 +68,28 @@ export const adminSidebarMenu = [
     label: "TIFFIN MANAGEMENT",
     items: [
       {
-        type: "expandable",
-        label: "Tiffin Service",
+        type: "link",
+        label: "Tiffin Service Management",
+        path: "/admin/food/tiffin-management",
         icon: "UtensilsCrossed",
-        subItems: [
-          { label: "Tiffin Service Management", path: "/admin/food/tiffin-management" },
-          { label: "Subscription Plans", path: "/admin/food/tiffin-management?tab=plans" },
-          { label: "Customer Subscriptions", path: "/admin/food/tiffin-management?tab=subscriptions" },
-          { label: "Daily Meal Dispatch", path: "/admin/food/tiffin-management?tab=deliveries" },
-          { label: "Kitchen Partners", path: "/admin/food/tiffin-management?tab=kitchens" },
-          { label: "Delivery Payouts", path: "/admin/food/tiffin-management?tab=payouts" },
-        ],
+      },
+      {
+        type: "link",
+        label: "Restaurant Payout Request",
+        path: "/admin/food/tiffin-restaurant-payouts",
+        icon: "CreditCard",
+      },
+      {
+        type: "link",
+        label: "Tiffin Restaurant Commission",
+        path: "/admin/food/tiffin-restaurant-commission",
+        icon: "DollarSign",
+      },
+      {
+        type: "link",
+        label: "Delivery Boy Salary Payout",
+        path: "/admin/food/tiffin-delivery-salary",
+        icon: "Wallet",
       },
     ],
   },

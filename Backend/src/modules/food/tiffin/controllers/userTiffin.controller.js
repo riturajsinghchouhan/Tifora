@@ -39,6 +39,21 @@ export const getPlanById = async (req, res) => {
 import { createRazorpayOrder, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 
+const normalizeAddressCoords = (addr) => {
+    if (!addr) return addr;
+    const clean = typeof addr.toObject === 'function' ? addr.toObject() : { ...addr };
+    let coords = clean.location?.coordinates;
+    if (!Array.isArray(coords) || coords.length < 2 || (!coords[0] && !coords[1])) {
+        if (clean.longitude && clean.latitude) {
+            coords = [Number(clean.longitude), Number(clean.latitude)];
+        }
+    }
+    if (Array.isArray(coords) && coords.length === 2 && Number.isFinite(Number(coords[0])) && Number.isFinite(Number(coords[1]))) {
+        clean.location = { type: 'Point', coordinates: [Number(coords[0]), Number(coords[1])] };
+    }
+    return clean;
+};
+
 export const purchaseSubscription = async (req, res) => {
     try {
         const userId = getUserId(req);
@@ -58,6 +73,7 @@ export const purchaseSubscription = async (req, res) => {
         end.setDate(end.getDate() + plan.durationDays);
 
         const amountToPay = amountPaid || plan.price;
+        const normalizedAddress = normalizeAddressCoords(deliveryAddress);
 
         // If Razorpay, just create order and return to frontend
         if (paymentMethod === 'razorpay') {
@@ -76,7 +92,7 @@ export const purchaseSubscription = async (req, res) => {
                     planId,
                     startDate: start,
                     endDate: end,
-                    deliveryAddress,
+                    deliveryAddress: normalizedAddress,
                     amountPaid: amountToPay
                 }
             });
@@ -89,7 +105,7 @@ export const purchaseSubscription = async (req, res) => {
             planId,
             startDate: start,
             endDate: end,
-            deliveryAddress,
+            deliveryAddress: normalizedAddress,
             paymentId: paymentId || `OFFLINE_${Date.now()}`,
             paymentStatus: 'paid',
             amountPaid: amountToPay
@@ -130,7 +146,7 @@ export const verifyTiffinPayment = async (req, res) => {
             planId: subscriptionTemp.planId,
             startDate: subscriptionTemp.startDate,
             endDate: subscriptionTemp.endDate,
-            deliveryAddress: subscriptionTemp.deliveryAddress,
+            deliveryAddress: normalizeAddressCoords(subscriptionTemp.deliveryAddress),
             paymentId: null, // Could link to a transaction doc if needed
             paymentStatus: 'paid',
             amountPaid: subscriptionTemp.amountPaid,
@@ -271,12 +287,13 @@ export const getMyTiffinDeliveriesUser = async (req, res) => {
             date: { $gte: sixtyDaysAgo }
         })
         .select('+verification.otpExpected')
-        .populate('restaurantId', 'name address phone image logo location')
+        .populate('restaurantId', 'name restaurantName address formattedAddress phone image logo location')
         .populate({
             path: 'subscriptionId',
-            populate: { path: 'planId', select: 'name itemsDescription mealType' }
+            populate: { path: 'planId', select: 'name itemsDescription mealType durationDays price' }
         })
-        .populate('assignedTo', 'name phone profileImage location')
+        .populate('assignedTo', 'name phone profilePhoto lastLocation lastLat lastLng vehicleType vehicleNumber availabilityStatus')
+        .populate('userId', 'name fullName phone profileImage avatar addresses location')
         .sort({ date: -1, type: 1 });
 
         res.status(200).json({ success: true, data: deliveries });
@@ -293,7 +310,7 @@ export const updateSubscriptionAddress = async (req, res) => {
     try {
         const userId = getUserId(req);
         const { subscriptionId } = req.params;
-        const { street, area, landmark, zone, city, state, zipCode, phone, name, fullName, label } = req.body;
+        const { street, area, landmark, zone, city, state, zipCode, phone, name, fullName, label, location } = req.body;
 
         if (!street || !city) {
             return res.status(400).json({ success: false, message: 'Street address and City are required' });
@@ -302,6 +319,40 @@ export const updateSubscriptionAddress = async (req, res) => {
         const subscription = await TiffinSubscription.findOne({ _id: subscriptionId, userId });
         if (!subscription) {
             return res.status(404).json({ success: false, message: 'Subscription not found' });
+        }
+
+        const { TiffinDelivery } = await import('../models/tiffinDelivery.model.js');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // Security check: Check if any delivery for today is assigned or in-progress with a rider
+        const activeAssignedDelivery = await TiffinDelivery.findOne({
+            subscriptionId: subscription._id,
+            date: { $gte: today, $lt: tomorrow },
+            status: { $in: ['assigned', 'out_for_delivery'] },
+            assignedTo: { $ne: null }
+        }).populate('assignedTo', 'name phone');
+
+        if (activeAssignedDelivery) {
+            const riderName = activeAssignedDelivery.assignedTo?.name ? `(${activeAssignedDelivery.assignedTo.name})` : '';
+            return res.status(400).json({
+                success: false,
+                isRiderAssigned: true,
+                message: `Aaj ke tiffin ke liye delivery rider ${riderName} assign ho chuka hai. Delivery in-progress me address change nahi kiya ja sakta.`
+            });
+        }
+
+        // Normalize coordinates safely
+        let normalizedLoc = location;
+        if (location?.coordinates && Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+            normalizedLoc = {
+                type: 'Point',
+                coordinates: [Number(location.coordinates[0]), Number(location.coordinates[1])]
+            };
+        } else {
+            normalizedLoc = subscription.deliveryAddress?.location || { type: 'Point', coordinates: [75.8577, 22.7196] };
         }
 
         subscription.deliveryAddress = {
@@ -316,16 +367,12 @@ export const updateSubscriptionAddress = async (req, res) => {
             state: state ? state.trim() : (subscription.deliveryAddress?.state || 'Madhya Pradesh'),
             zipCode: zipCode ? zipCode.trim() : subscription.deliveryAddress?.zipCode || '',
             phone: phone ? phone.trim() : subscription.deliveryAddress?.phone || '',
-            location: subscription.deliveryAddress?.location || { type: 'Point', coordinates: [75.8577, 22.7196] }
+            location: normalizedLoc
         };
 
         await subscription.save();
 
-        // Also update any pending deliveries today for this subscription
-        const { TiffinDelivery } = await import('../models/tiffinDelivery.model.js');
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
+        // Also update any pending unassigned deliveries from today onwards for this subscription
         await TiffinDelivery.updateMany(
             {
                 subscriptionId: subscription._id,

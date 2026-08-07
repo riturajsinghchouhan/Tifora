@@ -51,7 +51,16 @@ import {
     getTodayDeliveries,
     adminToggleSubscriptionStatus,
     getKitchenPartners,
-    getDeliveryPayouts
+    getDeliveryPayouts,
+    getTiffinRestaurantPayouts,
+    updateTiffinRestaurantPayoutStatus,
+    createTiffinRestaurantPayoutRequest,
+    getTiffinCommissionSettings,
+    updateTiffinCommissionSettings,
+    setKitchenCustomCommissionRate,
+    getTiffinDeliverySalaries,
+    disburseTiffinDeliverySalary,
+    updateTiffinDeliveryPaySettings
 } from '../controllers/adminTiffin.controller.js';
 
 const router = express.Router();
@@ -187,5 +196,21 @@ router.delete(['/admin/plans/:planId', '/admin-plans/:planId'], adminAuth, admin
 router.get(['/admin/deliveries/today', '/deliveries/today', '/deliveries-today'], adminAuth, getTodayDeliveries);
 router.get(['/admin/kitchen-partners', '/kitchen-partners'], adminAuth, getKitchenPartners);
 router.get(['/admin/payout-logs', '/payout-logs'], adminAuth, getDeliveryPayouts);
+
+// Restaurant Payout Requests
+router.get(['/admin/restaurant-payouts', '/restaurant-payouts', '/admin/payout-requests', '/payout-requests'], adminAuth, getTiffinRestaurantPayouts);
+router.patch(['/admin/restaurant-payouts/:payoutId/status', '/restaurant-payouts/:payoutId/status', '/admin/payout-requests/:payoutId/status'], adminAuth, updateTiffinRestaurantPayoutStatus);
+router.post(['/admin/restaurant-payouts', '/restaurant-payouts', '/admin/payout-requests'], adminAuth, createTiffinRestaurantPayoutRequest);
+
+// Tiffin Restaurant Commission
+router.get(['/admin/commission-settings', '/commission-settings', '/admin/commission', '/commission'], adminAuth, getTiffinCommissionSettings);
+router.put(['/admin/commission-settings', '/commission-settings', '/admin/commission', '/commission'], adminAuth, updateTiffinCommissionSettings);
+router.post(['/admin/commission-settings/custom-rate', '/commission-settings/custom-rate'], adminAuth, setKitchenCustomCommissionRate);
+
+// Delivery Boy Salary Payout for Tiffin
+router.get(['/admin/delivery-salaries', '/delivery-salaries', '/admin/delivery-salary', '/delivery-salary'], adminAuth, getTiffinDeliverySalaries);
+router.post(['/admin/delivery-salaries/disburse', '/delivery-salaries/disburse', '/admin/delivery-salary/disburse'], adminAuth, disburseTiffinDeliverySalary);
+router.get(['/admin/delivery-salaries/settings', '/delivery-salaries/settings'], adminAuth, getTiffinCommissionSettings);
+router.put(['/admin/delivery-salaries/settings', '/delivery-salaries/settings'], adminAuth, updateTiffinDeliveryPaySettings);
 
 export default router;

@@ -1,7 +1,10 @@
 import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
 import { TiffinDelivery } from '../models/tiffinDelivery.model.js';
 import { TiffinPlan } from '../models/tiffinPlan.model.js';
+import { TiffinPayout } from '../models/tiffinPayout.model.js';
+import { TiffinCommissionSetting } from '../models/tiffinCommission.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
+import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { ensureTodayDeliveriesSync } from '../scripts/tiffinScheduler.js';
 import mongoose from 'mongoose';
 
@@ -83,8 +86,7 @@ export const getAdminTiffinOverview = async (req, res) => {
         ]);
 
         const totalRevenue = revenueAgg[0]?.total || 0;
-        // If no deliveries found for today specifically, fallback to overall active deliveries for live tracking
-        const todayStats = todayDeliveriesAgg[0] || allDeliveriesAgg[0] || {
+        const todayStats = todayDeliveriesAgg[0] || {
             total: 0,
             morning: 0,
             evening: 0,
@@ -95,12 +97,12 @@ export const getAdminTiffinOverview = async (req, res) => {
         res.status(200).json({
             success: true,
             data: {
-                totalSubscriptions: totalSubs,
-                activeSubscriptions: activeSubs,
-                pausedSubscriptions: pausedSubs,
+                totalSubscriptions: totalSubs || 0,
+                activeSubscriptions: activeSubs || 0,
+                pausedSubscriptions: pausedSubs || 0,
                 totalRevenue,
-                totalPlans,
-                activeKitchens: kitchensCount || 1,
+                totalPlans: totalPlans || 0,
+                activeKitchens: kitchensCount || 0,
                 todayDeliveries: todayStats
             }
         });
@@ -420,3 +422,495 @@ export const getDeliveryPayouts = async (req, res) => {
 };
 
 export const getDeliveryBoyPayoutLogs = getDeliveryPayouts;
+
+/**
+ * =========================================================================
+ * 11. TIFFIN RESTAURANT PAYOUT REQUESTS
+ * =========================================================================
+ */
+export const getTiffinRestaurantPayouts = async (req, res) => {
+    try {
+        const { status, search } = req.query;
+        let query = { type: 'restaurant_payout' };
+
+        if (status && status.toLowerCase() !== 'all') {
+            query.status = status.toLowerCase();
+        }
+
+        let payouts = await TiffinPayout.find(query)
+            .populate('restaurantId', 'restaurantName name logo address phone ownerPhone bankDetails')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Search filtering if requested
+        if (search) {
+            const s = search.toLowerCase();
+            payouts = payouts.filter(p => 
+                (p.restaurantId?.restaurantName || p.restaurantId?.name || '').toLowerCase().includes(s) ||
+                (p.bankDetails?.accountHolder || '').toLowerCase().includes(s) ||
+                (p.bankDetails?.accountNumber || '').includes(s) ||
+                (p.transactionReference || '').toLowerCase().includes(s) ||
+                String(p.amount).includes(s)
+            );
+        }
+
+        // Summary Aggregates
+        const allPayouts = await TiffinPayout.find({ type: 'restaurant_payout' }).lean();
+        const stats = {
+            totalRequested: allPayouts.reduce((sum, p) => sum + (p.amount || 0), 0),
+            pendingCount: allPayouts.filter(p => p.status === 'pending').length,
+            pendingAmount: allPayouts.filter(p => p.status === 'pending').reduce((sum, p) => sum + (p.amount || 0), 0),
+            approvedCount: allPayouts.filter(p => p.status === 'approved').length,
+            approvedAmount: allPayouts.filter(p => p.status === 'approved').reduce((sum, p) => sum + (p.amount || 0), 0),
+            rejectedCount: allPayouts.filter(p => p.status === 'rejected').length
+        };
+
+        res.status(200).json({
+            success: true,
+            data: payouts,
+            stats
+        });
+    } catch (error) {
+        console.error('Error fetching tiffin restaurant payouts:', error);
+        res.status(500).json({ success: false, message: 'Server error fetching payouts' });
+    }
+};
+
+export const updateTiffinRestaurantPayoutStatus = async (req, res) => {
+    try {
+        const { payoutId } = req.params;
+        const { status, transactionReference, rejectionReason, adminNote } = req.body;
+
+        if (!['approved', 'rejected', 'processing', 'pending'].includes(status)) {
+            return res.status(400).json({ success: false, message: 'Invalid status' });
+        }
+
+        const updateData = {
+            status,
+            processedAt: ['approved', 'rejected'].includes(status) ? new Date() : null,
+            processedBy: req.user?.name || req.user?.email || 'Admin'
+        };
+
+        if (transactionReference) updateData.transactionReference = transactionReference;
+        if (rejectionReason) updateData.rejectionReason = rejectionReason;
+        if (adminNote) updateData.adminNote = adminNote;
+
+        const updated = await TiffinPayout.findByIdAndUpdate(payoutId, { $set: updateData }, { new: true })
+            .populate('restaurantId', 'restaurantName name phone');
+
+        if (!updated) {
+            return res.status(404).json({ success: false, message: 'Payout request not found' });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Payout request marked as ${status}`,
+            data: updated
+        });
+    } catch (error) {
+        console.error('Error updating payout status:', error);
+        res.status(500).json({ success: false, message: 'Server error updating payout status' });
+    }
+};
+
+export const createTiffinRestaurantPayoutRequest = async (req, res) => {
+    try {
+        const { restaurantId, amount, paymentMethod, bankDetails, adminNote } = req.body;
+
+        if (!restaurantId || !amount || amount <= 0) {
+            return res.status(400).json({ success: false, message: 'Restaurant ID and valid amount required' });
+        }
+
+        const newPayout = await TiffinPayout.create({
+            type: 'restaurant_payout',
+            restaurantId,
+            amount: Number(amount),
+            paymentMethod: paymentMethod || 'Bank Transfer',
+            bankDetails: bankDetails || {},
+            adminNote: adminNote || '',
+            status: 'pending',
+            requestedAt: new Date()
+        });
+
+        const populated = await TiffinPayout.findById(newPayout._id)
+            .populate('restaurantId', 'restaurantName name phone address');
+
+        res.status(201).json({
+            success: true,
+            message: 'Payout request created successfully',
+            data: populated
+        });
+    } catch (error) {
+        console.error('Error creating tiffin payout request:', error);
+        res.status(500).json({ success: false, message: 'Server error creating payout request' });
+    }
+};
+
+/**
+ * =========================================================================
+ * 12. TIFFIN RESTAURANT COMMISSION MANAGEMENT
+ * =========================================================================
+ */
+export const getTiffinCommissionSettings = async (req, res) => {
+    try {
+        let settings = await TiffinCommissionSetting.findOne({}).lean();
+        if (!settings) {
+            settings = await TiffinCommissionSetting.create({
+                globalCommissionPercentage: 10,
+                gstOnCommission: 18,
+                perDeliveryRate: 25,
+                customKitchenRates: [],
+                salaryCalculationMode: 'per_drop'
+            });
+            settings = settings.toObject();
+        }
+
+        const kitchens = await FoodRestaurant.find({})
+            .select('restaurantName name logo address phone ownerPhone rating isActive')
+            .lean();
+
+        // Get active subscription counts & revenue per kitchen
+        const subAgg = await TiffinSubscription.aggregate([
+            {
+                $group: {
+                    _id: '$restaurantId',
+                    totalSubscriptions: { $sum: 1 },
+                    activeSubscriptions: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
+                    totalRevenue: { $sum: '$amountPaid' }
+                }
+            }
+        ]);
+
+        const subMap = {};
+        subAgg.forEach(item => {
+            if (item._id) subMap[item._id.toString()] = item;
+        });
+
+        const customRateMap = {};
+        (settings.customKitchenRates || []).forEach(r => {
+            if (r.restaurantId) customRateMap[r.restaurantId.toString()] = r;
+        });
+
+        const kitchensWithCommission = kitchens.map(k => {
+            const kId = k._id.toString();
+            const subData = subMap[kId] || { totalSubscriptions: 0, activeSubscriptions: 0, totalRevenue: 0 };
+            const custom = customRateMap[kId];
+            const commissionRate = custom && custom.isActive ? custom.commissionRate : settings.globalCommissionPercentage;
+            const estimatedCommission = Math.round((subData.totalRevenue * commissionRate) / 100);
+            const gstAmount = Math.round((estimatedCommission * (settings.gstOnCommission || 18)) / 100);
+
+            return {
+                _id: k._id,
+                name: k.restaurantName || k.name || "Renuka's Kitchen",
+                address: k.address || 'Indore, MP',
+                phone: k.phone || k.ownerPhone || '9876543210',
+                logo: k.logo,
+                hasCustomRate: Boolean(custom && custom.isActive),
+                commissionRate,
+                customRateActive: custom ? custom.isActive : false,
+                notes: custom ? custom.notes : '',
+                totalSubscriptions: subData.totalSubscriptions,
+                activeSubscriptions: subData.activeSubscriptions,
+                totalRevenue: subData.totalRevenue,
+                estimatedCommission,
+                gstAmount
+            };
+        });
+
+        // Global commission analytics
+        const totalRevenue = kitchensWithCommission.reduce((sum, k) => sum + k.totalRevenue, 0);
+        const totalCommission = kitchensWithCommission.reduce((sum, k) => sum + k.estimatedCommission, 0);
+        const totalGst = kitchensWithCommission.reduce((sum, k) => sum + k.gstAmount, 0);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                settings,
+                kitchens: kitchensWithCommission,
+                stats: {
+                    globalCommissionPercentage: settings.globalCommissionPercentage,
+                    gstOnCommission: settings.gstOnCommission,
+                    totalKitchens: kitchens.length,
+                    customRateKitchensCount: (settings.customKitchenRates || []).filter(r => r.isActive).length,
+                    totalRevenue,
+                    totalCommission,
+                    totalGst,
+                    netAdminEarnings: totalCommission + totalGst
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching tiffin commission settings:', error);
+        res.status(500).json({ success: false, message: 'Server error fetching commission settings' });
+    }
+};
+
+export const updateTiffinCommissionSettings = async (req, res) => {
+    try {
+        const { globalCommissionPercentage, gstOnCommission, perDeliveryRate, customKitchenRates } = req.body;
+
+        let settings = await TiffinCommissionSetting.findOne({});
+        if (!settings) {
+            settings = new TiffinCommissionSetting();
+        }
+
+        if (globalCommissionPercentage !== undefined) settings.globalCommissionPercentage = Number(globalCommissionPercentage);
+        if (gstOnCommission !== undefined) settings.gstOnCommission = Number(gstOnCommission);
+        if (perDeliveryRate !== undefined) settings.perDeliveryRate = Number(perDeliveryRate);
+        if (Array.isArray(customKitchenRates)) settings.customKitchenRates = customKitchenRates;
+
+        await settings.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Tiffin commission settings updated successfully',
+            data: settings
+        });
+    } catch (error) {
+        console.error('Error updating tiffin commission settings:', error);
+        res.status(500).json({ success: false, message: 'Server error updating commission settings' });
+    }
+};
+
+export const setKitchenCustomCommissionRate = async (req, res) => {
+    try {
+        const { restaurantId, commissionRate, isActive = true, notes = '' } = req.body;
+
+        if (!restaurantId || commissionRate === undefined) {
+            return res.status(400).json({ success: false, message: 'Restaurant ID and commission rate required' });
+        }
+
+        let settings = await TiffinCommissionSetting.findOne({});
+        if (!settings) {
+            settings = await TiffinCommissionSetting.create({
+                globalCommissionPercentage: 10,
+                gstOnCommission: 18,
+                perDeliveryRate: 25,
+                customKitchenRates: []
+            });
+        }
+
+        const existingIdx = settings.customKitchenRates.findIndex(r => r.restaurantId.toString() === restaurantId.toString());
+        if (existingIdx >= 0) {
+            settings.customKitchenRates[existingIdx].commissionRate = Number(commissionRate);
+            settings.customKitchenRates[existingIdx].isActive = Boolean(isActive);
+            settings.customKitchenRates[existingIdx].notes = notes;
+            settings.customKitchenRates[existingIdx].updatedAt = new Date();
+        } else {
+            settings.customKitchenRates.push({
+                restaurantId,
+                commissionRate: Number(commissionRate),
+                isActive: Boolean(isActive),
+                notes,
+                updatedAt: new Date()
+            });
+        }
+
+        await settings.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Kitchen custom commission rate updated successfully',
+            data: settings
+        });
+    } catch (error) {
+        console.error('Error setting kitchen custom commission:', error);
+        res.status(500).json({ success: false, message: 'Server error setting custom rate' });
+    }
+};
+
+/**
+ * =========================================================================
+ * 13. TIFFIN DELIVERY BOY SALARY & PAYOUT MANAGEMENT
+ * =========================================================================
+ */
+export const getTiffinDeliverySalaries = async (req, res) => {
+    try {
+        // Fetch commission & delivery rate config
+        let commissionConfig = await TiffinCommissionSetting.findOne({}).lean();
+        const baseDropRate = commissionConfig?.perDeliveryRate || 25;
+
+        // Fetch all delivery partners
+        const partners = await FoodDeliveryPartner.find({})
+            .select('name phone email profileImage status vehicleType active isOnline walletBalance')
+            .lean();
+
+        // Aggregate completed tiffin drops by delivery partner
+        const dropsAgg = await TiffinDelivery.aggregate([
+            {
+                $match: {
+                    status: { $in: ['delivered', 'delivered_unattended'] }
+                }
+            },
+            {
+                $group: {
+                    _id: '$assignedTo',
+                    totalDeliveries: { $sum: 1 },
+                    morningDeliveries: { $sum: { $cond: [{ $eq: ['$type', 'Morning'] }, 1, 0] } },
+                    eveningDeliveries: { $sum: { $cond: [{ $eq: ['$type', 'Evening'] }, 1, 0] } },
+                    totalCalculatedEarning: { $sum: { $ifNull: ['$deliveryEarning', baseDropRate] } },
+                    lastDeliveredDate: { $max: '$deliveredAt' }
+                }
+            }
+        ]);
+
+        const dropsMap = {};
+        dropsAgg.forEach(d => {
+            if (d._id) dropsMap[d._id.toString()] = d;
+        });
+
+        // Aggregate salary disbursals made to delivery partners
+        const disbursements = await TiffinPayout.find({ type: 'delivery_salary' })
+            .populate('deliveryPartnerId', 'name phone')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const paidMap = {};
+        disbursements.forEach(p => {
+            if (p.deliveryPartnerId?._id) {
+                const partnerId = p.deliveryPartnerId._id.toString();
+                paidMap[partnerId] = (paidMap[partnerId] || 0) + (p.amount || 0);
+            }
+        });
+
+        // Merge roster
+        const riderSalaries = partners.map(p => {
+            const pId = p._id.toString();
+            const dropData = dropsMap[pId] || {
+                totalDeliveries: 0,
+                morningDeliveries: 0,
+                eveningDeliveries: 0,
+                totalCalculatedEarning: 0,
+                lastDeliveredDate: null
+            };
+
+            const totalEarned = dropData.totalCalculatedEarning > 0 
+                ? dropData.totalCalculatedEarning 
+                : dropData.totalDeliveries * baseDropRate;
+
+            const paidAmount = paidMap[pId] || 0;
+            const pendingSalary = Math.max(0, totalEarned - paidAmount);
+
+            return {
+                _id: p._id,
+                name: p.name || 'Delivery Partner',
+                phone: p.phone || '',
+                email: p.email || '',
+                profileImage: p.profileImage,
+                status: p.status || 'approved',
+                vehicleType: p.vehicleType || 'Bike',
+                ratePerDrop: baseDropRate,
+                totalDeliveries: dropData.totalDeliveries,
+                morningDeliveries: dropData.morningDeliveries,
+                eveningDeliveries: dropData.eveningDeliveries,
+                totalEarned,
+                paidAmount,
+                pendingSalary,
+                lastDeliveredDate: dropData.lastDeliveredDate,
+                payoutStatus: pendingSalary === 0 && totalEarned > 0 ? 'Settled' : (pendingSalary > 0 ? 'Pending' : 'No Activity')
+            };
+        });
+
+        // Summary Stats
+        const stats = {
+            activeRidersCount: riderSalaries.filter(r => r.totalDeliveries > 0 || r.status === 'approved').length,
+            totalMealsDelivered: riderSalaries.reduce((sum, r) => sum + r.totalDeliveries, 0),
+            totalMorningMeals: riderSalaries.reduce((sum, r) => sum + r.morningDeliveries, 0),
+            totalEveningMeals: riderSalaries.reduce((sum, r) => sum + r.eveningDeliveries, 0),
+            totalSalaryEarned: riderSalaries.reduce((sum, r) => sum + r.totalEarned, 0),
+            totalSalaryDisbursed: disbursements.reduce((sum, p) => sum + (p.amount || 0), 0),
+            totalPendingSalary: riderSalaries.reduce((sum, r) => sum + r.pendingSalary, 0),
+            baseDropRate
+        };
+
+        res.status(200).json({
+            success: true,
+            data: {
+                roster: riderSalaries,
+                disbursements,
+                stats
+            }
+        });
+    } catch (error) {
+        console.error('Error calculating delivery boy salaries:', error);
+        res.status(500).json({ success: false, message: 'Server error calculating salaries' });
+    }
+};
+
+export const disburseTiffinDeliverySalary = async (req, res) => {
+    try {
+        const {
+            deliveryPartnerId,
+            amount,
+            paymentMethod = 'UPI',
+            transactionReference = '',
+            deliveriesCount = 0,
+            periodStart,
+            periodEnd,
+            adminNote = ''
+        } = req.body;
+
+        if (!deliveryPartnerId || !amount || Number(amount) <= 0) {
+            return res.status(400).json({ success: false, message: 'Valid delivery partner and amount required' });
+        }
+
+        const partner = await FoodDeliveryPartner.findById(deliveryPartnerId);
+        if (!partner) {
+            return res.status(404).json({ success: false, message: 'Delivery partner not found' });
+        }
+
+        const payout = await TiffinPayout.create({
+            type: 'delivery_salary',
+            deliveryPartnerId,
+            amount: Number(amount),
+            paymentMethod,
+            transactionReference: transactionReference || `SAL-${Date.now()}`,
+            deliveriesCount: Number(deliveriesCount),
+            periodStart: periodStart ? new Date(periodStart) : null,
+            periodEnd: periodEnd ? new Date(periodEnd) : null,
+            status: 'approved',
+            adminNote,
+            requestedAt: new Date(),
+            processedAt: new Date(),
+            processedBy: req.user?.name || req.user?.email || 'Admin'
+        });
+
+        const populated = await TiffinPayout.findById(payout._id)
+            .populate('deliveryPartnerId', 'name phone email');
+
+        res.status(201).json({
+            success: true,
+            message: `Salary payout of ₹${amount} successfully recorded for ${partner.name}`,
+            data: populated
+        });
+    } catch (error) {
+        console.error('Error disbursing delivery salary:', error);
+        res.status(500).json({ success: false, message: 'Server error disbursing salary' });
+    }
+};
+
+export const updateTiffinDeliveryPaySettings = async (req, res) => {
+    try {
+        const { perDeliveryRate, monthlyFixedSalaryDefault, salaryCalculationMode } = req.body;
+
+        let settings = await TiffinCommissionSetting.findOne({});
+        if (!settings) {
+            settings = new TiffinCommissionSetting();
+        }
+
+        if (perDeliveryRate !== undefined) settings.perDeliveryRate = Number(perDeliveryRate);
+        if (monthlyFixedSalaryDefault !== undefined) settings.monthlyFixedSalaryDefault = Number(monthlyFixedSalaryDefault);
+        if (salaryCalculationMode) settings.salaryCalculationMode = salaryCalculationMode;
+
+        await settings.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Tiffin delivery salary pay settings updated',
+            data: settings
+        });
+    } catch (error) {
+        console.error('Error updating delivery pay settings:', error);
+        res.status(500).json({ success: false, message: 'Server error updating pay settings' });
+    }
+};

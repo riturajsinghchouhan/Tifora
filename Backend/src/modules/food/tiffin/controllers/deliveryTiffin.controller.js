@@ -245,15 +245,15 @@ export const updateDeliveryStatus = async (req, res) => {
 
         await delivery.save();
 
-        // Emit socket notification to user
+        // Emit socket notification to user and tracking rooms
         try {
             const { getIO, rooms } = await import('../../../../config/socket.js');
             const io = getIO();
-            if (io && delivery.userId) {
-                const userRoom = rooms.user(delivery.userId.toString());
+            if (io) {
                 const payload = {
                     deliveryId: delivery._id,
                     _id: delivery._id,
+                    orderId: delivery.orderId,
                     status: delivery.status,
                     type: delivery.type,
                     date: delivery.date,
@@ -261,8 +261,20 @@ export const updateDeliveryStatus = async (req, res) => {
                     verification: delivery.verification,
                     timestamp: new Date().toISOString()
                 };
-                io.to(userRoom).emit('tiffin_status_update', payload);
-                console.log(`📡 [Socket] Emitted tiffin_status_update to user room ${userRoom}: status=${delivery.status}`);
+
+                if (delivery.userId) {
+                    const userRoom = rooms.user(delivery.userId.toString());
+                    io.to(userRoom).emit('tiffin_status_update', payload);
+                    io.to(userRoom).emit('delivery_status_update', payload);
+                }
+
+                const trackingRoomId = `tracking:${delivery.orderId || delivery._id}`;
+                io.to(trackingRoomId).emit('tiffin_status_update', payload);
+                io.to(trackingRoomId).emit('delivery_status_update', payload);
+                io.to(`tracking:${delivery._id}`).emit('tiffin_status_update', payload);
+                io.to(`tracking:${delivery._id}`).emit('delivery_status_update', payload);
+
+                console.log(`📡 [Socket] Emitted tiffin_status_update: status=${delivery.status} for delivery ${delivery._id}`);
             }
         } catch (socketErr) {
             console.warn('[updateDeliveryStatus] Socket error:', socketErr.message);

@@ -129,6 +129,24 @@ export default function MySubscriptions() {
 
     const currentSub = subscriptions[selectedSubIndex] || subscriptions[0];
 
+    // Helper to check if rider is assigned for today's delivery for a subscription
+    const isRiderAssignedForSub = (subId) => {
+        if (!subId || !deliveries?.length) return false;
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(todayStart);
+        todayEnd.setDate(todayEnd.getDate() + 1);
+
+        return deliveries.some((d) => {
+            const dSubId = d.subscriptionId?._id || d.subscriptionId;
+            if (dSubId?.toString() !== subId?.toString()) return false;
+            const dDate = new Date(d.date);
+            const isToday = dDate >= todayStart && dDate < todayEnd;
+            const isAssignedOrEnRoute = d.status === 'assigned' || d.status === 'out_for_delivery';
+            return isToday && isAssignedOrEnRoute && Boolean(d.assignedTo);
+        });
+    };
+
     const handleTogglePause = async (sub) => {
         const action = sub.status === 'active' ? 'pause' : 'resume';
         try {
@@ -150,6 +168,11 @@ export default function MySubscriptions() {
 
     // Open Address Modal
     const openAddressModal = async (sub) => {
+        if (isRiderAssignedForSub(sub?._id)) {
+            toast.error('Aaj ke tiffin ke liye delivery rider assign ho chuka hai. Delivery complete hone ke baad hi address change kar sakte hain.');
+            return;
+        }
+
         setSelectedSubForAddress(sub);
         const initialStreet = sub.deliveryAddress?.street || '';
         setAddressForm({
@@ -540,6 +563,11 @@ export default function MySubscriptions() {
     // Save Address
     const handleSaveAddress = async (e) => {
         e.preventDefault();
+        if (isRiderAssignedForSub(selectedSubForAddress?._id)) {
+            toast.error('Aaj ke tiffin ke liye delivery rider assign ho chuka hai. Delivery complete hone ke baad hi address update karein.');
+            return;
+        }
+
         if (!addressForm.street || !addressForm.city) {
             toast.error('Street and City fields are mandatory');
             return;
@@ -556,7 +584,8 @@ export default function MySubscriptions() {
                 toast.error(res?.data?.message || 'Failed to update address');
             }
         } catch (err) {
-            toast.error('Error updating address');
+            const msg = err?.response?.data?.message || 'Error updating address';
+            toast.error(msg);
         } finally {
             setActionLoading(false);
         }
@@ -1345,13 +1374,24 @@ export default function MySubscriptions() {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={() => openAddressModal(currentSub)}
-                                    className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all shrink-0 shadow-2xs self-start sm:self-center"
-                                >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                    <span>Update Address</span>
-                                </button>
+                                {isRiderAssignedForSub(currentSub?._id) ? (
+                                    <div 
+                                        onClick={() => toast.error('Aaj ke tiffin ke liye delivery rider assign ho chuka hai. Delivery complete hone ke baad hi address change kar sakte hain.')}
+                                        className="h-10 px-3.5 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/80 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-not-allowed shrink-0 self-start sm:self-center"
+                                        title="Address is locked because rider is already assigned for today's delivery"
+                                    >
+                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                                        <span>Rider Assigned (Locked)</span>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => openAddressModal(currentSub)}
+                                        className="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-750 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center justify-center gap-1.5 transition-all shrink-0 shadow-2xs self-start sm:self-center"
+                                    >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                        <span>Update Address</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )

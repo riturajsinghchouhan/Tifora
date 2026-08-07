@@ -1,42 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { GoogleMap, Marker, DirectionsRenderer, OverlayView } from '@react-google-maps/api';
-import { ArrowLeft, Clock, Phone, Home, Check, ShieldCheck, Soup, Bike, Star, Loader2, User } from 'lucide-react';
+import { GoogleMap, DirectionsRenderer, OverlayView } from '@react-google-maps/api';
+import { ArrowLeft, Share2, RefreshCw, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import api from '@food/api';
 import { loadGoogleMaps, isGoogleMapsLoaded } from '@food/utils/googleMapsLoader';
 import { useOrderLocationSubscription } from '@food/hooks/useOrderLocationSubscription';
 import { subscribeLocationUpdates, getUserSocket } from '@food/utils/userSocketManager';
 import bikelogo from '@food/assets/bikelogo.png';
-
-import { motion, AnimatePresence } from 'framer-motion';
-import { Share2, RefreshCw, Receipt, ChevronRight, X, MessageSquare, Calendar } from 'lucide-react';
-import { RIDER_BIKE_SVG, CUSTOMER_PIN_SVG, RESTAURANT_PIN_SVG } from '@food/constants/mapIcons';
+import { CUSTOMER_PIN_SVG, RESTAURANT_PIN_SVG } from '@food/constants/mapIcons';
+import TiffinTrackingDetailsSheet from './components/TiffinTrackingDetailsSheet';
 
 const DEFAULT_CUSTOMER_PIN = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="#10B981"><path d="M12 2C8.13 2 5 5.13 5 9c0 4.17 4.42 9.92 6.24 12.11.4.48 1.08.48 1.52 0C14.58 18.92 19 13.17 19 9c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5 14.5 7.62 14.5 9 13.38 11.5 12 11.5z"/><circle cx="12" cy="9" r="3" fill="#FFFFFF"/></svg>`;
 const SAFE_CUSTOMER_PIN = typeof CUSTOMER_PIN_SVG !== 'undefined' ? CUSTOMER_PIN_SVG : DEFAULT_CUSTOMER_PIN;
 const DEFAULT_RESTAURANT_PIN = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="#FF6B35"><path d="M12 2C8.13 2 5 5.13 5 9c0 4.17 4.42 9.92 6.24 12.11.4.48 1.08.48 1.52 0C14.58 18.92 19 13.17 19 9c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5 14.5 7.62 14.5 9 13.38 11.5 12 11.5z"/><circle cx="12" cy="9" r="3" fill="#FFFFFF"/></svg>`;
 const SAFE_RESTAURANT_PIN = typeof RESTAURANT_PIN_SVG !== 'undefined' ? RESTAURANT_PIN_SVG : DEFAULT_RESTAURANT_PIN;
-
-// Reusable Section Item Component
-const SectionItem = ({ icon: Icon, iconNode, title, subtitle, showArrow = true, onClick }) => (
-  <div 
-    className={`flex items-start gap-4 p-4 border-b border-gray-100 dark:border-gray-800 ${onClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors' : ''}`}
-    onClick={onClick}
-  >
-    <div className="mt-1 shrink-0">
-      {iconNode ? iconNode : <Icon className="w-6 h-6 text-gray-400" />}
-    </div>
-    <div className="flex-1">
-      <h3 className="font-bold text-gray-900 dark:text-gray-100">{title}</h3>
-      <p className="text-sm text-gray-500 dark:text-gray-400 leading-snug mt-1">{subtitle}</p>
-    </div>
-    {showArrow && (
-      <ChevronRight className="w-5 h-5 text-gray-400 shrink-0 mt-1" />
-    )}
-  </div>
-);
-
-
 
 const mapContainerStyle = {
     width: '100vw',
@@ -45,7 +23,6 @@ const mapContainerStyle = {
     inset: 0
 };
 
-// Clean map style
 const mapOptions = {
     disableDefaultUI: true,
     zoomControl: false,
@@ -63,6 +40,19 @@ const mapOptions = {
         { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c9e8f5' }] },
         { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#eeeeee' }] },
     ]
+};
+
+// Calculate straight-line distance in meters between two lat/lng points
+const getDistanceMeters = (p1, p2) => {
+    if (!p1 || !p2) return 0;
+    const R = 6371e3;
+    const dLat = (p2.lat - p1.lat) * Math.PI / 180;
+    const dLng = (p2.lng - p1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return Math.round(R * c);
 };
 
 export default function TiffinUserTrackingMap() {
@@ -84,20 +74,14 @@ export default function TiffinUserTrackingMap() {
     const [smoothLocation, setSmoothLocation] = useState(null);
     const [isSheetExpanded, setIsSheetExpanded] = useState(true);
     const [customerDeliveryOtp, setCustomerDeliveryOtp] = useState(null);
-    const directionsCalledRef = useRef(false);
+
     const mapRef = useRef(null);
-    
-    // Smooth animation refs (same as DeliveryTrackingMap)
+    const lastRouteKeyRef = useRef('');
     const interpStateRef = useRef({ lastPos: null, nextPos: null, startTime: 0, durationMs: 1500 });
     const lastUpdateAtRef = useRef(0);
     const lastSmoothSetRef = useRef(0);
 
-    // Tracking IDs for socket subscription
-    const trackingIds = useMemo(() => {
-        return deliveryId ? [deliveryId] : [];
-    }, [deliveryId]);
-
-    // 1. Connect to socket for live location
+    const trackingIds = useMemo(() => (deliveryId ? [deliveryId] : []), [deliveryId]);
     useOrderLocationSubscription(trackingIds, { enabled: trackingIds.length > 0 });
 
     useEffect(() => {
@@ -108,132 +92,158 @@ export default function TiffinUserTrackingMap() {
         }
     }, []);
 
-    useEffect(() => {
-        const fetchDelivery = async () => {
-            try {
-                const res = await api.get('/food/tiffin/user/deliveries');
-                if (res?.data?.success) {
-                    const found = res.data.data.find(d => d._id === deliveryId);
-                    if (found) {
-                        setDelivery(found);
-                        
-                        // Auto-set OTP if it was already generated
-                        if (found.verification?.otpExpected) {
-                            setCustomerDeliveryOtp(found.verification.otpExpected);
-                        }
-                        
-                        // Set customer coords
-                        const cCoords = found.deliveryAddress?.location?.coordinates;
-                        if (cCoords && cCoords.length === 2) {
-                            setCustomerCoords({ lat: cCoords[1], lng: cCoords[0] });
-                        } else {
-                            setCustomerCoords({ lat: 22.7296, lng: 75.8677 }); 
-                        }
-                        
-                        // Set initial rider coords from delivery's current location if available
-                        const rLoc = found.assignedTo?.currentLocation || found.assignedTo?.location || found.riderLocation;
-                        
-                        // Extract restaurant coords for fallback
-                        let restCoords = { lat: 22.7196, lng: 75.8577 };
-                        const rstCoordsArr = found.restaurantId?.location?.coordinates || found.restaurantId?.address?.location?.coordinates;
-                        if (rstCoordsArr && rstCoordsArr.length === 2) {
-                            restCoords = { lat: rstCoordsArr[1], lng: rstCoordsArr[0] };
-                        }
-                        setRestaurantCoords(restCoords);
+    const extractCoordinates = useCallback((deliv) => {
+        if (!deliv) return;
 
-                        if (rLoc) {
-                            const rLat = rLoc.lat || (rLoc.coordinates && rLoc.coordinates[1]);
-                            const rLng = rLoc.lng || (rLoc.coordinates && rLoc.coordinates[0]);
-                            if (rLat && rLng) {
-                                setRiderCoords({ lat: Number(rLat), lng: Number(rLng), heading: rLoc.heading || 0 });
-                            } else {
-                                setRiderCoords(restCoords); // Fallback if rLoc exists but empty
-                            }
-                        } else if (found.status === 'assigned' || found.status === 'out_for_delivery') {
-                            // If active delivery but no rider location yet, show rider at restaurant
-                            setRiderCoords(restCoords);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("Error fetching delivery", error);
-            } finally {
-                setLoading(false);
+        // 1. Restaurant Coords
+        let rest = null;
+        const restArr = deliv.restaurantId?.location?.coordinates || deliv.restaurantId?.address?.location?.coordinates;
+        if (Array.isArray(restArr) && restArr.length === 2 && Number.isFinite(restArr[0])) {
+            rest = { lat: Number(restArr[1]), lng: Number(restArr[0]) };
+        } else if (deliv.restaurantId?.location?.latitude && deliv.restaurantId?.location?.longitude) {
+            rest = { lat: Number(deliv.restaurantId.location.latitude), lng: Number(deliv.restaurantId.location.longitude) };
+        }
+        if (!rest) rest = { lat: 22.7176, lng: 75.8719 };
+        setRestaurantCoords(rest);
+
+        // 2. Customer Coords
+        let cust = null;
+        const custArr = deliv.deliveryAddress?.location?.coordinates || deliv.subscriptionId?.deliveryAddress?.location?.coordinates;
+        if (Array.isArray(custArr) && custArr.length === 2 && Number.isFinite(custArr[0]) && (custArr[1] !== 22.7196 || custArr[0] !== 75.8577)) {
+            cust = { lat: Number(custArr[1]), lng: Number(custArr[0]) };
+        } else if (deliv.userId?.addresses?.length) {
+            const def = deliv.userId.addresses.find(a => a.isDefault) || deliv.userId.addresses[0];
+            if (Array.isArray(def?.location?.coordinates) && def.location.coordinates.length === 2) {
+                cust = { lat: Number(def.location.coordinates[1]), lng: Number(def.location.coordinates[0]) };
             }
-        };
+        }
+        if (!cust && Array.isArray(custArr) && custArr.length === 2) {
+            cust = { lat: Number(custArr[1]), lng: Number(custArr[0]) };
+        }
+        if (!cust) cust = rest;
+        setCustomerCoords(cust);
+
+        // 3. Rider Coords
+        const partner = deliv.assignedTo;
+        let rider = null;
+        if (partner?.lastLat && partner?.lastLng) {
+            rider = { lat: Number(partner.lastLat), lng: Number(partner.lastLng), heading: 0 };
+        } else if (Array.isArray(partner?.lastLocation?.coordinates) && partner.lastLocation.coordinates.length === 2) {
+            rider = { lat: Number(partner.lastLocation.coordinates[1]), lng: Number(partner.lastLocation.coordinates[0]), heading: 0 };
+        } else if (deliv.riderLocation?.lat && deliv.riderLocation?.lng) {
+            rider = { lat: Number(deliv.riderLocation.lat), lng: Number(deliv.riderLocation.lng), heading: 0 };
+        }
+
+        if (rider) {
+            setRiderCoords(rider);
+        } else if (deliv.status === 'assigned' || deliv.status === 'out_for_delivery') {
+            setRiderCoords(rest);
+        }
+    }, []);
+
+    const fetchDelivery = useCallback(async () => {
+        try {
+            const res = await api.get('/food/tiffin/user/deliveries');
+            if (res?.data?.success) {
+                const found = res.data.data.find(d => d._id === deliveryId);
+                if (found) {
+                    setDelivery(found);
+                    if (found.verification?.otpExpected) {
+                        setCustomerDeliveryOtp(found.verification.otpExpected);
+                    }
+                    extractCoordinates(found);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching delivery:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [deliveryId, extractCoordinates]);
+
+    // Initial fetch and auto-polling until delivered
+    useEffect(() => {
         fetchDelivery();
-    }, [deliveryId]);
+        const isCompleted = delivery?.status === 'delivered' || delivery?.status === 'delivered_unattended';
+        if (isCompleted) return;
+
+        const interval = setInterval(() => {
+            fetchDelivery();
+        }, 4000);
+
+        return () => clearInterval(interval);
+    }, [fetchDelivery, delivery?.status]);
 
     // Check for delivered status to trigger success animation and redirect
     useEffect(() => {
-        if (delivery?.status === 'delivered') {
+        if (delivery?.status === 'delivered' || delivery?.status === 'delivered_unattended') {
             setShowSuccess(true);
-            const timer = setTimeout(() => {
-                navigate('/food');
-            }, 3000);
+            const timer = setTimeout(() => navigate('/food'), 3000);
             return () => clearTimeout(timer);
         }
     }, [delivery?.status, navigate]);
 
-    // 2. Listen for live location updates via Socket.IO
+    // Socket: Live Rider Location
     useEffect(() => {
         if (!trackingIds.length) return undefined;
-
         const handleLocationUpdate = (data) => {
-            console.log('📍 [TiffinTracking] Location update received via socket:', data);
-            
-            // Only process updates for this specific delivery
             if (data.orderId && data.orderId !== deliveryId) return;
-
             const lat = Number(data?.lat ?? data?.boy_lat ?? data?.location?.lat ?? data?.location?.coordinates?.[1]);
             const lng = Number(data?.lng ?? data?.boy_lng ?? data?.location?.lng ?? data?.location?.coordinates?.[0]);
-
             if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-            const nextPos = {
-                lat,
-                lng,
-                heading: Number(data?.heading ?? data?.bearing ?? data?.location?.heading ?? 0),
-            };
+            const nextPos = { lat, lng, heading: Number(data?.heading ?? data?.bearing ?? 0) };
             const now = Date.now();
             const delta = Math.max(300, Math.min(now - (lastUpdateAtRef.current || now), 4000));
             lastUpdateAtRef.current = now;
 
-            // Set up interpolation state for smooth glide
             interpStateRef.current = {
                 lastPos: interpStateRef.current.nextPos || nextPos,
                 nextPos,
                 startTime: now,
                 durationMs: delta,
             };
-
             setRiderCoords(nextPos);
-
-            if (data?.eta) {
-                setCurrentEta(data.eta);
-            }
+            if (data?.eta) setCurrentEta(data.eta);
         };
-
         return subscribeLocationUpdates(handleLocationUpdate);
-    }, [trackingIds]);
+    }, [trackingIds, deliveryId]);
 
-    // Listen for OTP trigger
+    // Socket: Handover OTP & Realtime Status Updates
     useEffect(() => {
         const sock = getUserSocket();
         if (!sock) return;
 
         const handleOtp = (data) => {
-            if (data?.deliveryId === deliveryId && data?.otp) {
+            if ((data?.deliveryId === deliveryId || data?._id === deliveryId) && data?.otp) {
                 setCustomerDeliveryOtp(data.otp);
-                setIsSheetExpanded(true); // Auto expand to show OTP
+                setIsSheetExpanded(true);
+            }
+        };
+
+        const handleStatusUpdate = (data) => {
+            if (data?.deliveryId === deliveryId || data?._id === deliveryId || data?.orderId === deliveryId) {
+                if (data.status) {
+                    setDelivery(prev => prev ? { ...prev, status: data.status, deliveredAt: data.deliveredAt } : prev);
+                    if (data.status === 'delivered' || data.status === 'delivered_unattended') {
+                        setShowSuccess(true);
+                    }
+                }
             }
         };
 
         sock.on('tiffin_handover_otp', handleOtp);
-        return () => sock.off('tiffin_handover_otp', handleOtp);
-    }, [deliveryId, trackingIds]);
+        sock.on('tiffin_status_update', handleStatusUpdate);
+        sock.on('delivery_status_update', handleStatusUpdate);
 
-    // 3. Smooth Animation Loop (60 FPS Glide) — same as DeliveryTrackingMap
+        return () => {
+            sock.off('tiffin_handover_otp', handleOtp);
+            sock.off('tiffin_status_update', handleStatusUpdate);
+            sock.off('delivery_status_update', handleStatusUpdate);
+        };
+    }, [deliveryId]);
+
+    // 60 FPS Glide animation
     useEffect(() => {
         let frame;
         const update = () => {
@@ -242,12 +252,11 @@ export default function TiffinUserTrackingMap() {
                 const duration = Math.max(600, durationMs || 1500);
                 const elapsed = Date.now() - startTime;
                 const raw = Math.min(elapsed / duration, 1);
-                const progress = raw * raw * (3 - 2 * raw); // easeInOut
+                const progress = raw * raw * (3 - 2 * raw);
 
                 const lat = lastPos.lat + (nextPos.lat - lastPos.lat) * progress;
                 const lng = lastPos.lng + (nextPos.lng - lastPos.lng) * progress;
 
-                // Shortest-path heading interpolation
                 let lastHead = lastPos.heading || 0;
                 let nextHead = nextPos.heading || 0;
                 if (Math.abs(nextHead - lastHead) > 180) {
@@ -255,7 +264,6 @@ export default function TiffinUserTrackingMap() {
                     else nextHead += 360;
                 }
                 const heading = lastHead + (nextHead - lastHead) * progress;
-
                 const now = Date.now();
                 if (now - lastSmoothSetRef.current >= 33 || raw >= 1) {
                     lastSmoothSetRef.current = now;
@@ -268,23 +276,31 @@ export default function TiffinUserTrackingMap() {
         return () => cancelAnimationFrame(frame);
     }, []);
 
-    // Display location: prefer smooth interpolated, fallback to raw
     const displayRiderLocation = smoothLocation || riderCoords;
 
-    // Calculate directions between rider and customer
+    // Calculate Directions and accurate distance
     useEffect(() => {
         const originCoords = riderCoords || restaurantCoords;
-        if (!mapsReady || !originCoords || !customerCoords || directionsCalledRef.current) return;
-        
-        directionsCalledRef.current = true;
+        if (!mapsReady || !originCoords || !customerCoords || !window.google?.maps) return;
+
+        const distanceM = getDistanceMeters(originCoords, customerCoords);
+        if (distanceM < 80) {
+            setRouteInfo({ distance: '< 100 m', duration: '1-2 mins' });
+            setDirections(null);
+            if (mapRef.current) {
+                mapRef.current.panTo(customerCoords);
+                mapRef.current.setZoom(17);
+            }
+            return;
+        }
+
+        const routeKey = `${originCoords.lat.toFixed(4)},${originCoords.lng.toFixed(4)}->${customerCoords.lat.toFixed(4)},${customerCoords.lng.toFixed(4)}`;
+        if (lastRouteKeyRef.current === routeKey) return;
+        lastRouteKeyRef.current = routeKey;
+
         const service = new window.google.maps.DirectionsService();
-        
         service.route(
-            {
-                origin: originCoords,
-                destination: customerCoords,
-                travelMode: window.google.maps.TravelMode.DRIVING
-            },
+            { origin: originCoords, destination: customerCoords, travelMode: window.google.maps.TravelMode.DRIVING },
             (result, status) => {
                 if (status === 'OK' && result) {
                     setDirections(result);
@@ -293,16 +309,24 @@ export default function TiffinUserTrackingMap() {
                         setRouteInfo({ distance: leg.distance?.text, duration: leg.duration?.text });
                     }
                     if (mapRef.current && result.routes?.[0]?.bounds) {
-                        mapRef.current.fitBounds(result.routes[0].bounds, { top: 40, right: 20, bottom: 80, left: 20 });
+                        mapRef.current.fitBounds(result.routes[0].bounds, { top: 60, right: 30, bottom: 120, left: 30 });
                     }
                 }
             }
         );
     }, [mapsReady, riderCoords, customerCoords, restaurantCoords]);
 
-    const handleMapLoad = useCallback((mapInstance) => {
-        mapRef.current = mapInstance;
-    }, []);
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({ title: 'Track my Tiffin Order', url: window.location.href }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+        }
+    };
+
+    const handleRefresh = () => {
+        fetchDelivery();
+    };
 
     if (loading) {
         return (
@@ -326,46 +350,22 @@ export default function TiffinUserTrackingMap() {
         );
     }
 
-    const { restaurantId, assignedTo, status, type } = delivery;
+    const { restaurantId, status } = delivery;
     const isOutForDelivery = status === 'out_for_delivery';
     const isAssigned = status === 'assigned';
     const isDelivered = status === 'delivered';
-    const ETA = currentEta || routeInfo?.duration || "15 mins";
-
-    // Determine stepper state
-    let currentStepIndex = 0;
-    if (isAssigned) currentStepIndex = 1;
-    if (isOutForDelivery) currentStepIndex = 1; 
-    if (isDelivered) currentStepIndex = 3;
 
     const getStatusHeading = () => {
         if (isDelivered) return 'Tiffin Delivered';
-        if (isOutForDelivery || isAssigned) return 'Preparing your Tiffin'; 
+        if (isOutForDelivery || isAssigned) return 'Preparing your Tiffin';
         return 'Preparing your Tiffin';
-    };
-
-
-    const handleShare = () => {
-      if (navigator.share) {
-        navigator.share({
-          title: 'Track my Tiffin Order',
-          url: window.location.href,
-        }).catch(console.error);
-      } else {
-        navigator.clipboard.writeText(window.location.href);
-      }
-    };
-
-    const handleRefresh = () => {
-      window.location.reload();
     };
 
     return (
         <div className="h-screen w-full flex flex-col relative overflow-hidden bg-gray-100 dark:bg-[#0a0a0a]">
-            
             {/* Green Header */}
             <motion.div
-                className={`bg-green-600 text-white z-20 flex-shrink-0 relative shadow-md`}
+                className="bg-green-600 text-white z-20 flex-shrink-0 relative shadow-md"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
             >
@@ -420,9 +420,9 @@ export default function TiffinUserTrackingMap() {
                     <GoogleMap
                         mapContainerStyle={mapContainerStyle}
                         options={mapOptions}
-                        onLoad={handleMapLoad}
-                        center={riderCoords || restaurantCoords || { lat: 22.7196, lng: 75.8577 }}
-                        zoom={15}
+                        onLoad={(map) => { mapRef.current = map; }}
+                        center={riderCoords || restaurantCoords || { lat: 22.7176, lng: 75.8719 }}
+                        zoom={16}
                     >
                         {directions && (
                             <DirectionsRenderer
@@ -497,194 +497,14 @@ export default function TiffinUserTrackingMap() {
             </div>
 
             {/* Scrollable Content (Bottom Sheet) */}
-            <motion.div 
-                className="absolute bottom-0 left-0 right-0 z-20 bg-gray-50 dark:bg-[#141414] rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.1)] flex flex-col max-h-[45vh]"
-                initial={false}
-                animate={{ y: isSheetExpanded ? 0 : 'calc(100% - 48px)' }}
-                transition={{ type: "spring", damping: 25, stiffness: 250 }}
-            >
-                {/* Drag handle pill */}
-                <div 
-                    className="w-full flex justify-center pt-4 pb-3 shrink-0 bg-transparent cursor-pointer"
-                    onClick={() => setIsSheetExpanded(!isSheetExpanded)}
-                >
-                    <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto px-4 md:px-6 lg:px-8 py-4 space-y-4 md:space-y-6 pb-24">
-                    <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
-                        
-                        {/* Customer Delivery OTP */}
-                        {customerDeliveryOtp && (
-                            <motion.div
-                                className="bg-sky-50 dark:bg-sky-900/10 rounded-xl p-4 shadow-sm border border-sky-100 dark:border-sky-800"
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-bold text-sky-900 dark:text-sky-100 flex items-center gap-1.5">
-                                            <ShieldCheck className="w-4 h-4 text-sky-500" /> Handover OTP
-                                        </p>
-                                        <p className="text-xs text-sky-700/80 dark:text-sky-300">Share this with the delivery partner</p>
-                                    </div>
-                                    <div className="bg-white dark:bg-black/20 px-4 py-2 rounded-lg border border-sky-200 dark:border-sky-700 shadow-inner">
-                                        <span className="text-2xl font-black tracking-widest text-sky-600 dark:text-sky-400">{customerDeliveryOtp}</span>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-
-                        {/* Dynamic Status Card */}
-                        <motion.div
-                            className="bg-white dark:bg-[#1a1a1a] rounded-xl p-3 sm:p-4 shadow-sm border border-gray-100"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm border border-orange-100 bg-orange-50 text-orange-500">
-                                    <Receipt className="w-7 h-7" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="font-semibold text-gray-900 dark:text-gray-100 leading-tight">{getStatusHeading()}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 leading-snug">Waiting for restaurant to accept</p>
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        {/* Delivery Details Banner */}
-                        <motion.div
-                            className="bg-yellow-50 dark:bg-yellow-900/10 rounded-xl p-4 text-center border border-yellow-100 dark:border-yellow-900/30"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.4 }}
-                        >
-                            <p className="text-yellow-800 dark:text-yellow-400 font-medium text-sm">
-                                All your delivery details in one place 🥡
-                            </p>
-                        </motion.div>
-
-                        {/* Contact & Address Section */}
-                        <motion.div
-                            className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm overflow-hidden border border-gray-100"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.5 }}
-                        >
-                            <SectionItem
-                                icon={User}
-                                title={delivery?.userId?.name || delivery?.userId?.fullName || 'Customer'}
-                                subtitle={delivery?.userId?.phone || 'Phone number not available'}
-                                showArrow={false}
-                            />
-                            <SectionItem
-                                iconNode={
-                                    <div
-                                        dangerouslySetInnerHTML={{ __html: SAFE_CUSTOMER_PIN }}
-                                        className="w-6 h-6 [&_svg]:w-full [&_svg]:h-full [&_svg]:block"
-                                    />
-                                }
-                                title="Delivery at Location"
-                                subtitle={delivery?.deliveryAddress?.formattedAddress || 'Address not available'}
-                                showArrow={false}
-                            />
-                            <SectionItem
-                                icon={MessageSquare}
-                                title="Add delivery instructions"
-                                subtitle=""
-                                onClick={() => {}}
-                            />
-                        </motion.div>
-
-                        {/* Restaurant Section */}
-                        <motion.div
-                            className="bg-white dark:bg-[#1a1a1a] rounded-xl shadow-sm overflow-hidden border border-gray-100"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.6 }}
-                        >
-                            <div className="flex items-center gap-3 p-4 border-b border-dashed border-gray-200 dark:border-gray-800">
-                                <div className="w-12 h-12 rounded-full bg-orange-100 overflow-hidden flex items-center justify-center flex-shrink-0">
-                                    <div
-                                        dangerouslySetInnerHTML={{ __html: SAFE_RESTAURANT_PIN }}
-                                        className="w-7 h-7 [&_svg]:w-full [&_svg]:h-full [&_svg]:block"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="font-semibold text-gray-900 dark:text-gray-100">{restaurantId?.name || 'Tiffin Service'}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{restaurantId?.address?.formattedAddress || 'Restaurant location'}</p>
-                                </div>
-                                <motion.button
-                                    className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center"
-                                    whileTap={{ scale: 0.9 }}
-                                    onClick={() => window.location.href = `tel:${restaurantId?.phone || ''}`}
-                                >
-                                    <Phone className="w-5 h-5 text-orange-500" />
-                                </motion.button>
-                            </div>
-
-                            {/* Order Items */}
-                            <div className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                <div className="flex items-start gap-3">
-                                    <Receipt className="w-5 h-5 text-gray-500 mt-0.5" />
-                                    <div className="flex-1">
-                                        <div className="mt-1 space-y-1">
-                                            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                                                <span className="w-4 h-4 rounded border border-green-600 flex items-center justify-center">
-                                                    <span className="w-2 h-2 rounded-full bg-green-600" />
-                                                </span>
-                                                <span>1 x {type || 'Special'} Meal / Dinner Tiffin</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <ChevronRight className="w-5 h-5 text-gray-400" />
-                                </div>
-                            </div>
-                        </motion.div>
-
-                    </div>
-                </div>
-            </motion.div>
-            
-            {/* Success Overlay */}
-            <AnimatePresence>
-                {showSuccess && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-green-600 flex flex-col justify-center items-center text-white"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.5, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ type: "spring", damping: 15 }}
-                            className="bg-white rounded-full p-4 mb-6 shadow-2xl"
-                        >
-                            <svg className="w-16 h-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                        </motion.div>
-                        <motion.h2
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.2 }}
-                            className="text-3xl font-bold mb-2"
-                        >
-                            Order Received!
-                        </motion.h2>
-                        <motion.p
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.3 }}
-                            className="text-green-100 font-medium"
-                        >
-                            Taking you to home screen...
-                        </motion.p>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            <TiffinTrackingDetailsSheet
+                delivery={delivery}
+                isSheetExpanded={isSheetExpanded}
+                setIsSheetExpanded={setIsSheetExpanded}
+                customerDeliveryOtp={customerDeliveryOtp}
+                getStatusHeading={getStatusHeading}
+                showSuccess={showSuccess}
+            />
         </div>
     );
 }

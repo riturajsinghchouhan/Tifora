@@ -13,6 +13,9 @@ const NewRefundRequests = lazy(() => import("@food/pages/admin/refunds/NewRefund
 const FoodApproval = lazy(() => import("@food/pages/admin/restaurant/FoodApproval"));
 const OrdersPage = lazy(() => import("@food/pages/admin/orders/OrdersPage"));
 const AdminTiffinManagement = lazy(() => import("@food/pages/admin/tiffin/AdminTiffinManagement"));
+const TiffinRestaurantPayouts = lazy(() => import("@food/pages/admin/tiffin/TiffinRestaurantPayouts"));
+const TiffinRestaurantCommission = lazy(() => import("@food/pages/admin/tiffin/TiffinRestaurantCommission"));
+const TiffinDeliverySalary = lazy(() => import("@food/pages/admin/tiffin/TiffinDeliverySalary"));
 const OrderDetectDelivery = lazy(() => import("@food/pages/admin/OrderDetectDelivery"));
 const Category = lazy(() => import("@food/pages/admin/categories/Category"));
 const FeeSettings = lazy(() => import("@food/pages/admin/fee-settings/FeeSettings"));
@@ -184,6 +187,12 @@ export default function AdminRouter() {
             <Route path="order-detect-delivery" element={<OrderDetectDelivery />} />
             <Route path="tiffin-management" element={<AdminTiffinManagement />} />
             <Route path="tiffin-subscriptions" element={<AdminTiffinManagement />} />
+            <Route path="tiffin-restaurant-payouts" element={<TiffinRestaurantPayouts />} />
+            <Route path="tiffin-payout-requests" element={<TiffinRestaurantPayouts />} />
+            <Route path="tiffin-restaurant-commission" element={<TiffinRestaurantCommission />} />
+            <Route path="tiffin-commission" element={<TiffinRestaurantCommission />} />
+            <Route path="tiffin-delivery-salary" element={<TiffinDeliverySalary />} />
+            <Route path="tiffin-delivery-payouts" element={<TiffinDeliverySalary />} />
 
             {/* RESTAURANT MANAGEMENT */}
             <Route path="zone-setup" element={<ZoneSetup />} />
