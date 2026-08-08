@@ -209,8 +209,8 @@ export async function listPublicCategories(query = {}) {
         FoodCategory.countDocuments(filter)
     ]);
 
-    await backfillLegacyCategoryWorkflow(list);
-    const categories = list.map((category) => serializeCategoryForResponse(category));
+    const statsById = await backfillLegacyCategoryWorkflow(list);
+    const categories = list.map((category) => serializeCategoryForResponse(category, { includeCounts: true, statsById }));
 
     return { categories, total, page, limit };
 }

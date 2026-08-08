@@ -73,12 +73,16 @@ const buildCategoryStatsMap = async (categoryIds = []) => {
                     $sum: {
                         $cond: [{ $eq: ['$approvalStatus', 'approved'] }, 1, 0]
                     }
-                }
+                },
+                kitchens: { $addToSet: '$restaurantId' }
             }
         }
     ]);
 
-    return new Map(stats.map((item) => [String(item._id), item]));
+    return new Map(stats.map((item) => [String(item._id), {
+        ...item,
+        kitchenCount: Array.isArray(item.kitchens) ? item.kitchens.filter(Boolean).length : 0
+    }]));
 };
 
 export const backfillLegacyCategoryWorkflow = async (categories = []) => {
@@ -211,8 +215,10 @@ export const serializeCategoryForResponse = (category = {}, options = {}) => {
             : null,
         zoneId: category.zoneId || null,
         sortOrder: category.sortOrder || 0,
-        itemCount: options.includeCounts ? Number(stats?.totalFoods || 0) : undefined,
-        approvedFoodCount: options.includeCounts ? Number(stats?.approvedFoods || 0) : undefined,
+        itemCount: Number(stats?.totalFoods || 0),
+        approvedFoodCount: Number(stats?.approvedFoods || 0),
+        kitchenCount: Number(stats?.kitchenCount ?? (Array.isArray(stats?.kitchens) ? stats.kitchens.filter(Boolean).length : (restaurantId ? 1 : 0))),
+        restaurantCount: Number(stats?.kitchenCount ?? (Array.isArray(stats?.kitchens) ? stats.kitchens.filter(Boolean).length : (restaurantId ? 1 : 0))),
         createdAt: category.createdAt,
         updatedAt: category.updatedAt
     };

@@ -95,6 +95,8 @@ import { API_BASE_URL } from "@food/api/config";
 import OptimizedImage, { ShopPlaceholder } from "@food/components/OptimizedImage";
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability";
 import HomeHeader from "@food/components/user/home/HomeHeader";
+import HomeHeroPromo from "@food/components/user/home/HomeHeroPromo";
+import HomeExploreTiffinPlans from "@food/components/user/home/HomeExploreTiffinPlans";
 import HeroBanner from "@food/components/user/home/HeroBanner";
 import RestaurantGrid from "@food/components/user/home/RestaurantGrid";
 import ExploreMoreSection from "@food/components/user/home/ExploreMoreSection";
@@ -117,11 +119,11 @@ import hotelCategoryIcon from "@food/assets/category-icons/hotel.png";
 
 // Animated placeholder for search - moved outside component to prevent recreation
 const placeholders = [
+  'Search "home style veg"',
   'Search "tiffin"',
   'Search "thali"',
   'Search "monthly plan"',
   'Search "diet meal"',
-  'Search "home style veg"',
   'Search "jain thali"',
   'Search "dabba"',
   'Search "healthy food"',
@@ -588,6 +590,8 @@ export default function Home() {
       slug:
         category.slug || slugifyCategory(category.label || category.name || ""),
       label: category.label || category.name || "Category",
+      kitchenCount: Number(category.kitchenCount ?? category.restaurantCount ?? 0),
+      itemCount: Number(category.itemCount ?? 0),
     }));
   }, [landingCategories, normalizeImageUrl, slugifyCategory]);
 
@@ -903,6 +907,8 @@ export default function Home() {
                 foodImages[idx % foodImages.length] ||
                 foodImages[0],
               type: cat?.type || "",
+              kitchenCount: Number(cat?.kitchenCount ?? cat?.restaurantCount ?? 0),
+              itemCount: Number(cat?.itemCount ?? 0),
             }))
           : [];
 
@@ -956,6 +962,8 @@ export default function Home() {
               foodImages[idx % foodImages.length] ||
               foodImages[0],
             type: cat?.type || "",
+            kitchenCount: Number(cat?.kitchenCount ?? cat?.restaurantCount ?? 0),
+            itemCount: Number(cat?.itemCount ?? 0),
           }))
         : [];
 
@@ -2261,150 +2269,11 @@ export default function Home() {
             />
 
             {activeTab === "food" && (
-              <div id="tiffin-banner-wrapper" className="px-4 mt-3 mb-2 space-y-3.5">
-                {/* Promotional Banner (Top) */}
-                {activeBanners.length > 0 && (
-                  <div className="w-full">
-                    <div 
-                      className="relative w-full h-[140px] sm:h-[175px] rounded-2xl overflow-hidden shadow-md cursor-pointer group bg-gray-100 dark:bg-gray-800"
-                      onClick={() => handlePromoBannerClick(activeBanners[currentBannerIndex])}
-                    >
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        <motion.div
-                          key={currentBannerIndex}
-                          initial={{ opacity: 0, x: 20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -20 }}
-                          transition={{ duration: 0.5, ease: "easeOut" }}
-                          className="absolute inset-0 w-full h-full"
-                        >
-                          <img
-                            src={activeBanners[currentBannerIndex]?.imageUrl}
-                            alt="Promotional Banner"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                            onError={(e) => {
-                              e.currentTarget.src = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&h=500&fit=crop&q=80";
-                            }}
-                          />
-                          {/* Glossy Gradient Overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/20 to-transparent pointer-events-none" />
-
-                          {/* Banner Content (if title/tag exists) */}
-                          {activeBanners[currentBannerIndex]?.title && (
-                            <div className="absolute bottom-3 left-3.5 right-12 z-10 text-white pointer-events-none">
-                              {activeBanners[currentBannerIndex]?.tag && (
-                                <span className="inline-block text-[9px] font-black uppercase tracking-wider bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/20 mb-1">
-                                  {activeBanners[currentBannerIndex].tag}
-                                </span>
-                              )}
-                              <h4 className="text-sm sm:text-base font-extrabold line-clamp-1 drop-shadow-md">
-                                {activeBanners[currentBannerIndex].title}
-                              </h4>
-                              {activeBanners[currentBannerIndex]?.subtitle && (
-                                <p className="text-[11px] text-white/90 font-medium line-clamp-1 drop-shadow-sm mt-0.5">
-                                  {activeBanners[currentBannerIndex].subtitle}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </motion.div>
-                      </AnimatePresence>
-
-                      {/* Shimmer Effect */}
-                      <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-                        <motion.div
-                          animate={{ x: ['-200%', '200%'] }}
-                          transition={{ duration: 3, repeat: Infinity, repeatDelay: 4, ease: "easeInOut" }}
-                          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-[-20deg] w-[150%] h-full"
-                        />
-                      </div>
-
-                      {/* Pagination Dots */}
-                      {activeBanners.length > 1 && (
-                        <div className="absolute bottom-2.5 right-3 z-20 flex gap-1 px-2 py-1 bg-black/40 backdrop-blur-md rounded-full border border-white/20">
-                          {activeBanners.map((_, i) => (
-                            <div
-                              key={i}
-                              className={`h-1.5 rounded-full transition-all duration-300 ${
-                                i === currentBannerIndex ? 'w-4 bg-white' : 'w-1.5 bg-white/40'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* 2-Column Cards (Below Banner) */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Column 1: Tiffin Services (Green) */}
-                  <Link
-                    to="/food/user/tiffin"
-                    className="group relative flex flex-col justify-between h-[115px] sm:h-[125px] rounded-2xl overflow-hidden p-3.5 bg-gradient-to-br from-[#009b67] via-[#007a51] to-[#004e33] border border-white/10 shadow-[0_6px_20px_rgba(0,155,103,0.22)] hover:shadow-lg transition-all duration-300 active:scale-[0.97]"
-                  >
-                    {/* Top Icon Badge */}
-                    <div className="w-10 h-10 rounded-xl bg-white/95 backdrop-blur-md p-1.5 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
-                      {foodCategoryIcon ? (
-                        <img
-                          src={foodCategoryIcon}
-                          alt="Tiffin Services"
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallback = e.currentTarget.parentElement?.querySelector('.icon-fallback');
-                            if (fallback) fallback.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <UtensilsCrossed className="w-5 h-5 text-[#009b67] icon-fallback hidden" />
-                    </div>
-
-                    {/* Bottom Texts */}
-                    <div className="min-w-0 z-10">
-                      <h3 className="text-[15px] font-bold text-white leading-tight tracking-tight">
-                        Tiffin Services
-                      </h3>
-                      <p className="text-[11px] text-emerald-100/90 font-medium leading-tight mt-1 flex items-center gap-0.5">
-                        Healthy Meals <ChevronRight className="h-3 w-3 inline text-emerald-200" />
-                      </p>
-                    </div>
-                  </Link>
-
-                  {/* Column 2: Hotel Booking (Blue) */}
-                  <Link
-                    to="/food/user/hotel"
-                    className="group relative flex flex-col justify-between h-[115px] sm:h-[125px] rounded-2xl overflow-hidden p-3.5 bg-gradient-to-br from-[#1d4ed8] via-[#1e3a8a] to-[#0f172a] border border-white/10 shadow-[0_6px_20px_rgba(29,78,216,0.22)] hover:shadow-lg transition-all duration-300 active:scale-[0.97]"
-                  >
-                    {/* Top Icon Badge */}
-                    <div className="w-10 h-10 rounded-xl bg-white/95 backdrop-blur-md p-1.5 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
-                      {hotelCategoryIcon ? (
-                        <img
-                          src={hotelCategoryIcon}
-                          alt="Hotel Booking"
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallback = e.currentTarget.parentElement?.querySelector('.icon-fallback');
-                            if (fallback) fallback.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <Building2 className="w-5 h-5 text-[#1d4ed8] icon-fallback hidden" />
-                    </div>
-
-                    {/* Bottom Texts */}
-                    <div className="min-w-0 z-10">
-                      <h3 className="text-[15px] font-bold text-white leading-tight tracking-tight">
-                        Hotel Booking
-                      </h3>
-                      <p className="text-[11px] text-blue-100/90 font-medium leading-tight mt-1 flex items-center gap-0.5">
-                        Best Stays <ChevronRight className="h-3 w-3 inline text-blue-200" />
-                      </p>
-                    </div>
-                  </Link>
-                </div>
-              </div>
+              <HomeHeroPromo
+                activeBanners={activeBanners}
+                currentBannerIndex={currentBannerIndex}
+                handlePromoBannerClick={handlePromoBannerClick}
+              />
             )}
             <div className="h-1 w-full" />
 
@@ -2419,155 +2288,30 @@ export default function Home() {
                 className="bg-transparent dark:bg-transparent pt-2 sm:pt-4"
               >
 
-                {/* "What's on your mind today?" Section - Now with Sticky Logic */}
-                <div ref={categoryAnchorRef} className="h-0 w-full" />
-                <div
-                  id="categories-section"
-                  className={`sticky top-[60px] z-[50] w-full transition-all duration-300 ${isCategoryStuck ? "bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-2xl shadow-[0_4px_30px_rgba(0,0,0,0.05)] pb-2 pt-2 border-b border-white/50 dark:border-white/10 px-4" : "bg-transparent px-4 py-3"} space-y-3`}
-                >
-                  <div className={`flex items-center gap-2 min-w-0 ${isCategoryStuck ? 'hidden' : ''}`}>
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white min-w-0 flex-shrink leading-tight">Explore Tiffin Plans</h2>
-                    <div className="h-[1px] bg-gray-100 dark:bg-gray-800 flex-1"></div>
-                    <Link to="/food/user/categories" className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-0.5 whitespace-nowrap shrink-0 hover:text-gray-900 dark:hover:text-white transition-colors">
-                      View All <ArrowDownUp className="h-3 w-3 rotate-90" />
-                    </Link>
-                  </div>
+                {/* Explore Tiffin Plans & Filter Pills Row */}
+                <HomeExploreTiffinPlans
+                  categoryAnchorRef={categoryAnchorRef}
+                  isCategoryStuck={isCategoryStuck}
+                  displayCategories={displayCategories}
+                  hasMoreCategories={hasMoreCategories}
+                  realCategories={realCategories}
+                  loadMoreCategories={loadMoreCategories}
+                  isLoadingMoreCategories={isLoadingMoreCategories}
+                  setIsFilterOpen={setIsFilterOpen}
+                  activeFilters={activeFilters}
+                  setActiveFilters={setActiveFilters}
+                  applyFiltersAndRefetch={applyFiltersAndRefetch}
+                  sortBy={sortBy}
+                  selectedCuisine={selectedCuisine}
+                />
 
-                  {/* Categories Horizontal Slider */}
-                  <div className="flex overflow-x-auto gap-1.5 pb-2 scrollbar-hide -mx-4 px-4 mask-edge-fade items-center">
-                    {displayCategories.map((category, index) => (
-                      <Link
-                        key={category.id || index}
-                        to={`/food/user/category/${category.slug}`}
-                        className="flex-shrink-0 flex flex-col items-center gap-1.5 group w-[76px]"
-                      >
-                        <div className="relative w-[68px] h-[68px] sm:w-[84px] sm:h-[84px] rounded-full overflow-hidden shadow-md border-2 border-gray-100 dark:border-gray-800 bg-white dark:bg-[#1a1a1a] group-active:scale-95 transition-all duration-300">
-                          {/* Shining Glint Effect */}
-                          <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-                            <motion.div
-                              animate={{
-                                x: ['-200%', '200%'],
-                              }}
-                              transition={{
-                                duration: 2,
-                                repeat: Infinity,
-                                repeatDelay: 3 + index * 0.5,
-                                ease: "easeInOut"
-                              }}
-                              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent skew-x-[-20deg] w-[150%] h-full"
-                            />
-                          </div>
-
-                          <OptimizedImage
-                            src={category.image}
-                            alt={category.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          />
-                        </div>
-                        <span className="text-[11px] font-extrabold text-gray-900 dark:text-gray-100 text-center leading-tight line-clamp-1 w-full px-0.5">
-                          {category.name}
-                        </span>
-                      </Link>
-                    ))}
-
-                    {/* Load More Categories Button */}
-                    {hasMoreCategories && displayCategories === realCategories && (
-                       <button 
-                         type="button"
-                         onClick={loadMoreCategories} 
-                         disabled={isLoadingMoreCategories}
-                         className="flex-shrink-0 flex flex-col items-center gap-1.5 group w-[76px] cursor-pointer"
-                       >
-                         <div className="relative w-[68px] h-[68px] sm:w-[84px] sm:h-[84px] rounded-full flex items-center justify-center bg-gray-50 dark:bg-[#1a1a1a] border-2 border-dashed border-gray-300 dark:border-gray-700 hover:border-primary transition-colors">
-                           {isLoadingMoreCategories ? (
-                             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                           ) : (
-                             <Plus className="h-6 w-6 text-gray-400 group-hover:text-primary transition-colors" />
-                           )}
-                         </div>
-                         <span className="text-[11px] font-extrabold text-gray-900 dark:text-gray-100 text-center leading-tight w-full px-0.5">
-                           View More
-                         </span>
-                       </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Removed Dynamic Sticky Header (Search + Slider + Filters) */}
-
-                {/* Admin Hero Banners Section - Now below categories */}
+                {/* Admin Hero Banners Section */}
                 <HeroBanner
                   images={heroBannerImages}
                   bannersData={heroBannersData}
                   loading={showBannerSkeleton}
                   shellRef={heroShellRef}
                 />
-
-
-                {/* Filters Sticky Sidebar Header */}
-                <section className="bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-md sticky top-0 z-[40] w-full px-4 my-3 border-y border-gray-100 dark:border-white/5 shadow-sm transition-colors duration-300">
-                  <div
-                    className="flex items-center gap-2.5 overflow-x-auto scrollbar-hide py-2.5"
-                    style={{
-                      scrollbarWidth: "none",
-                      msOverflowStyle: "none",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setIsFilterOpen(true)}
-                      className="h-9 px-4 rounded-full flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 font-bold transition-all bg-white dark:bg-[#1a1a1a] border border-gray-200 shadow-sm active:scale-95"
-                    >
-                      <SlidersHorizontal className="h-4 w-4 text-black" />
-                      <span className="text-xs font-bold text-black dark:text-white uppercase tracking-tight">
-                        Filters
-                      </span>
-                    </button>
-
-                    {[
-                      { id: "delivery-under-30", label: "Under 30 mins" },
-                      { id: "delivery-under-45", label: "Under 45 mins" },
-                      { id: "distance-under-1km", label: "Under 1km", icon: MapPin },
-                      { id: "distance-under-2km", label: "Under 2km", icon: MapPin },
-                    ].map((filter) => {
-                      const Icon = filter.icon;
-                      const isActive = activeFilters.has(filter.id);
-                      return (
-                        <button
-                          key={filter.id}
-                          type="button"
-                          onClick={() => {
-                            const nextFilters = new Set(activeFilters);
-                            if (nextFilters.has(filter.id)) {
-                              nextFilters.delete(filter.id);
-                            } else {
-                              nextFilters.add(filter.id);
-                            }
-                            setActiveFilters(nextFilters);
-                            void applyFiltersAndRefetch(
-                              nextFilters,
-                              sortBy,
-                              selectedCuisine,
-                            );
-                          }}
-                          className={`h-9 px-4 rounded-full flex items-center gap-2 whitespace-nowrap flex-shrink-0 transition-all font-bold shadow-sm active:scale-95 ${isActive
-                            ? "bg-primary text-white border border-primary hover:bg-orange-700"
-                            : "bg-white dark:bg-[#1a1a1a] border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                            }`}
-                        >
-                          {Icon && (
-                            <Icon
-                              className={`h-3.5 w-3.5 ${isActive ? "fill-white" : ""}`}
-                            />
-                          )}
-                          <span className="text-xs font-bold tracking-tight">
-                            {filter.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
 
 
 

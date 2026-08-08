@@ -1,18 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, ChevronDown, Search, Mic, Bell, CheckCircle2, Tag, Gift, AlertCircle, Clock, BellOff, X, IndianRupee } from 'lucide-react';
+import { ChevronDown, Search, Mic, Bell, CheckCircle2, Tag, Gift, AlertCircle, BellOff } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger
 } from "@food/components/ui/popover";
 import { Badge } from "@food/components/ui/badge";
-import { Avatar, AvatarFallback } from "@food/components/ui/avatar";
-import foodIcon from "@food/assets/category-icons/food.png";
-import quickIcon from "@food/assets/category-icons/quick.png";
-import taxiIcon from "@food/assets/category-icons/taxi.png";
-import hotelIcon from "@food/assets/category-icons/hotel.png";
 import brandLogo from "@/assets/logo.png";
 import useNotificationInbox from "@food/hooks/useNotificationInbox";
 
@@ -23,11 +18,59 @@ const ICON_MAP = {
   AlertCircle
 };
 
+// Premium Veg Leaf SVG matching exact reference UI
+function VegLeafIcon({ className = "w-6 h-6" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <defs>
+        <linearGradient id="vegLeafGradient" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#059669" />
+          <stop offset="60%" stopColor="#10B981" />
+          <stop offset="100%" stopColor="#34D399" />
+        </linearGradient>
+      </defs>
+      {/* Leaf Body */}
+      <path
+        d="M20.8 3.2C13.5 3.2 5.5 8.8 4.2 16C3.2 21.2 7.8 21.8 10.5 21.2C17.8 19.5 22.8 11.2 20.8 3.2Z"
+        fill="url(#vegLeafGradient)"
+      />
+      {/* Central Stem */}
+      <path
+        d="M5.5 19.5C8.2 16.8 12.8 12.2 19.2 5"
+        stroke="#047857"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      {/* Veins */}
+      <path
+        d="M9.2 15.8C11.2 14.5 13.5 14.8 13.5 14.8"
+        stroke="#047857"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12.2 12.8C14.2 11.5 16.5 11.8 16.5 11.8"
+        stroke="#047857"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+      />
+      <path
+        d="M7.2 17.8C7.8 16.5 7.2 15 7.2 15"
+        stroke="#047857"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export default function HomeHeader({
-  activeTab,
-  setActiveTab,
   location,
-  savedAddressText,
   handleLocationClick,
   handleSearchFocus,
   placeholderIndex,
@@ -41,6 +84,7 @@ export default function HomeHeader({
     const saved = localStorage.getItem('food_user_notifications');
     return saved ? JSON.parse(saved) : [];
   });
+
   const {
     items: broadcastNotifications,
     unreadCount: broadcastUnreadCount,
@@ -54,7 +98,6 @@ export default function HomeHeader({
     };
 
     window.addEventListener('notificationsUpdated', syncNotifications);
-
     return () => window.removeEventListener('notificationsUpdated', syncNotifications);
   }, []);
 
@@ -86,117 +129,124 @@ export default function HomeHeader({
     );
   }, [broadcastNotifications, notifications]);
 
-  const unreadCount = notifications.filter(n => !n.read).length + broadcastUnreadCount;
+  const unreadCount = notifications.filter((n) => !n.read).length + broadcastUnreadCount;
 
-  const handleDeleteNotification = (id, source = "local") => {
-    if (source === "broadcast") {
-      dismissBroadcastNotification(id);
-      return;
+  // Format Area Title
+  const areaTitle = useMemo(() => {
+    const area = location?.area || location?.subLocality || location?.mainTitle || location?.neighborhood;
+    const city = (location?.city || "").toLowerCase();
+    const state = (location?.state || "").toLowerCase();
+
+    if (area && !/^-?\d+(\.\d+)?$/.test(area.trim())) {
+      const areaLower = area.toLowerCase();
+      if (areaLower !== city && areaLower !== state) {
+        return area;
+      }
     }
-    setNotifications((prev) => {
-      const next = prev.filter((notification) => notification.id !== id);
-      localStorage.setItem('food_user_notifications', JSON.stringify(next));
-      window.dispatchEvent(new CustomEvent('notificationsUpdated', { detail: { count: next.filter((n) => !n.read).length } }));
-      return next;
-    });
-  };
+
+    if (location?.address && location.address !== "Select location") {
+      const parts = location.address.split(',').map((p) => p.trim());
+      for (const part of parts) {
+        const partLower = part.toLowerCase();
+        if (
+          partLower &&
+          partLower !== city &&
+          partLower !== state &&
+          !/^-?\d/.test(part) &&
+          part.length > 2
+        ) {
+          return part;
+        }
+      }
+    }
+
+    return location?.area || location?.city || "Select Location";
+  }, [location]);
+
+  // Format Subtitle Address
+  const subtitleAddress = useMemo(() => {
+    const addr = location?.formattedAddress || location?.address || "";
+    if (addr && addr.length > 5 && addr !== "Select location") {
+      return addr;
+    }
+
+    const state = location?.state || "";
+    const pincode = location?.pincode || "";
+
+    if (state && pincode) return `${state}, ${pincode}`;
+    if (state) return state;
+    if (pincode) return pincode;
+
+    return "Pinpoint location";
+  }, [location]);
 
   return (
     <>
-      <div id="home-header-loc-row" className="relative pt-2 pb-0 px-4 transition-all duration-700 overflow-hidden bg-transparent shadow-none">
-        {/* Subtle Artistic Glows - Adds depth without being 'boring' */}
-        <div className="absolute top-[-20%] right-[-10%] w-48 h-48 bg-primary/5 blur-[80px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-[-20%] left-[-10%] w-48 h-48 bg-[#48c479]/5 blur-[80px] rounded-full pointer-events-none" />
+      {/* Top Header Background with Warm Ambient Glow */}
+      <div id="home-header-loc-row" className="relative pt-2.5 pb-1 px-4 transition-all duration-500 overflow-hidden bg-gradient-to-b from-[#FEF5E7] via-[#FFFBF5] to-white/90 dark:from-[#1f180e] dark:via-[#13110e] dark:to-[#0a0a0a]">
+        {/* Subtle Decorative Ambient Glows */}
+        <div className="absolute -top-10 -right-10 w-56 h-56 bg-amber-400/10 blur-[70px] rounded-full pointer-events-none" />
+        <div className="absolute top-0 -left-12 w-48 h-48 bg-[#10b981]/10 blur-[80px] rounded-full pointer-events-none" />
 
-        {/* Main Header Content */}
-        <div className="relative z-10 space-y-2.5">
-          {/* Row 1: Logo, Location Selector, and Notifications */}
-          <div className="flex items-center justify-between gap-2.5">
-            {/* Brand Logo */}
-            <Link to="/food/user" className="shrink-0 flex items-center active:scale-95 transition-transform">
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden shadow-sm border border-gray-200/80 dark:border-gray-700 shrink-0 bg-white dark:bg-gray-800 flex items-center justify-center p-0.5">
-                <img 
-                  src={brandLogo} 
-                  alt="Tifora" 
-                  className="w-full h-full rounded-full object-cover drop-shadow-sm" 
-                />
-              </div>
-            </Link>
+        {/* Faint Background Art Pattern on Left */}
+        <svg
+          className="absolute -top-4 -left-6 w-36 h-36 opacity-[0.08] dark:opacity-[0.05] pointer-events-none text-amber-900 dark:text-amber-100"
+          viewBox="0 0 100 100"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="0.75"
+        >
+          <circle cx="50" cy="50" r="45" strokeDasharray="3 3" />
+          <circle cx="50" cy="50" r="30" />
+          <circle cx="50" cy="50" r="15" />
+          <path d="M50 5 L50 95 M5 50 L95 50" strokeDasharray="2 2" />
+        </svg>
 
-            {/* Location Selector */}
-            <div
-              className="flex items-center gap-1.5 cursor-pointer group min-w-0 flex-1 pl-1"
-              onClick={handleLocationClick}
-            >
-              <div className="flex-shrink-0 flex items-center justify-center">
-                <MapPin className="h-[22px] w-[22px] text-[#e11d48]" strokeWidth={2.5} />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1">
-                  <span className="text-[13px] sm:text-[15px] font-bold text-gray-900 dark:text-white truncate tracking-tight">
-                    {(() => {
-                      const area = location?.area || location?.subLocality || location?.mainTitle || location?.neighborhood;
-                      const city = (location?.city || "").toLowerCase();
-                      const state = (location?.state || "").toLowerCase();
+        {/* Main Location & Notification Row */}
+        <div className="relative z-10 flex items-center justify-between gap-3 py-1">
+          {/* Left: Brand Logo in Green Circle */}
+          <Link to="/food/user" className="shrink-0 flex items-center active:scale-95 transition-transform">
+            <div className="w-[42px] h-[42px] sm:w-[46px] sm:h-[46px] rounded-full overflow-hidden shadow-[0_2px_8px_rgba(16,185,129,0.25)] border border-emerald-500/20 shrink-0 bg-gradient-to-br from-[#00A86B] via-[#059669] to-[#047857] flex items-center justify-center p-0.5">
+              <img
+                src={brandLogo}
+                alt="Tifora"
+                className="w-full h-full rounded-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+              <span className="hidden w-full h-full rounded-full bg-emerald-600 text-white font-black text-xl items-center justify-center">
+                T
+              </span>
+            </div>
+          </Link>
 
-                      if (area && !/^-?\d+(\.\d+)?$/.test(area.trim())) {
-                        const areaLower = area.toLowerCase();
-                        if (areaLower !== city && areaLower !== state) {
-                          return area;
-                        }
-                      }
-                      
-                      // Fallback to a part of the address if area is missing or redundant
-                      if (location?.address && location.address !== "Select location") {
-                        const parts = location.address.split(',').map(p => p.trim());
-                        // Take the first part that isn't city or state
-                        for (const part of parts) {
-                          const partLower = part.toLowerCase();
-                          if (partLower && 
-                              partLower !== city && 
-                              partLower !== state && 
-                              !/^-?\d/.test(part) &&
-                              part.length > 2) {
-                            return part;
-                          }
-                        }
-                      }
-                      
-                      return location?.area || location?.city || "Select Location";
-                    })()}
-                  </span>
-                  <ChevronDown className="h-[14px] w-[14px] text-gray-900 dark:text-white flex-shrink-0" strokeWidth={2.5} />
-                </div>
-                
-                <span className="text-[10px] sm:text-[11px] font-medium text-gray-500 dark:text-gray-400 uppercase truncate leading-tight mt-0.5">
-                  {(() => {
-                    const addr = location?.formattedAddress || location?.address || "";
-                    if (addr && addr.length > 5 && addr !== "Select location") {
-                       return addr;
-                    }
-                    
-                    const state = location?.state || "";
-                    const pincode = location?.pincode || "";
-                    
-                    if (state && pincode) return `${state}, ${pincode}`;
-                    if (state) return state;
-                    if (pincode) return pincode;
-                    
-                    return "Pinpoint location";
-                  })()}
-                </span>
-              </div>
+          {/* Center: Location Title & Subtitle */}
+          <div
+            className="flex flex-col min-w-0 flex-1 cursor-pointer group select-none"
+            onClick={handleLocationClick}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[16px] sm:text-[17px] font-extrabold text-gray-900 dark:text-white truncate tracking-tight">
+                {areaTitle}
+              </span>
+              <ChevronDown className="h-4 w-4 text-gray-900 dark:text-white shrink-0 stroke-[2.8] group-hover:translate-y-0.5 transition-transform" />
             </div>
 
-            {/* Right Actions: Bell */}
-            <div className="flex items-center gap-2 shrink-0">
- 
+            <span className="text-[12px] sm:text-[12.5px] font-normal text-gray-500 dark:text-gray-400 truncate leading-tight mt-0.5 max-w-[210px] sm:max-w-xs md:max-w-md">
+              {subtitleAddress}
+            </span>
+          </div>
+
+          {/* Right: Notification Bell Button */}
+          <div className="shrink-0">
             <Popover>
               <PopoverTrigger asChild>
-                <div className="h-8 w-8 relative flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 cursor-pointer active:scale-90 transition-all">
-                  <Bell className="h-4 w-4 text-gray-700 dark:text-gray-200" />
+                <div className="w-[42px] h-[42px] sm:w-[46px] sm:h-[46px] relative flex items-center justify-center rounded-2xl bg-white dark:bg-[#1c1c1e] border border-gray-200/80 dark:border-zinc-800 shadow-[0_2px_10px_rgba(0,0,0,0.05)] cursor-pointer active:scale-90 transition-all hover:bg-gray-50 dark:hover:bg-zinc-800">
+                  <Bell className="h-5 w-5 text-gray-900 dark:text-gray-100 stroke-[2]" />
                   {unreadCount > 0 && (
-                    <span className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full border animate-pulse ${vegMode ? 'bg-orange-400 border-[#00b09b]' : 'bg-orange-400 border-primary'}`} />
+                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white dark:ring-zinc-900 animate-pulse" />
                   )}
                 </div>
               </PopoverTrigger>
@@ -206,7 +256,7 @@ export default function HomeHeader({
                     <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                       Notifications
                       {unreadCount > 0 && (
-                        <Badge variant="secondary" className="bg-orange-100 text-primary border-none text-[10px] h-4">
+                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border-none text-[10px] h-4">
                           {unreadCount} New
                         </Badge>
                       )}
@@ -217,46 +267,51 @@ export default function HomeHeader({
                       mergedNotifications.slice(0, 5).map((notif) => {
                         const Icon = ICON_MAP[notif.icon] || Bell;
                         return (
-                          <div key={notif.id} className="p-4 flex items-start gap-3 border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 transition-colors">
-                            <div className="mt-1 p-2 rounded-full bg-gray-100 text-primary">
+                          <div key={notif.id} className="p-4 flex items-start gap-3 border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
+                            <div className="mt-1 p-2 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600">
                               <Icon className="h-4 w-4" />
                             </div>
                             <div className="flex-1 min-w-0">
-                               <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{notif.title}</p>
-                               <p className="text-xs text-gray-500 line-clamp-1">{notif.message}</p>
+                              <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{notif.title}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{notif.message}</p>
                             </div>
                           </div>
-                        )
+                        );
                       })
                     ) : (
                       <div className="p-8 text-center flex flex-col items-center gap-2">
-                        <BellOff className="h-10 w-10 text-gray-200" />
+                        <BellOff className="h-10 w-10 text-gray-300 dark:text-zinc-600" />
                         <p className="text-xs text-gray-400 font-medium">All caught up!</p>
                       </div>
                     )}
                   </div>
                   <div className="p-3 bg-gray-50 dark:bg-gray-800/50 text-center">
-                    <Link to="/food/user/notifications" className="text-xs font-bold text-gray-400">View All</Link>
+                    <Link to="/food/user/notifications" className="text-xs font-bold text-gray-500 hover:text-emerald-600">View All</Link>
                   </div>
                 </div>
               </PopoverContent>
             </Popover>
           </div>
         </div>
-
-        </div>
       </div>
 
-      {/* Sticky Search Bar and Veg Toggle */}
-      <div id="home-header-search-row" className={`relative sticky z-[60] px-1 pb-2 transition-all duration-300 pointer-events-none mt-2 sm:mt-3 ${isCategoryStuck ? 'top-0 pt-2 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-2xl' : 'top-2 pt-2 bg-transparent'}`}>
-        <div className="flex items-center gap-2.5 w-[96%] mx-auto pointer-events-auto">
-          {/* Search Bar */}
+      {/* Sticky Search Bar and VEG MODE Row */}
+      <div
+        id="home-header-search-row"
+        className={`sticky z-[60] px-4 pb-2 transition-all duration-300 ${
+          isCategoryStuck
+            ? 'top-0 pt-2 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-2xl shadow-sm'
+            : 'top-0 pt-1.5 bg-gradient-to-b from-white/90 to-transparent dark:from-[#0a0a0a]/90 dark:to-transparent'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 w-full">
+          {/* Search Bar (Matching reference UI) */}
           <div
-            className="relative bg-white dark:bg-[#1a1a1a] rounded-2xl flex items-center px-3.5 shadow-[0_8px_24px_rgba(0,0,0,0.10)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)] border border-gray-200/90 dark:border-gray-800/90 cursor-pointer active:scale-[0.98] transition-all duration-300 flex-1 h-11"
+            className="relative flex-1 h-[52px] bg-white dark:bg-[#18181b] rounded-2xl flex items-center px-4 shadow-[0_3px_14px_rgba(0,0,0,0.06)] dark:shadow-[0_3px_14px_rgba(0,0,0,0.3)] border border-gray-200/90 dark:border-zinc-800/90 cursor-pointer active:scale-[0.99] transition-all duration-200"
             onClick={handleSearchFocus}
           >
-            <Search className="h-[18px] w-[18px] text-primary mr-2 shrink-0" strokeWidth={2.5} />
-            
+            <Search className="h-5 w-5 text-gray-800 dark:text-gray-200 mr-3 shrink-0 stroke-[2.2]" />
+
             <div className="flex-1 overflow-hidden relative h-5">
               <AnimatePresence mode="wait">
                 <motion.span
@@ -264,18 +319,19 @@ export default function HomeHeader({
                   initial={{ y: 8, opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: -8, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute inset-0 text-[13px] font-bold text-gray-400 truncate flex items-center"
+                  transition={{ duration: 0.22 }}
+                  className="absolute inset-0 text-[14.5px] font-normal text-gray-400 dark:text-zinc-500 truncate flex items-center"
                 >
-                  {placeholders?.[placeholderIndex] || 'Search'}
+                  {placeholders?.[placeholderIndex] || 'Search "home style veg"'}
                 </motion.span>
               </AnimatePresence>
             </div>
 
-            <div className="flex items-center gap-2 pl-2">
-              <div className="h-5 w-[1px] bg-gray-200 dark:bg-gray-700" />
-              <Mic 
-                className="h-5 w-5 text-primary" 
+            {/* Mic with subtle divider */}
+            <div className="flex items-center gap-2.5 pl-2 shrink-0">
+              <div className="h-6 w-[1px] bg-gray-200 dark:bg-zinc-700" />
+              <Mic
+                className="h-5 w-5 text-gray-800 dark:text-gray-200 stroke-[2] hover:text-emerald-600 active:scale-90 transition-all cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleVoiceSearchClick?.();
@@ -284,16 +340,26 @@ export default function HomeHeader({
             </div>
           </div>
 
-          {/* Veg Toggle (Stacked Pill Switch) */}
-          <div 
-            className="flex flex-col items-center justify-center cursor-pointer active:scale-95 transition-transform duration-300 shrink-0 px-2.5 bg-white dark:bg-[#1a1a1a] rounded-2xl py-1 shadow-[0_8px_24px_rgba(0,0,0,0.10)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.35)] border border-gray-200/90 dark:border-gray-800/90"
+          {/* VEG MODE Card (Matching exact reference leaf + text) */}
+          <div
+            className={`shrink-0 h-[52px] px-3.5 rounded-2xl flex items-center gap-2 cursor-pointer active:scale-95 transition-all duration-200 shadow-[0_3px_14px_rgba(0,0,0,0.06)] dark:shadow-[0_3px_14px_rgba(0,0,0,0.3)] select-none border ${
+              vegMode
+                ? 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-500/70 ring-2 ring-emerald-500/20'
+                : 'bg-white dark:bg-[#18181b] border-gray-200/90 dark:border-zinc-800/90 hover:bg-gray-50 dark:hover:bg-zinc-800'
+            }`}
             onClick={() => handleVegModeChange?.(!vegMode)}
           >
-            <div className="text-[9px] font-black leading-tight text-gray-700 dark:text-gray-200 tracking-wider text-center drop-shadow-sm">
-              VEG<br/>MODE
+            <div className="shrink-0 flex items-center justify-center">
+              <VegLeafIcon className={`w-6 h-6 transition-transform duration-300 ${vegMode ? 'scale-110 drop-shadow-[0_2px_6px_rgba(16,185,129,0.4)]' : 'opacity-90'}`} />
             </div>
-            <div className={`mt-0.5 w-[30px] h-[16px] rounded-full relative transition-colors duration-300 border border-white/20 ${vegMode ? 'bg-green-600' : 'bg-[#bcc0c5]/50'}`}>
-              <div className={`absolute top-[1px] w-[12px] h-[12px] rounded-full bg-white shadow-sm transition-transform duration-300 ${vegMode ? 'translate-x-[15px]' : 'translate-x-[1px]'}`} />
+
+            <div className="flex flex-col text-left justify-center">
+              <span className={`text-[10.5px] font-black tracking-wider leading-none ${vegMode ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-white'}`}>
+                VEG
+              </span>
+              <span className={`text-[9.5px] font-bold tracking-wider leading-none mt-0.5 ${vegMode ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                MODE
+              </span>
             </div>
           </div>
         </div>
