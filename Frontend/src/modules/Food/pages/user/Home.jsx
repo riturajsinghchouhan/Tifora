@@ -97,6 +97,7 @@ import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailabil
 import HomeHeader from "@food/components/user/home/HomeHeader";
 import HomeHeroPromo from "@food/components/user/home/HomeHeroPromo";
 import HomeExploreTiffinPlans from "@food/components/user/home/HomeExploreTiffinPlans";
+import HomeTiffinPlansMarquee from "@food/components/user/home/HomeTiffinPlansMarquee";
 import HeroBanner from "@food/components/user/home/HeroBanner";
 import RestaurantGrid from "@food/components/user/home/RestaurantGrid";
 import ExploreMoreSection from "@food/components/user/home/ExploreMoreSection";
@@ -1158,21 +1159,17 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("food");
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsCategoryStuck(!entry.isIntersecting);
-      },
-      {
-        threshold: 0,
-        rootMargin: "-72px 0px 0px 0px",
+    const handleScroll = () => {
+      if (categoryAnchorRef.current) {
+        const rect = categoryAnchorRef.current.getBoundingClientRect();
+        const headerOffset = window.innerWidth >= 768 ? 85 : 75;
+        setIsCategoryStuck(rect.top <= headerOffset);
       }
-    );
+    };
 
-    if (categoryAnchorRef.current) {
-      observer.observe(categoryAnchorRef.current);
-    }
-
-    return () => observer.disconnect();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   // Simple filter toggle function
@@ -2251,7 +2248,8 @@ export default function Home() {
           `}</style>
         </div>
 
-        <div className="md:hidden relative overflow-x-clip bg-white dark:bg-[#0a0a0a]">
+        {/* Responsive Container for Mobile & Desktop */}
+        <div className="relative w-full max-w-7xl mx-auto bg-white dark:bg-[#0a0a0a] px-3.5 sm:px-6 md:px-8 lg:px-10">
           {/* Unified Scroll Container so Sticky Search Bar works for the whole page */}
           <div className="relative z-10 w-full mb-2">
             <HomeHeader
@@ -2279,12 +2277,8 @@ export default function Home() {
 
           <AnimatePresence mode="wait">
             {activeTab === "food" ? (
-              <motion.div
+              <div
                 key="food-content"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
                 className="bg-transparent dark:bg-transparent pt-2 sm:pt-4"
               >
 
@@ -2305,6 +2299,9 @@ export default function Home() {
                   selectedCuisine={selectedCuisine}
                 />
 
+                {/* Restaurant Tiffin Plans Infinite Scrolling Marquee */}
+                <HomeTiffinPlansMarquee />
+
                 {/* Admin Hero Banners Section */}
                 <HeroBanner
                   images={heroBannerImages}
@@ -2320,11 +2317,11 @@ export default function Home() {
             className="content-auto pt-1 sm:pt-2"
             initial={false}
             animate={{ opacity: 1, y: 0 }}>
-            <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-2 sm:mb-3 px-4">
+            <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 dark:text-gray-500 tracking-widest uppercase mb-2 sm:mb-3 px-0">
               Recommended For You
             </h2>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 px-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 px-0">
               {recommendedForYouRestaurants.map((restaurant, index) => {
                 const restaurantSlug =
                   restaurant.slug ||
@@ -2390,7 +2387,7 @@ export default function Home() {
           className="content-auto space-y-0 pt-3 sm:pt-4 lg:pt-6 pb-8 md:pb-10"
         >
           {!shouldShowOutOfZoneHome && (
-            <div className="px-4 mb-3 lg:mb-4">
+            <div className="px-0 mb-3 lg:mb-4">
               <div className="flex flex-col gap-0.5 lg:gap-1">
                 <h2 className="text-xs sm:text-sm lg:text-base font-semibold text-gray-400 tracking-widest uppercase">
                   {filteredRestaurants.length} Tiffin Centers & Kitchens Near You
@@ -2530,7 +2527,7 @@ export default function Home() {
             </>
           )}
         </section>
-              </motion.div>
+              </div>
             ) : (
               <motion.div
                 key="quick-content"

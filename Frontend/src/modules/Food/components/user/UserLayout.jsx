@@ -110,6 +110,10 @@ function UserLayoutShell() {
     normalizedPath === "/user/dining" ||
     normalizedPath === "/under-250" ||
     normalizedPath === "/user/under-250" ||
+    normalizedPath === "/dietbox" ||
+    normalizedPath === "/user/dietbox" ||
+    normalizedPath === "/diet-box" ||
+    normalizedPath === "/user/diet-box" ||
     normalizedPath === "/tiffin" ||
     normalizedPath === "/user/tiffin" ||
     normalizedPath === "/orders" ||
@@ -123,10 +127,10 @@ function UserLayoutShell() {
   return (
     <>
       <div className="hidden md:block">
-        {showBottomNav && <DesktopNavbar showLogo={!isUnder250} />}
+        {showBottomNav && <DesktopNavbar showLogo={true} />}
       </div>
       <LocationGuard>
-        <main className={showBottomNav ? "md:pt-40" : ""}>
+        <main className={showBottomNav ? "md:pt-28 lg:pt-32" : ""}>
           <Outlet />
         </main>
       </LocationGuard>

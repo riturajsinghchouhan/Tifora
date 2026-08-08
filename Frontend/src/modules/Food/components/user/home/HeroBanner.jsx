@@ -142,7 +142,7 @@ export default function HeroBanner({
   if (loading) {
     return (
       <div className="px-4 py-2">
-        <HeroBannerSkeleton className="w-full aspect-[3/2] rounded-2xl" />
+        <HeroBannerSkeleton className="w-full aspect-[16/9] sm:aspect-[21/9] lg:aspect-[24/8] max-h-[280px] lg:max-h-[320px] rounded-2xl md:rounded-3xl" />
       </div>
     );
   }
@@ -154,7 +154,7 @@ export default function HeroBanner({
       <div
         ref={shellRef}
         data-home-hero-shell="true"
-        className="relative w-full aspect-[3/2] overflow-hidden rounded-2xl shadow-sm group cursor-pointer bg-white"
+        className="relative w-full aspect-[16/9] sm:aspect-[21/9] lg:aspect-[24/8] max-h-[280px] lg:max-h-[320px] overflow-hidden rounded-2xl md:rounded-3xl shadow-sm group cursor-pointer bg-white"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

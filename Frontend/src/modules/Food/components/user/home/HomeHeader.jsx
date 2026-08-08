@@ -182,8 +182,8 @@ export default function HomeHeader({
 
   return (
     <>
-      {/* Top Header Background with Warm Ambient Glow */}
-      <div id="home-header-loc-row" className="relative pt-2.5 pb-1 px-4 transition-all duration-500 overflow-hidden bg-gradient-to-b from-[#FEF5E7] via-[#FFFBF5] to-white/90 dark:from-[#1f180e] dark:via-[#13110e] dark:to-[#0a0a0a]">
+      {/* Top Header Background with Warm Ambient Glow (Mobile Only - Desktop has DesktopNavbar) */}
+      <div id="home-header-loc-row" className="md:hidden relative pt-2.5 pb-1 -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 transition-all duration-500 overflow-hidden bg-gradient-to-b from-[#FEF5E7] via-[#FFFBF5] to-white/90 dark:from-[#1f180e] dark:via-[#13110e] dark:to-[#0a0a0a]">
         {/* Subtle Decorative Ambient Glows */}
         <div className="absolute -top-10 -right-10 w-56 h-56 bg-amber-400/10 blur-[70px] rounded-full pointer-events-none" />
         <div className="absolute top-0 -left-12 w-48 h-48 bg-[#10b981]/10 blur-[80px] rounded-full pointer-events-none" />
@@ -295,10 +295,10 @@ export default function HomeHeader({
         </div>
       </div>
 
-      {/* Sticky Search Bar and VEG MODE Row */}
+      {/* Sticky Search Bar and VEG MODE Row (Mobile Only) */}
       <div
         id="home-header-search-row"
-        className={`sticky z-[60] px-4 pb-2 transition-all duration-300 ${
+        className={`md:hidden sticky z-[60] px-0 pb-2 transition-all duration-300 ${
           isCategoryStuck
             ? 'top-0 pt-2 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-2xl shadow-sm'
             : 'top-0 pt-1.5 bg-gradient-to-b from-white/90 to-transparent dark:from-[#0a0a0a]/90 dark:to-transparent'

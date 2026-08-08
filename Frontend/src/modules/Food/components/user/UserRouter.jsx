@@ -132,6 +132,8 @@ export default function UserRouter() {
             }
           />
           <Route path="under-250" element={<Under250 />} />
+          <Route path="dietbox" element={<Under250 />} />
+          <Route path="diet-box" element={<Under250 />} />
           <Route path="categories" element={<Categories />} />
           <Route path="category/:category" element={<CategoryPage />} />
           <Route path="restaurants" element={<Restaurants />} />

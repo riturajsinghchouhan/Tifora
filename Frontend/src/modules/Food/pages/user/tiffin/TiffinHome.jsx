@@ -1,167 +1,136 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, CheckCircle2, ChevronRight, UtensilsCrossed } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import api from '@food/api';
 
+import TiffinHeroBanner from './components/TiffinHeroBanner';
+import TiffinFeatureCards from './components/TiffinFeatureCards';
+import TiffinSubscriptionCard from './components/TiffinSubscriptionCard';
+
+const DEMO_TIFFIN_PLANS = [
+  {
+    _id: 'plan-1',
+    name: "Renuka's 30-Day Monthly Ghar Ka Khana Delight",
+    restaurantName: "Renuka's Kitchen",
+    mealType: 'Both',
+    durationDays: 30,
+    price: 4500,
+    isVegetarian: true,
+    itemsDescription: 'Our most popular full month meal subscription. Pure ghar jaisa swaad with rotating daily fresh vegetables.',
+    image: 'https://images.unsplash.com/photo-1613292443284-8d10ef9383fe?w=600&h=450&fit=crop&q=80',
+  },
+  {
+    _id: 'plan-2',
+    name: "Renuka's 15-Day Ghar Ka Khana Plan",
+    restaurantName: "Renuka's Kitchen",
+    mealType: 'Both',
+    durationDays: 15,
+    price: 2499,
+    isVegetarian: true,
+    itemsDescription: 'Perfect for short-term healthy eating. Fresh dal, sabzi, phulkas and jeera rice delivered twice daily.',
+    image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&h=450&fit=crop&q=80',
+  },
+  {
+    _id: 'plan-3',
+    name: 'Royal Student & Executive Weekly Meal Box',
+    restaurantName: 'Campus Rasoi Kitchen',
+    mealType: 'Morning',
+    durationDays: 7,
+    price: 999,
+    isVegetarian: true,
+    itemsDescription: 'Budget-friendly weekly meal with wholesome 4 chapatis, seasonal veg curry, dal tadka & salad.',
+    image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&h=450&fit=crop&q=80',
+  },
+];
+
 export default function TiffinHome() {
-    const navigate = useNavigate();
-    const [plans, setPlans] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchPlans = async () => {
-            try {
-                const res = await api.get('/user/tiffin/plans/available').catch(() => null);
-                if (res?.data?.success) {
-                    setPlans(res.data.data);
-                } else {
-                    // Fallback demo plans
-                    setPlans([
-                        {
-                            _id: 'plan-1',
-                            name: 'Homestyle North Indian Tiffin',
-                            restaurantName: 'Annapurna Rasoi',
-                            mealType: 'Both',
-                            durationDays: 30,
-                            price: 4500,
-                            isVegetarian: true,
-                            itemsDescription: '4 Butter Rotis, Dal Tadka, Seasonal Sabzi, Jeera Rice, Salad, Pickle'
-                        },
-                        {
-                            _id: 'plan-2',
-                            name: 'Weekly Student Budget Meal',
-                            restaurantName: 'Campus Dabbawala',
-                            mealType: 'Morning',
-                            durationDays: 7,
-                            price: 899,
-                            isVegetarian: true,
-                            itemsDescription: '3 Phulkas, Paneer/Veg Curry, Rice, Raita'
-                        },
-                        {
-                            _id: 'plan-3',
-                            name: 'Executive Deluxe Meal Box',
-                            restaurantName: 'Royal Spoon Kitchen',
-                            mealType: 'Both',
-                            durationDays: 15,
-                            price: 2999,
-                            isVegetarian: false,
-                            itemsDescription: 'Special Gravy (Chicken/Paneer), 4 Chapatis, Pulao, Sweet of the Day'
-                        }
-                    ]);
-                }
-            } catch (err) {
-                console.error('Error fetching tiffin plans', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchPlans();
-    }, []);
+  useEffect(() => {
+    let isCancelled = false;
+    const fetchPlans = async () => {
+      try {
+        const res = await api.get('/user/tiffin/plans/available').catch(() => null);
+        if (isCancelled) return;
+        if (res?.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
+          setPlans(res.data.data);
+        } else {
+          setPlans(DEMO_TIFFIN_PLANS);
+        }
+      } catch (err) {
+        console.error('Error fetching tiffin plans', err);
+        if (!isCancelled) {
+          setPlans(DEMO_TIFFIN_PLANS);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+    fetchPlans();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
-    return (
-        <div className="min-h-screen bg-gray-50 pb-24">
-            {/* Hero Header */}
-            <div className="bg-gradient-to-r from-[#088c64] via-[#0cb884] to-[#20d49f] text-white px-4 sm:px-6 py-8 rounded-b-3xl shadow-lg shadow-[#0cb884]/20">
-                <div className="max-w-5xl mx-auto">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                            Daily Meal Subscriptions
-                        </span>
-                        <button 
-                            onClick={() => navigate('/food/user/tiffin/my-subscriptions')}
-                            className="text-xs bg-white text-[#0cb884] font-bold px-3.5 py-1.5 rounded-full shadow-sm hover:bg-[#0cb884]/10 transition active:scale-95"
-                        >
-                            My Plans
-                        </button>
-                    </div>
-                    <h1 className="text-2xl sm:text-3xl font-black mt-2">Homestyle Tiffin Service</h1>
-                    <p className="text-white/90 text-xs sm:text-sm mt-1">Freshly cooked meals delivered to your door every morning (11 AM) & evening (7 PM).</p>
-                </div>
+  return (
+    <div className="min-h-screen bg-white dark:bg-[#0a0a0a] pb-24 text-gray-900 dark:text-gray-100">
+      {/* Main Container with Standardized Left & Right Margins */}
+      <div className="relative w-full max-w-7xl mx-auto px-3.5 sm:px-6 md:px-8 lg:px-10 py-3 sm:py-5">
+        
+        {/* 1. Luxury Dark Emerald Hero Banner */}
+        <TiffinHeroBanner />
+
+        {/* 2. Three Pastel Feature Cards */}
+        <TiffinFeatureCards />
+
+        {/* 3. Available Subscription Plans Section */}
+        <div className="w-full mt-6 sm:mt-8 space-y-4 sm:space-y-6">
+          {/* Section Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-gray-950 dark:text-white tracking-tight">
+                Available Subscription Plans
+              </h2>
+              {/* Accent Underline Bar matching screenshot */}
+              <div className="w-10 h-1 bg-[#b87c26] rounded-full mt-1.5" />
             </div>
 
-            {/* Why Tiffin Highlight */}
-            <div className="max-w-5xl mx-auto px-4 mt-6 mb-8">
-                <div className="grid grid-cols-3 gap-3 sm:gap-6">
-                    <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-center">
-                        <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-[#0cb884] mx-auto mb-1.5" />
-                        <p className="text-xs sm:text-sm font-bold text-gray-800">Fixed Timings</p>
-                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">11 AM & 7 PM</p>
-                    </div>
-                    <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-center">
-                        <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-[#0cb884] mx-auto mb-1.5" />
-                        <p className="text-xs sm:text-sm font-bold text-gray-800">Flexible Plans</p>
-                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">Pause anytime</p>
-                    </div>
-                    <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-center">
-                        <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 text-[#0cb884] mx-auto mb-1.5" />
-                        <p className="text-xs sm:text-sm font-bold text-gray-800">Zero Surge</p>
-                        <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">Flat pricing</p>
-                    </div>
-                </div>
+            {/* View All Button */}
+            <Link
+              to="/food/user/tiffin"
+              className="flex items-center gap-1 text-xs sm:text-sm font-bold text-gray-700 dark:text-gray-300 hover:text-[#009b67] dark:hover:text-[#00b87c] transition-colors"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+            </Link>
+          </div>
+
+          {/* Cards List */}
+          {loading ? (
+            <div className="space-y-4 py-6">
+              {[1, 2].map((n) => (
+                <div
+                  key={n}
+                  className="w-full h-48 rounded-[24px] bg-gray-100 dark:bg-zinc-900 animate-pulse"
+                />
+              ))}
             </div>
-
-            {/* Plan List */}
-            <div className="max-w-5xl mx-auto px-4 space-y-4">
-                <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">Available Subscription Plans</h2>
-
-                {loading ? (
-                    <div className="flex justify-center p-10">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0cb884]"></div>
-                    </div>
-                ) : (
-                    plans.map((plan) => (
-                        <div
-                            key={plan._id}
-                            onClick={() => navigate(`/food/user/tiffin/plan/${plan._id}`, { state: { plan } })}
-                            className="bg-white rounded-3xl p-4 sm:p-5 border border-gray-200 shadow-sm hover:border-[#0cb884] hover:shadow-md transition-all cursor-pointer active:scale-[0.99] group"
-                        >
-                            <div className="flex flex-col sm:flex-row gap-4 items-start">
-                                <div className="w-full sm:w-28 h-36 sm:h-28 rounded-2xl overflow-hidden bg-gray-900 shrink-0 relative shadow-sm">
-                                    <img
-                                        src={plan.image || '/food/tiffin/tiffin_box_default.png'}
-                                        alt={plan.name}
-                                        onError={(e) => {
-                                            e.target.src = '/food/tiffin/tiffin_box_default.png';
-                                        }}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    />
-                                    <span className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-sm ${
-                                        plan.isVegetarian ? 'bg-green-600' : 'bg-red-600'
-                                    }`}>
-                                        {plan.isVegetarian ? 'Pure Veg' : 'Non-Veg'}
-                                    </span>
-                                </div>
-
-                                <div className="flex-1 w-full">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <span className="text-xs font-semibold text-gray-500">{plan.restaurantId?.restaurantName || plan.restaurantId?.name || plan.restaurantName || "Renuka's Kitchen"}</span>
-                                            <h3 className="font-bold text-gray-900 text-base group-hover:text-[#0cb884] transition-colors">{plan.name}</h3>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-xl font-black text-gray-900">₹{plan.price}</span>
-                                            <p className="text-xs text-gray-500">/{plan.durationDays} Days</p>
-                                        </div>
-                                    </div>
-
-                                    <p className="text-xs text-gray-600 mt-2 bg-gray-50 p-2.5 rounded-xl border border-gray-100 line-clamp-2">
-                                        {plan.itemsDescription}
-                                    </p>
-
-                                    <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-gray-100">
-                                        <span className="text-xs font-bold text-[#0cb884] bg-[#0cb884]/10 px-2.5 py-1 rounded-lg">
-                                            {plan.mealType === 'Both' ? 'Morning (11 AM) & Evening (7 PM)' : `${plan.mealType} Only`}
-                                        </span>
-                                        <span className="text-xs font-bold text-gray-700 flex items-center gap-1 group-hover:text-[#0cb884] transition-colors">
-                                            View Details <ChevronRight className="w-4 h-4" />
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))
-                )}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {plans.map((plan, index) => (
+                <TiffinSubscriptionCard
+                  key={plan._id || index}
+                  plan={plan}
+                  index={index}
+                />
+              ))}
             </div>
+          )}
         </div>
-    );
+      </div>
+    </div>
+  );
 }

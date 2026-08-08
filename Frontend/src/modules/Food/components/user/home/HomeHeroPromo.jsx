@@ -8,7 +8,7 @@ import hotelCardBg from "@food/assets/hotel-booking-card-bg.png";
 export default function HomeHeroPromo({
   activeBanners = [],
   currentBannerIndex = 0,
-  handlePromoBannerClick
+  handlePromoBannerClick,
 }) {
   const navigate = useNavigate();
 
@@ -17,11 +17,14 @@ export default function HomeHeroPromo({
   const bannerImage = currentBanner?.imageUrl || homelyMealsBanner;
 
   return (
-    <div id="tiffin-banner-wrapper" className="px-4 mt-2 mb-1.5 space-y-2.5">
-      {/* 1. Homely Meals Promotional Banner */}
-      <div className="w-full">
+    <div
+      id="tiffin-banner-wrapper"
+      className="mt-2 mb-2 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4"
+    >
+      {/* 1. Homely Meals Promotional Banner (Full width on mobile, 8 cols on desktop) */}
+      <div className="w-full lg:col-span-8">
         <div
-          className="relative w-full h-[155px] sm:h-[180px] rounded-[22px] overflow-hidden shadow-[0_6px_20px_rgba(0,0,0,0.16)] cursor-pointer group bg-[#121212]"
+          className="relative w-full h-[160px] sm:h-[190px] md:h-[230px] lg:h-[250px] rounded-[22px] overflow-hidden shadow-[0_6px_20px_rgba(0,0,0,0.16)] cursor-pointer group bg-[#121212]"
           onClick={() => {
             if (currentBanner && handlePromoBannerClick) {
               handlePromoBannerClick(currentBanner);
@@ -54,13 +57,15 @@ export default function HomeHeroPromo({
               <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent pointer-events-none" />
 
               {/* Banner Left Content Overlay */}
-              <div className="absolute inset-y-0 left-0 flex flex-col justify-center pl-4 sm:pl-6 pr-4 z-10 text-white max-w-[68%] sm:max-w-[55%]">
-                <h2 className="text-[17px] sm:text-[21px] font-black leading-[1.15] tracking-tight drop-shadow-md">
-                  Homely Meals<br />
-                  Delivered <span className="text-[#22c55e] italic font-serif">Fresh</span>
+              <div className="absolute inset-y-0 left-0 flex flex-col justify-center pl-4 sm:pl-7 lg:pl-9 pr-4 z-10 text-white max-w-[68%] sm:max-w-[55%]">
+                <h2 className="text-[17px] sm:text-[22px] lg:text-[26px] font-black leading-[1.15] tracking-tight drop-shadow-md">
+                  Homely Meals
+                  <br />
+                  Delivered{" "}
+                  <span className="text-[#22c55e] italic font-serif">Fresh</span>
                 </h2>
 
-                <p className="text-[11px] sm:text-[12px] text-gray-200/95 font-medium leading-snug drop-shadow-sm mt-0.5">
+                <p className="text-[11px] sm:text-[13px] text-gray-200/95 font-medium leading-snug drop-shadow-sm mt-0.5 sm:mt-1">
                   Healthy. Hygienic. Delicious.
                 </p>
 
@@ -71,11 +76,11 @@ export default function HomeHeroPromo({
                       e.stopPropagation();
                       navigate("/food/user/tiffin");
                     }}
-                    className="mt-2.5 px-3 py-1 sm:px-3.5 sm:py-1.5 bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold text-[11px] sm:text-[12px] rounded-full shadow-[0_4px_10px_rgba(34,197,94,0.35)] flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                    className="mt-2.5 sm:mt-3 px-3 py-1 sm:px-4 sm:py-1.5 bg-[#22c55e] hover:bg-[#16a34a] text-white font-bold text-[11px] sm:text-[13px] rounded-full shadow-[0_4px_10px_rgba(34,197,94,0.35)] flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
                   >
                     <span>Order Now</span>
-                    <div className="w-3.5 h-3.5 rounded-full bg-white/20 border border-white/60 flex items-center justify-center">
-                      <ChevronRight className="w-2.5 h-2.5 text-white stroke-[3.5]" />
+                    <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-white/20 border border-white/60 flex items-center justify-center">
+                      <ChevronRight className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-white stroke-[3.5]" />
                     </div>
                   </button>
                 </div>
@@ -87,7 +92,12 @@ export default function HomeHeroPromo({
           <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
             <motion.div
               animate={{ x: ["-200%", "200%"] }}
-              transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 4, ease: "easeInOut" }}
+              transition={{
+                duration: 3.5,
+                repeat: Infinity,
+                repeatDelay: 4,
+                ease: "easeInOut",
+              }}
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-[-20deg] w-[150%] h-full"
             />
           </div>
@@ -102,29 +112,25 @@ export default function HomeHeroPromo({
         </div>
       </div>
 
-      {/* 2. Two-Column Dark Service Cards with User Images */}
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5">
-        {/* Left Column Card: Tiffin Services */}
+      {/* 2. Service Cards (2 Columns on mobile, Stacked 4-cols on desktop) */}
+      <div className="grid grid-cols-2 lg:grid-cols-1 lg:col-span-4 gap-2.5 sm:gap-3.5 lg:h-[250px]">
+        {/* Card 1: Tiffin Services */}
         <Link
           to="/food/user/tiffin"
-          className="group relative flex flex-col justify-between h-[118px] sm:h-[130px] rounded-[20px] overflow-hidden p-3 sm:p-3.5 bg-gray-950 border border-white/15 shadow-[0_6px_20px_rgba(0,0,0,0.25)] hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
+          className="group relative flex flex-col justify-between h-[118px] sm:h-[135px] lg:h-[118px] rounded-[20px] overflow-hidden p-3 sm:p-3.5 bg-gray-950 border border-white/15 shadow-[0_6px_20px_rgba(0,0,0,0.25)] hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
         >
-          {/* Card Background Image */}
           <img
             src={tiffinCardBg}
             alt="Tiffin Services"
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 pointer-events-none"
           />
 
-          {/* Subtle Emerald Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-emerald-950/20 pointer-events-none" />
 
-          {/* Top-Left Rounded Icon Badge */}
           <div className="relative z-10 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/95 dark:bg-black/80 backdrop-blur-md shadow-md flex items-center justify-center p-2 border border-white/30 group-hover:scale-105 transition-transform">
             <UtensilsCrossed className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#009b67] stroke-[2.4]" />
           </div>
 
-          {/* Bottom Titles & Action Arrow */}
           <div className="relative z-10 flex items-end justify-between">
             <div className="min-w-0 pr-1.5">
               <h3 className="text-[13.5px] sm:text-[15px] font-black text-white leading-tight tracking-tight drop-shadow-md">
@@ -135,34 +141,29 @@ export default function HomeHeroPromo({
               </p>
             </div>
 
-            {/* Bottom-Right Arrow Circle */}
             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/95 backdrop-blur-md shadow-md flex items-center justify-center text-[#007a51] shrink-0 group-hover:translate-x-0.5 transition-transform">
               <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
             </div>
           </div>
         </Link>
 
-        {/* Right Column Card: Hotel Booking */}
+        {/* Card 2: Hotel Booking */}
         <Link
           to="/food/user/hotel"
-          className="group relative flex flex-col justify-between h-[118px] sm:h-[130px] rounded-[20px] overflow-hidden p-3 sm:p-3.5 bg-gray-950 border border-white/15 shadow-[0_6px_20px_rgba(0,0,0,0.25)] hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
+          className="group relative flex flex-col justify-between h-[118px] sm:h-[135px] lg:h-[118px] rounded-[20px] overflow-hidden p-3 sm:p-3.5 bg-gray-950 border border-white/15 shadow-[0_6px_20px_rgba(0,0,0,0.25)] hover:shadow-xl transition-all duration-300 active:scale-[0.98]"
         >
-          {/* Card Background Image */}
           <img
             src={hotelCardBg}
             alt="Hotel Booking"
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 pointer-events-none"
           />
 
-          {/* Subtle Royal Blue Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-blue-950/20 pointer-events-none" />
 
-          {/* Top-Left Rounded Icon Badge */}
           <div className="relative z-10 w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/95 dark:bg-black/80 backdrop-blur-md shadow-md flex items-center justify-center p-2 border border-white/30 group-hover:scale-105 transition-transform">
             <Building2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-[#2563eb] stroke-[2.4]" />
           </div>
 
-          {/* Bottom Titles & Action Arrow */}
           <div className="relative z-10 flex items-end justify-between">
             <div className="min-w-0 pr-1.5">
               <h3 className="text-[13.5px] sm:text-[15px] font-black text-white leading-tight tracking-tight drop-shadow-md">
@@ -173,7 +174,6 @@ export default function HomeHeroPromo({
               </p>
             </div>
 
-            {/* Bottom-Right Arrow Circle */}
             <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white/95 backdrop-blur-md shadow-md flex items-center justify-center text-[#1d4ed8] shrink-0 group-hover:translate-x-0.5 transition-transform">
               <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
             </div>
