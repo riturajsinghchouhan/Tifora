@@ -243,10 +243,11 @@ export async function createRestaurantCategory(restaurantId, body = {}) {
         sortOrder: Number.isFinite(Number(body.sortOrder)) ? Number(body.sortOrder) : 0,
         restaurantId: context.restaurantId,
         createdByRestaurantId: context.restaurantId,
-        approvalStatus: 'pending',
-        isApproved: false,
+        approvalStatus: 'approved',
+        isApproved: true,
         rejectionReason: '',
         requestedAt: new Date(),
+        approvedAt: new Date(),
         zoneId: context.zoneId && mongoose.Types.ObjectId.isValid(context.zoneId)
             ? new mongoose.Types.ObjectId(context.zoneId)
             : undefined
@@ -298,12 +299,7 @@ export async function updateRestaurantCategory(restaurantId, id, body = {}) {
     }
 
     doc.createdByRestaurantId = doc.createdByRestaurantId || context.restaurantId;
-    doc.approvalStatus = 'pending';
-    doc.isApproved = false;
     doc.rejectionReason = '';
-    doc.requestedAt = new Date();
-    doc.approvedAt = undefined;
-    doc.rejectedAt = undefined;
 
     await doc.save();
     return doc.toObject();

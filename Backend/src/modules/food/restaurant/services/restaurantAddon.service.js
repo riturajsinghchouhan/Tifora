@@ -100,40 +100,26 @@ export async function createRestaurantAddon(restaurantId, body) {
         throw new ValidationError('Add-on already exists');
     }
 
+    const draftData = {
+        name,
+        description: String(body.description || '').trim(),
+        price: Number(body.price) || 0,
+        image: String(body.image || '').trim(),
+        images: Array.isArray(body.images) ? body.images.filter(Boolean).slice(0, 10) : []
+    };
+
     const doc = await FoodAddon.create({
         restaurantId: rid,
-        draft: {
-            name,
-            description: String(body.description || '').trim(),
-            price: Number(body.price) || 0,
-            image: String(body.image || '').trim(),
-            images: Array.isArray(body.images) ? body.images.filter(Boolean).slice(0, 10) : []
-        },
-        published: null,
-        approvalStatus: 'pending',
+        draft: draftData,
+        published: draftData,
+        approvalStatus: 'approved',
         rejectionReason: '',
         requestedAt: new Date(),
-        approvedAt: null,
+        approvedAt: new Date(),
         rejectedAt: null,
         isAvailable: true,
         isDeleted: false
     });
-
-    try {
-        const { notifyAdminsSafely } = await import('../../../../core/notifications/firebase.service.js');
-        void notifyAdminsSafely({
-            title: 'New Addon Approval Request 🍟',
-            body: `Restaurant has submitted a new addon "${name}" for approval.`,
-            data: {
-                type: 'approval_request',
-                subType: 'addon',
-                id: String(doc._id)
-            }
-        });
-    } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to notify admins of new addon approval request:', e);
-    }
 
     return normalizeAddonDoc(doc.toObject());
 }
@@ -187,12 +173,14 @@ export async function updateRestaurantAddon(restaurantId, addonId, updateDto) {
             set['draft.images'] = imgs;
         }
 
-        // Any draft content change must go through admin approval again.
-        set.approvalStatus = 'pending';
+        // Auto-approve and publish edits immediately
+        if (set['draft.name'] !== undefined) set['published.name'] = set['draft.name'];
+        if (set['draft.description'] !== undefined) set['published.description'] = set['draft.description'];
+        if (set['draft.price'] !== undefined) set['published.price'] = set['draft.price'];
+        if (set['draft.image'] !== undefined) set['published.image'] = set['draft.image'];
+        if (set['draft.images'] !== undefined) set['published.images'] = set['draft.images'];
+
         set.rejectionReason = '';
-        set.requestedAt = new Date();
-        set.approvedAt = null;
-        set.rejectedAt = null;
     }
 
     if (Object.keys(set).length === 0) {
