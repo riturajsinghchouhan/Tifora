@@ -1,5 +1,21 @@
 const MONGO_ID_RE = /^[a-f0-9]{24}$/i;
 
+function coerceTimestamp(value) {
+  if (value == null || value === '') return 0;
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue) && numericValue > 0) {
+    return numericValue;
+  }
+
+  const parsedValue = Date.parse(value);
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+}
+
 /**
  * Canonical MongoDB id for accept API + lock comparisons.
  * Prefers orderMongoId / _id over display order_id.
@@ -65,6 +81,48 @@ export function getOrderAlertKey(order = {}) {
   return getOrderMongoId(order) || getOrderDisplayId(order);
 }
 
+export function getIncomingOrderOfferTimestamp(order) {
+  if (!order) return 0;
+
+  const candidates = [
+    order.offeredAt,
+    order.offerAt,
+    order.last_updated,
+    order.lastUpdated,
+    order.recoveredAt,
+    order.createdAt,
+    order.updatedAt,
+    order.dispatch?.assignedAt,
+  ];
+
+  for (const candidate of candidates) {
+    const ts = coerceTimestamp(candidate);
+    if (ts > 0) return ts;
+  }
+
+  return 0;
+}
+
+export function sortIncomingOrders(queue) {
+  const list = Array.isArray(queue) ? queue : [];
+
+  return list
+    .map((item, index) => ({
+      item,
+      index,
+      offeredAt: getIncomingOrderOfferTimestamp(item),
+    }))
+    .sort((a, b) => {
+      if (a.offeredAt > 0 && b.offeredAt > 0 && a.offeredAt !== b.offeredAt) {
+        return a.offeredAt - b.offeredAt;
+      }
+      if (a.offeredAt > 0 && b.offeredAt <= 0) return -1;
+      if (a.offeredAt <= 0 && b.offeredAt > 0) return 1;
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
 export function upsertIncomingOrderInQueue(queue, order) {
   const normalized = normalizeIncomingOrder(order);
   if (!normalized) return Array.isArray(queue) ? queue : [];
@@ -72,11 +130,11 @@ export function upsertIncomingOrderInQueue(queue, order) {
   const list = Array.isArray(queue) ? queue : [];
   const exists = list.some((item) => isSameOrder(item, normalized));
   if (exists) {
-    return list.map((item) =>
+    return sortIncomingOrders(list.map((item) =>
       isSameOrder(item, normalized) ? { ...item, ...normalized } : item,
-    );
+    ));
   }
-  return [...list, normalized];
+  return sortIncomingOrders([...list, normalized]);
 }
 
 export function removeIncomingOrderFromQueue(queue, orderRef) {

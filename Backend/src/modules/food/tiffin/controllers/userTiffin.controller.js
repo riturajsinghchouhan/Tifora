@@ -1,6 +1,6 @@
 import { TiffinPlan } from '../models/tiffinPlan.model.js';
 import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
-import { generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
+import { ensureSubscriptionDeliveriesForDate, generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
 import mongoose from 'mongoose';
 
 const getUserId = (req) => {
@@ -61,7 +61,7 @@ export const purchaseSubscription = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized: User not authenticated' });
         }
 
-        const { restaurantId, planId, startDate, deliveryAddress, paymentId, amountPaid, paymentMethod } = req.body;
+        const { planId, startDate, deliveryAddress, paymentId, paymentMethod } = req.body;
 
         const plan = await TiffinPlan.findById(planId);
         if (!plan || !plan.isActive) {
@@ -72,7 +72,7 @@ export const purchaseSubscription = async (req, res) => {
         const end = new Date(start);
         end.setDate(end.getDate() + plan.durationDays);
 
-        const amountToPay = amountPaid || plan.price;
+        const amountToPay = Number(plan.price || 0);
         const normalizedAddress = normalizeAddressCoords(deliveryAddress);
 
         // If Razorpay, just create order and return to frontend
@@ -88,7 +88,7 @@ export const purchaseSubscription = async (req, res) => {
                     currency: 'INR'
                 },
                 subscriptionTemp: {
-                    restaurantId: restaurantId || plan.restaurantId,
+                    restaurantId: plan.restaurantId,
                     planId,
                     startDate: start,
                     endDate: end,
@@ -101,7 +101,7 @@ export const purchaseSubscription = async (req, res) => {
         // For non-razorpay (e.g. wallet/offline)
         const newSubscription = new TiffinSubscription({
             userId,
-            restaurantId: restaurantId || plan.restaurantId,
+            restaurantId: plan.restaurantId,
             planId,
             startDate: start,
             endDate: end,
@@ -112,7 +112,8 @@ export const purchaseSubscription = async (req, res) => {
         });
 
         await newSubscription.save();
-        await generateInitialDeliveries(newSubscription, plan, start);
+        const createdDeliveries = await generateInitialDeliveries(newSubscription, plan, start);
+        await emitRestaurantSubscriptionUpdate(newSubscription, createdDeliveries);
 
         res.status(201).json({ success: true, data: newSubscription, message: 'Subscription purchased successfully' });
     } catch (error) {
@@ -142,27 +143,20 @@ export const verifyTiffinPayment = async (req, res) => {
 
         const newSubscription = new TiffinSubscription({
             userId,
-            restaurantId: subscriptionTemp.restaurantId,
+            restaurantId: plan.restaurantId,
             planId: subscriptionTemp.planId,
             startDate: subscriptionTemp.startDate,
             endDate: subscriptionTemp.endDate,
             deliveryAddress: normalizeAddressCoords(subscriptionTemp.deliveryAddress),
             paymentId: null, // Could link to a transaction doc if needed
             paymentStatus: 'paid',
-            amountPaid: subscriptionTemp.amountPaid,
+            amountPaid: Number(plan.price || 0),
             status: 'active'
         });
 
         await newSubscription.save();
-        await generateInitialDeliveries(newSubscription, plan, new Date(subscriptionTemp.startDate));
-
-        try {
-            const io = getIO();
-            const room = rooms.restaurant(subscriptionTemp.restaurantId);
-            io.to(room).emit('new-tiffin-subscription', { subscription: newSubscription });
-        } catch (err) {
-            console.error('Failed to emit socket:', err);
-        }
+        const createdDeliveries = await generateInitialDeliveries(newSubscription, plan, new Date(subscriptionTemp.startDate));
+        await emitRestaurantSubscriptionUpdate(newSubscription, createdDeliveries);
 
         res.status(200).json({ success: true, message: 'Payment verified and subscription activated', data: newSubscription });
     } catch (error) {
@@ -179,23 +173,38 @@ async function generateInitialDeliveries(newSubscription, plan, start) {
 
     if (startCheck.getTime() <= today.getTime()) {
         try {
-            const { TiffinDelivery } = await import('../models/tiffinDelivery.model.js');
-            const mealTypes = plan.mealType === 'Both' ? ['Morning', 'Evening'] : [plan.mealType];
-            
-            for (const type of mealTypes) {
-                await TiffinDelivery.create({
-                    subscriptionId: newSubscription._id,
-                    restaurantId: newSubscription.restaurantId,
-                    userId: newSubscription.userId,
-                    deliveryAddress: newSubscription.deliveryAddress,
-                    type,
-                    date: today,
-                    status: 'pending'
-                });
-            }
+            return await ensureSubscriptionDeliveriesForDate(newSubscription, today, plan);
         } catch (err) {
             console.error('Failed to generate initial tiffin deliveries:', err);
         }
+    }
+
+    return 0;
+}
+
+async function emitRestaurantSubscriptionUpdate(subscription, createdDeliveries = 0) {
+    try {
+        const io = getIO();
+        if (!io) return;
+
+        const restaurantRoom = rooms.restaurant(subscription.restaurantId);
+        const payload = {
+            subscription,
+            createdDeliveries,
+            restaurantId: String(subscription.restaurantId),
+            timestamp: new Date().toISOString()
+        };
+
+        io.to(restaurantRoom).emit('new-tiffin-subscription', payload);
+        io.to(restaurantRoom).emit('tiffin_dispatch_updated', {
+            restaurantId: String(subscription.restaurantId),
+            subscriptionId: String(subscription._id),
+            createdDeliveries,
+            reason: 'subscription_created',
+            timestamp: payload.timestamp
+        });
+    } catch (err) {
+        console.error('Failed to emit tiffin subscription update:', err);
     }
 }
 

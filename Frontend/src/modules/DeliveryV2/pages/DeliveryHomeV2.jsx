@@ -874,8 +874,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     });
   }, [incomingOrder, isModalMinimized, incomingOrders.length, selectedIncomingId]);
 
-  const dismissCurrentIncomingOrder = useCallback(() => {
-    if (!incomingOrder) {
+  const dismissCurrentIncomingOrder = useCallback((orderToDismiss = incomingOrder) => {
+    if (!orderToDismiss) {
       setIncomingOrders([]);
       setSelectedIncomingId(null);
       lockedIncomingOrderIdRef.current = null;
@@ -884,7 +884,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     }
 
     setIncomingOrders((prev) => {
-      const next = removeIncomingOrderFromQueue(prev, incomingOrder);
+      const next = removeIncomingOrderFromQueue(prev, orderToDismiss);
       syncSelectionAfterQueueChange(next);
       return next;
     });
@@ -931,7 +931,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
         toast.info('One of your queued orders was taken.', { duration: 3000 });
       }
 
-      clearNewOrder();
+      if (wasVisible || !incomingOrder) {
+        clearNewOrder();
+      }
     },
     [incomingOrder, incomingOrders, syncSelectionAfterQueueChange, clearNewOrder],
   );
@@ -1884,12 +1886,12 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                <div className="flex flex-col items-start gap-0.5">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
                     {incomingOrders.length > 1
-                      ? `${incomingOrders.length} orders waiting`
+                      ? `1 live + ${incomingOrders.length - 1} more`
                       : 'Order Action Pending'}
                   </span>
                   <span className="text-xs font-bold uppercase tracking-wider">
                     {incomingOrders.length > 1
-                      ? 'Tap to choose and accept'
+                      ? 'Tap to switch pending offers'
                       : 'Tap to open delivery panel'}
                   </span>
                </div>

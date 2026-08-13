@@ -2,10 +2,20 @@ import { TiffinPlan } from '../models/tiffinPlan.model.js';
 import { TiffinDelivery } from '../models/tiffinDelivery.model.js';
 import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
 import { generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
+import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import mongoose from 'mongoose';
 
 const getRestaurantId = (req) => {
-    return req.query.restaurantId || req.headers['x-restaurant-id'] || req.user?.restaurantId || req.user?.userId || req.user?._id || '6a6e2741189263f779c76706';
+    const authenticatedRestaurantId = req.user?.restaurantId || req.user?.userId || req.user?._id;
+    if (authenticatedRestaurantId) {
+        return authenticatedRestaurantId;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        return req.query.restaurantId || req.headers['x-restaurant-id'] || '6a6e2741189263f779c76706';
+    }
+
+    return null;
 };
 
 export const createTiffinPlan = async (req, res) => {
@@ -200,21 +210,12 @@ export const getUnassignedDeliveries = async (req, res) => {
         // Also fetch active delivery partners in the restaurant's zone if available
         let partners = [];
         try {
-            const FoodDeliveryPartner = mongoose.model('FoodDeliveryPartner');
             partners = await FoodDeliveryPartner.find({
-                $or: [{ status: 'approved' }, { isOnline: true }, { isActive: true }]
-            }).select('_id name phone vehicleType currentZone avatar isOnline').lean();
+                status: 'approved',
+                availabilityStatus: 'online'
+            }).select('_id name phone vehicleType vehicleName vehicleNumber availabilityStatus').lean();
         } catch (e) {
-            console.log('No FoodDeliveryPartner model or collection found');
-        }
-
-        // Fallback default partner if empty in dev
-        if (partners.length === 0) {
-            partners = [
-                { _id: 'partner_rahul_01', name: 'Rahul Sharma', phone: '9826012345', vehicleType: 'Honda Activa (MP09-AB-1234)', currentZone: 'Silicon City Zone', isOnline: true },
-                { _id: 'partner_amit_02', name: 'Amit Verma', phone: '9893054321', vehicleType: 'Hero Splendor (MP09-XY-5678)', currentZone: 'Vijay Nagar Zone', isOnline: true },
-                { _id: 'partner_deepak_03', name: 'Deepak Patel', phone: '9754088990', vehicleType: 'Bajaj Pulsar (MP09-CD-9012)', currentZone: 'Bhawarkua Zone', isOnline: true }
-            ];
+            console.log('Error loading FoodDeliveryPartner records:', e.message);
         }
 
         // Compute zones summary and ensure each delivery has resolved zone information
@@ -289,29 +290,61 @@ export const assignDeliveriesToPartner = async (req, res) => {
         const restaurantId = getRestaurantId(req);
         const { deliveryIds, partnerId } = req.body;
 
+        if (!restaurantId || !mongoose.isValidObjectId(restaurantId)) {
+            return res.status(401).json({ success: false, message: 'Unauthorized restaurant context' });
+        }
+
         if (!deliveryIds || !Array.isArray(deliveryIds) || deliveryIds.length === 0) {
             return res.status(400).json({ success: false, message: 'No deliveries selected' });
         }
 
-        if (!partnerId) {
-            return res.status(400).json({ success: false, message: 'Delivery Partner ID is required' });
+        if (!partnerId || !mongoose.isValidObjectId(partnerId)) {
+            return res.status(400).json({ success: false, message: 'A valid delivery partner is required' });
+        }
+
+        const restaurantObjectId = new mongoose.Types.ObjectId(restaurantId);
+        const normalizedDeliveryIds = [...new Set(deliveryIds)]
+            .filter((id) => mongoose.isValidObjectId(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+
+        if (normalizedDeliveryIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid deliveries selected' });
+        }
+
+        const partner = await FoodDeliveryPartner.findOne({
+            _id: new mongoose.Types.ObjectId(partnerId),
+            status: 'approved',
+            availabilityStatus: 'online'
+        }).select('_id name phone vehicleType vehicleName vehicleNumber');
+
+        if (!partner) {
+            return res.status(400).json({
+                success: false,
+                message: 'Selected rider is not available for dispatch right now'
+            });
         }
 
         const filter = {
-            _id: { $in: deliveryIds.map(id => mongoose.isValidObjectId(id) ? new mongoose.Types.ObjectId(id) : id) }
+            _id: { $in: normalizedDeliveryIds },
+            restaurantId: restaurantObjectId,
+            status: { $in: ['pending', 'unassigned'] }
         };
-        if (mongoose.isValidObjectId(restaurantId)) {
-            filter.restaurantId = new mongoose.Types.ObjectId(restaurantId);
-        }
 
-        const isRealPartnerObjId = mongoose.isValidObjectId(partnerId);
+        const deliveriesToAssign = await TiffinDelivery.find(filter).select('_id userId type date restaurantId subscriptionId');
+
+        if (deliveriesToAssign.length !== normalizedDeliveryIds.length) {
+            return res.status(409).json({
+                success: false,
+                message: 'Some selected tiffins are no longer pending or do not belong to your restaurant'
+            });
+        }
 
         const result = await TiffinDelivery.updateMany(
             filter,
             {
                 $set: {
                     status: 'assigned',
-                    ...(isRealPartnerObjId ? { assignedTo: new mongoose.Types.ObjectId(partnerId) } : {}),
+                    assignedTo: partner._id,
                     assignedAt: new Date()
                 }
             }
@@ -322,7 +355,7 @@ export const assignDeliveriesToPartner = async (req, res) => {
             const { getIO, rooms } = await import('../../../../config/socket.js');
             const io = getIO();
             if (io) {
-                const assignedDeliveries = await TiffinDelivery.find(filter)
+                const assignedDeliveries = await TiffinDelivery.find({ _id: { $in: deliveriesToAssign.map((delivery) => delivery._id) } })
                     .populate('restaurantId', 'name profileImage logo address')
                     .populate('assignedTo', 'name phone profileImage vehicleType')
                     .populate({
@@ -355,6 +388,15 @@ export const assignDeliveriesToPartner = async (req, res) => {
                         console.log(`📡 [Socket] Emitted tiffin_delivery_assigned to user room: ${userRoom}`);
                     }
                 }
+
+                io.to(rooms.restaurant(restaurantId.toString())).emit('tiffin_dispatch_updated', {
+                    restaurantId: restaurantId.toString(),
+                    partnerId: partner._id.toString(),
+                    partnerName: partner.name,
+                    deliveryIds: deliveriesToAssign.map((delivery) => delivery._id.toString()),
+                    reason: 'deliveries_assigned',
+                    timestamp: new Date().toISOString()
+                });
             }
         } catch (socketErr) {
             console.warn('[assignDeliveriesToPartner] Socket broadcast error:', socketErr.message);
@@ -369,4 +411,3 @@ export const assignDeliveriesToPartner = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error assigning deliveries' });
     }
 };
-

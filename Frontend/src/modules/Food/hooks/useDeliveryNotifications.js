@@ -10,6 +10,7 @@ import {
   getOrderAlertKey,
   getOrderMongoId,
   getOrderAcceptId,
+  getIncomingOrderOfferTimestamp,
   normalizeIncomingOrder,
 } from '@food/utils/orderDispatchId';
 import { isValidSocketOrigin, resolveSocketOrigin } from '@food/utils/socketOrigin';
@@ -225,6 +226,7 @@ export const useDeliveryNotifications = () => {
   const ALERT_LOOP_MAX_MS = 120000;
   const ALERT_DEDUPE_MS = 15000;
   const BROWSER_NOTIFICATION_DEDUPE_MS = 20000;
+  const OFFER_POPUP_TTL_MS = 60000;
   const NOTIFICATION_PERMISSION_ASKED_KEY = 'delivery_notification_permission_asked';
 
   // Step 3: All callbacks before effects (unconditional)
@@ -371,6 +373,62 @@ export const useDeliveryNotifications = () => {
     }
   }, [playNotificationSound, showBackgroundOrderNotification, startAlertLoop]);
 
+  const emitPendingOffersBatch = useCallback((offers = []) => {
+    const normalizedOffers = (Array.isArray(offers) ? offers : [])
+      .map((offer) => normalizeIncomingOrder(offer))
+      .filter(Boolean)
+      .sort((a, b) => getIncomingOrderOfferTimestamp(a) - getIncomingOrderOfferTimestamp(b));
+
+    if (!normalizedOffers.length || typeof window === 'undefined') return normalizedOffers;
+
+    window.dispatchEvent(
+      new CustomEvent('deliveryPendingOffers', {
+        detail: { offers: normalizedOffers },
+      }),
+    );
+
+    return normalizedOffers;
+  }, []);
+
+  const getRecoverablePendingOffers = useCallback((availableOrders = []) => {
+    if (!deliveryPartnerId) return [];
+
+    const now = Date.now();
+
+    return (Array.isArray(availableOrders) ? availableOrders : [])
+      .reduce((acc, order) => {
+        const offers = Array.isArray(order?.dispatch?.offeredTo) ? order.dispatch.offeredTo : [];
+        const partnerOffers = offers.filter(
+          (entry) => String(entry?.partnerId || '') === String(deliveryPartnerId),
+        );
+        const latestOffer = partnerOffers.length ? partnerOffers[partnerOffers.length - 1] : null;
+        const offeredAt = latestOffer?.at ? new Date(latestOffer.at).getTime() : 0;
+        const offerAgeMs = offeredAt > 0 ? now - offeredAt : Number.POSITIVE_INFINITY;
+        const isRecoverable = Boolean(
+          latestOffer &&
+          String(latestOffer?.action || '') === 'offered' &&
+          String(order?.dispatch?.status || '') === 'unassigned' &&
+          ['confirmed', 'preparing', 'ready_for_pickup'].includes(order?.orderStatus) &&
+          offerAgeMs <= OFFER_POPUP_TTL_MS,
+        );
+
+        if (!isRecoverable) return acc;
+
+        const normalized = normalizeIncomingOrder({
+          ...order,
+          offeredAt: offeredAt || order?.dispatch?.assignedAt || order?.createdAt,
+          recoverySource: 'delivery_available_orders',
+        });
+
+        if (normalized) {
+          acc.push(normalized);
+        }
+
+        return acc;
+      }, [])
+      .sort((a, b) => getIncomingOrderOfferTimestamp(a) - getIncomingOrderOfferTimestamp(b));
+  }, [deliveryPartnerId, OFFER_POPUP_TTL_MS]);
+
   const shouldUseSocketOrderFallback = useCallback((orderData = {}) => {
     const channel = String(orderData?.channel || '').toLowerCase();
     const shouldUse = channel === 'socket_fallback' || !firebaseDeliveryOffersHealthyRef.current;
@@ -422,24 +480,25 @@ export const useDeliveryNotifications = () => {
             ? availablePayload
             : [];
 
-      const recoverableOrder = availableOrders.find((order) => {
-        const dispatchStatus = order?.dispatch?.status;
-        return (
-          ['unassigned', 'assigned'].includes(dispatchStatus) &&
-          ['confirmed', 'preparing', 'ready_for_pickup'].includes(order?.orderStatus)
-        );
-      });
+      const recoverableOffers = getRecoverablePendingOffers(availableOrders);
 
-      if (recoverableOrder && !activeOrderRef.current) {
-        const normalized = normalizeIncomingOrder(recoverableOrder);
-        debugLog('Recovered available delivery order after reconnect/focus:', normalized);
-        setNewOrder(normalized);
-        handleIncomingOrderAlert(normalized);
+      if (recoverableOffers.length > 0) {
+        debugLog('Recovered available delivery offers after reconnect/focus:', {
+          count: recoverableOffers.length,
+          orderIds: recoverableOffers.map((offer) => offer?.orderId || offer?.orderMongoId || offer?._id),
+        });
+
+        emitPendingOffersBatch(recoverableOffers);
+
+        if (!activeOrderRef.current) {
+          setNewOrder(recoverableOffers[0]);
+          handleIncomingOrderAlert(recoverableOffers[0]);
+        }
       }
     } catch (error) {
       debugWarn('Delivery recovery sync failed:', error?.message || error);
     }
-  }, [deliveryPartnerId, handleIncomingOrderAlert]);
+  }, [deliveryPartnerId, emitPendingOffersBatch, getRecoverablePendingOffers, handleIncomingOrderAlert]);
 
   const joinDeliveryRoomIfPossible = useCallback(() => {
     if (!socketRef.current?.connected || !deliveryPartnerId) {
@@ -839,15 +898,7 @@ export const useDeliveryNotifications = () => {
     socketRef.current.on('pending_offers', ({ offers = [] } = {}) => {
       debugLog('Pending offers batch from resync', { count: offers.length });
       if (!isRiderOnline() || !Array.isArray(offers) || offers.length === 0) return;
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(
-          new CustomEvent('deliveryPendingOffers', {
-            detail: {
-              offers: offers.map((offer) => normalizeIncomingOrder(offer)).filter(Boolean),
-            },
-          }),
-        );
-      }
+      emitPendingOffersBatch(offers);
     });
 
     socketRef.current.on('connect_error', (error) => {
@@ -924,6 +975,7 @@ export const useDeliveryNotifications = () => {
         });
       }
       const normalized = normalizeIncomingOrder(orderData);
+      emitPendingOffersBatch([normalized]);
       setNewOrder(normalized);
       handleIncomingOrderAlert(normalized);
     });
@@ -952,6 +1004,7 @@ export const useDeliveryNotifications = () => {
           channel: orderData?.channel,
         });
       }
+      emitPendingOffersBatch([normalized]);
       setNewOrder(normalized);
       handleIncomingOrderAlert(normalized);
     });
@@ -969,6 +1022,7 @@ export const useDeliveryNotifications = () => {
         orderMongoId: data?.orderMongoId || data?.order_mongo_id,
         ...data
       });
+      emitPendingOffersBatch([normalizedData]);
       setNewOrder(normalizedData);
       // Force immediate buzz for notification events, even if dedupe would skip.
       activeOrderRef.current = normalizedData || { id: Date.now() };
@@ -1198,7 +1252,7 @@ export const useDeliveryNotifications = () => {
         socketRef.current = null;
       }
     };
-  }, [deliveryPartnerId, deliverySessionToken, handleIncomingOrderAlert, joinDeliveryRoomIfPossible, playNotificationSound, recoverDeliveryState, reconnectSocketWithToken, shouldUseSocketOrderFallback, showBackgroundOrderNotification, startAlertLoop, stopAlertLoop]);
+  }, [deliveryPartnerId, deliverySessionToken, emitPendingOffersBatch, handleIncomingOrderAlert, joinDeliveryRoomIfPossible, playNotificationSound, recoverDeliveryState, reconnectSocketWithToken, shouldUseSocketOrderFallback, showBackgroundOrderNotification, startAlertLoop, stopAlertLoop]);
 
   useEffect(() => {
     if (!deliveryPartnerId) {
@@ -1254,6 +1308,8 @@ export const useDeliveryNotifications = () => {
         }
         prevFirebaseOfferKeysRef.current = currentKeys;
 
+        const freshOffers = [];
+
         Object.entries(offersMap || {}).forEach(([orderMongoId, offerData]) => {
           if (!offerData || typeof offerData !== 'object') return;
 
@@ -1278,10 +1334,22 @@ export const useDeliveryNotifications = () => {
             orderId: normalized?.orderId,
             offeredAt,
           });
-
-          setNewOrder(normalized);
-          handleIncomingOrderAlert(normalized);
+          freshOffers.push(normalized);
         });
+
+        const queuedFreshOffers = emitPendingOffersBatch(freshOffers);
+        if (!queuedFreshOffers.length) return;
+
+        if (!activeOrderRef.current) {
+          setNewOrder(queuedFreshOffers[0]);
+          handleIncomingOrderAlert(queuedFreshOffers[0]);
+          return;
+        }
+
+        playNotificationSound(queuedFreshOffers[0]);
+        if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+          showBackgroundOrderNotification(queuedFreshOffers[0]);
+        }
       },
       (error) => {
         firebaseDeliveryOffersHealthyRef.current = false;
@@ -1294,7 +1362,7 @@ export const useDeliveryNotifications = () => {
       prevFirebaseOfferKeysRef.current = new Set();
       unsubscribe();
     };
-  }, [deliveryPartnerId, handleIncomingOrderAlert, stopAlertLoop]);
+  }, [deliveryPartnerId, emitPendingOffersBatch, handleIncomingOrderAlert, playNotificationSound, showBackgroundOrderNotification, stopAlertLoop]);
 
   // Helper functions
   const clearNewOrder = () => {

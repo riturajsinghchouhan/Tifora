@@ -22,6 +22,8 @@ import {
     Info
 } from 'lucide-react';
 import api from '@food/api';
+import io from 'socket.io-client';
+import { API_BASE_URL } from '@food/api/config';
 import { toast } from 'sonner';
 import RestaurantPageShell from '@food/components/restaurant/RestaurantPageShell';
 
@@ -40,6 +42,27 @@ export default function TiffinDispatchPanel() {
 
     useEffect(() => {
         fetchDispatchData();
+
+        const token = localStorage.getItem('token');
+        if (!token) return undefined;
+
+        const socket = io(API_BASE_URL, {
+            auth: { token },
+            transports: ['websocket']
+        });
+
+        const refreshDispatchPanel = () => {
+            fetchDispatchData();
+        };
+
+        socket.on('new-tiffin-subscription', refreshDispatchPanel);
+        socket.on('tiffin_dispatch_updated', refreshDispatchPanel);
+
+        return () => {
+            socket.off('new-tiffin-subscription', refreshDispatchPanel);
+            socket.off('tiffin_dispatch_updated', refreshDispatchPanel);
+            socket.disconnect();
+        };
     }, []);
 
     const fetchDispatchData = async () => {
@@ -639,7 +662,7 @@ export default function TiffinDispatchPanel() {
                                 {partners.length === 0 && !loading && (
                                     <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
                                         <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-                                        <span>No delivery riders online currently.</span>
+                                        <span>No approved riders are online currently.</span>
                                     </div>
                                 )}
                             </div>

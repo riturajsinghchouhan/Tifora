@@ -4,7 +4,12 @@ import { User, MapPin, FastForward, Clock, Phone, ChefHat, ChevronDown } from 'l
 import { ActionSlider } from '@/modules/DeliveryV2/components/ui/ActionSlider';
 import { useDeliveryStore } from '@/modules/DeliveryV2/store/useDeliveryStore';
 import { getHaversineDistance } from '@/modules/DeliveryV2/utils/geo';
-import { getOrderMongoId, getOrderDisplayId, isSameOrder } from '@food/utils/orderDispatchId';
+import {
+  getIncomingOrderOfferTimestamp,
+  getOrderMongoId,
+  getOrderDisplayId,
+  isSameOrder,
+} from '@food/utils/orderDispatchId';
 
 /**
  * NewOrderModal - Ported to Original 1:1 Theme with Slider Accept.
@@ -12,21 +17,29 @@ import { getOrderMongoId, getOrderDisplayId, isSameOrder } from '@food/utils/ord
  */
 export const NewOrderModal = ({ order, queuedOrders = [], onSelectOrder, onAccept, onReject, onMinimize }) => {
   const { riderLocation } = useDeliveryStore();
-  const [timeLeft, setTimeLeft] = useState(60);
   const orderKey = getOrderMongoId(order) || getOrderDisplayId(order);
+  const offeredAtMs = useMemo(() => getIncomingOrderOfferTimestamp(order), [order]);
+  const getRemainingTime = useMemo(
+    () => () => {
+      if (!offeredAtMs) return 60;
+      return Math.max(0, 60 - Math.floor((Date.now() - offeredAtMs) / 1000));
+    },
+    [offeredAtMs],
+  );
+  const [timeLeft, setTimeLeft] = useState(() => getRemainingTime());
 
   useEffect(() => {
-    setTimeLeft(60);
-  }, [orderKey]);
+    setTimeLeft(getRemainingTime());
+  }, [getRemainingTime, orderKey]);
 
   useEffect(() => {
     if (timeLeft <= 0) {
-      onReject();
+      onReject?.(order);
       return;
     }
-    const timer = setInterval(() => setTimeLeft((t) => t - 1), 1000);
+    const timer = setInterval(() => setTimeLeft(getRemainingTime()), 500);
     return () => clearInterval(timer);
-  }, [timeLeft, onReject]);
+  }, [getRemainingTime, onReject, order, timeLeft]);
 
   const { pickup, drop, total } = useMemo(() => {
     const unknown = {
@@ -219,7 +232,7 @@ export const NewOrderModal = ({ order, queuedOrders = [], onSelectOrder, onAccep
         {queuedOrders.length > 1 && (
           <div className="px-4 sm:px-6 py-3 bg-gray-50 border-b border-gray-100">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-              {queuedOrders.length} orders available — tap to switch
+              1 live + {queuedOrders.length - 1} more — tap to switch
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1">
               {queuedOrders.map((queuedOrder, index) => {
@@ -350,7 +363,7 @@ export const NewOrderModal = ({ order, queuedOrders = [], onSelectOrder, onAccep
                 Cancel
               </button>
               <button 
-                onClick={onReject}
+                onClick={() => onReject?.(order)}
                 className="text-gray-400 font-bold text-[10px] uppercase tracking-widest hover:text-red-500 transition-colors active:scale-95"
               >
                 Pass this task
