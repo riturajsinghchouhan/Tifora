@@ -14,9 +14,13 @@ router.post('/image', upload.single('file'), async (req, res, next) => {
             });
         }
 
-        const folder = typeof req.body?.folder === 'string' && req.body.folder.trim()
+        let folder = typeof req.body?.folder === 'string' && req.body.folder.trim()
             ? req.body.folder.trim()
             : 'uploads';
+
+        // Legacy appzeto removal and mapping categories to foods
+        folder = folder.replace(/^appzeto\//, '');
+        if (folder === 'categories') folder = 'foods';
 
         const url = await uploadImageBuffer(req.file.buffer, folder);
 
@@ -53,9 +57,11 @@ router.post('/file', upload.single('file'), async (req, res, next) => {
             });
         }
 
-        const folder = typeof req.body?.folder === 'string' && req.body.folder.trim()
+        let folder = typeof req.body?.folder === 'string' && req.body.folder.trim()
             ? req.body.folder.trim()
             : 'uploads';
+
+        folder = folder.replace(/^appzeto\//, '');
 
         const url = await uploadFileBuffer(req.file.buffer, folder, {
             fileName: req.file.originalname || 'menu.pdf',
@@ -93,9 +99,11 @@ router.post('/video', upload.single('file'), async (req, res, next) => {
             });
         }
 
-        const folder = typeof req.body?.folder === 'string' && req.body.folder.trim()
+        let folder = typeof req.body?.folder === 'string' && req.body.folder.trim()
             ? req.body.folder.trim()
             : 'uploads/videos';
+
+        folder = folder.replace(/^appzeto\//, '');
 
         const url = await uploadVideoBuffer(req.file.buffer, folder);
 

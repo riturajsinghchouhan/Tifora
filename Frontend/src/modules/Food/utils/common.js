@@ -64,6 +64,11 @@ export const normalizeImageUrl = (imageUrl, backendOrigin = "") => {
     }
   }
 
+  // Remap legacy appzeto paths
+  if (trimmed.includes("uploads/appzeto/categories/")) {
+    trimmed = trimmed.replace("uploads/appzeto/categories/", "uploads/foods/");
+  }
+
   const appProtocol = typeof window !== "undefined" ? window.location?.protocol : "";
   const appHost = typeof window !== "undefined" ? window.location?.hostname : "";
 

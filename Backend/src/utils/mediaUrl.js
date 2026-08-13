@@ -50,6 +50,11 @@ export const normalizeMediaUrl = (value) => {
     }
   }
 
+  // Remap legacy appzeto category image paths to new foods directory
+  if (raw.includes("uploads/appzeto/categories/")) {
+    raw = raw.replace("uploads/appzeto/categories/", "uploads/foods/");
+  }
+
   if (ABSOLUTE_URL_RE.test(raw)) return raw;
   if (!isUploadPath(raw)) return raw;
 
