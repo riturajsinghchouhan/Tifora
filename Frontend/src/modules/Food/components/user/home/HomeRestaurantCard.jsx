@@ -147,7 +147,7 @@ function HomeRestaurantCard({
             </div>
 
             <div className="transform transition-transform duration-300 group-hover:-translate-y-1">
-              <CardContent className="p-3 sm:p-4 lg:p-5 pt-8 sm:pt-8 lg:pt-8 flex flex-col flex-grow">
+              <CardContent className="px-2.5 pb-3 sm:px-3 sm:pb-4 lg:px-4 lg:pb-5 pt-8 sm:pt-8 lg:pt-8 flex flex-col flex-grow">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <div className="flex-1 min-w-0">
                     <h3 

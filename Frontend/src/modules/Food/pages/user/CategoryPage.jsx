@@ -1400,7 +1400,7 @@ export default function CategoryPage() {
       </div>
 
       {/* Content */}
-      <div className="px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 py-4 sm:py-6 md:py-8 lg:py-10 space-y-6 md:space-y-8 lg:space-y-10">
+      <div className="px-2 sm:px-4 md:px-6 lg:px-8 xl:px-10 py-4 sm:py-6 md:py-8 lg:py-10 space-y-6 md:space-y-8 lg:space-y-10">
         <div className="max-w-7xl mx-auto">
           {/* MATCHED DISHES Section */}
           {filteredRecommended.length > 0 && selectedCategory !== 'all' && (
@@ -1436,8 +1436,13 @@ export default function CategoryPage() {
                               alt={restaurant.categoryDishName || restaurant.name}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                e.target.style.display = 'none'
-                                e.target.parentElement.innerHTML += '<div class="w-full h-full flex items-center justify-center text-gray-300"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></div>'
+                                if (e.target.dataset.failed) return;
+                                e.target.dataset.failed = 'true';
+                                e.target.style.display = 'none';
+                                const placeholder = document.createElement('div');
+                                placeholder.className = 'w-full h-full flex items-center justify-center text-gray-300';
+                                placeholder.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-8 h-8"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
+                                e.target.parentElement.appendChild(placeholder);
                               }}
                             />
                           ) : (
@@ -1531,16 +1536,20 @@ export default function CategoryPage() {
                               alt={restaurant.categoryDishName || restaurant.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                               onError={(e) => {
+                                if (e.target.dataset.failed) return;
+                                
                                 // Fallback to restaurant image if dish image fails
-                                if (restaurant.image) {
-                                  e.target.src = restaurant.image
+                                if (restaurant.image && !e.target.dataset.fallbackTried) {
+                                  e.target.dataset.fallbackTried = 'true';
+                                  e.target.src = restaurant.image;
                                 } else {
+                                  e.target.dataset.failed = 'true';
                                   // Show emoji placeholder
-                                  e.target.style.display = 'none'
-                                  const placeholder = document.createElement('div')
-                                  placeholder.className = 'w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-6xl'
-                                  placeholder.textContent = '???'
-                                  e.target.parentElement.appendChild(placeholder)
+                                  e.target.style.display = 'none';
+                                  const placeholder = document.createElement('div');
+                                  placeholder.className = 'w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800';
+                                  placeholder.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 text-gray-300"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
+                                  e.target.parentElement.appendChild(placeholder);
                                 }
                               }}
                             />
@@ -1550,12 +1559,14 @@ export default function CategoryPage() {
                               alt={restaurant.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                               onError={(e) => {
+                                if (e.target.dataset.failed) return;
+                                e.target.dataset.failed = 'true';
                                 // Show emoji placeholder
-                                e.target.style.display = 'none'
-                                const placeholder = document.createElement('div')
-                                placeholder.className = 'w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-6xl'
-                                placeholder.textContent = '???'
-                                e.target.parentElement.appendChild(placeholder)
+                                e.target.style.display = 'none';
+                                const placeholder = document.createElement('div');
+                                placeholder.className = 'w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800';
+                                placeholder.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-16 h-16 text-gray-300"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
+                                e.target.parentElement.appendChild(placeholder);
                               }}
                             />
                           ) : (
