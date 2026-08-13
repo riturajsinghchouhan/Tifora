@@ -1,0 +1,189 @@
+name: Tifora CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify application
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            Backend/package-lock.json
+            Frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: Backend
+        run: npm ci
+
+      - name: Check backend JavaScript syntax
+        shell: bash
+        run: |
+          # These two tracked UTF-16 files are not imported runtime modules.
+          find Backend \
+            -path 'Backend/node_modules' -prune -o \
+            -type f -name '*.js' \
+            ! -path 'Backend/src/server.js' \
+            ! -path '*/order-delivery-HEAD.service.js' \
+            -print0 \
+            | xargs -0 -n 1 node --check
+
+      - name: Install frontend dependencies
+        working-directory: Frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: Frontend
+        env:
+          VITE_API_BASE_URL: /api/v1
+        run: npm run build
+
+  deploy:
+    name: Deploy production
+    if: github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://tifora.in
+    concurrency:
+      group: tifora-production
+      cancel-in-progress: false
+    env:
+      VPS_PORT: ${{ vars.VPS_PORT || '22' }}
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Frontend/package-lock.json
+
+      - name: Build production frontend
+        working-directory: Frontend
+        env:
+          FRONTEND_ENV: ${{ secrets.FRONTEND_ENV }}
+          VITE_API_BASE_URL: /api/v1
+        run: |
+          test -n "$FRONTEND_ENV" || {
+            echo "FRONTEND_ENV is missing from the production environment secrets."
+            exit 1
+          }
+          printf '%s\n' "$FRONTEND_ENV" > .env.production
+          npm ci
+          npm run build
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/tifora_deploy
+          chmod 600 ~/.ssh/tifora_deploy
+          touch ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Resolve remote paths
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          SSH="ssh -i $HOME/.ssh/tifora_deploy -p $VPS_PORT -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+
+          REMOTE_REPO_DIR="$($SSH "$VPS_USER@$VPS_HOST" '
+            if [ -d "$HOME/Tifora/Backend" ]; then
+              printf "%s\n" "$HOME/Tifora"
+            elif [ -d "/root/Tifora/Backend" ]; then
+              printf "%s\n" "/root/Tifora"
+            elif [ -d "/Tifora/Backend" ]; then
+              printf "%s\n" "/Tifora"
+            else
+              echo "Could not find Tifora backend directory on the server." >&2
+              exit 1
+            fi
+          ')"
+
+          REMOTE_WEB_DIR="$($SSH "$VPS_USER@$VPS_HOST" '
+            if [ -d "/var/www/Tifora" ]; then
+              printf "%s\n" "/var/www/Tifora"
+            elif [ -d "/var/www/tifora" ]; then
+              printf "%s\n" "/var/www/tifora"
+            else
+              echo "Could not find the frontend web root under /var/www." >&2
+              exit 1
+            fi
+          ')"
+
+          {
+            echo "REMOTE_REPO_DIR=$REMOTE_REPO_DIR"
+            echo "REMOTE_WEB_DIR=$REMOTE_WEB_DIR"
+          } >> "$GITHUB_ENV"
+
+      - name: Upload backend and frontend
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          SSH="ssh -i $HOME/.ssh/tifora_deploy -p $VPS_PORT -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+
+          rsync -az --delete \
+            --exclude='.env' \
+            --exclude='node_modules/' \
+            -e "$SSH" \
+            Backend/ "$VPS_USER@$VPS_HOST:$REMOTE_REPO_DIR/Backend/"
+
+          rsync -az --delete-delay \
+            -e "$SSH" \
+            Frontend/dist/ "$VPS_USER@$VPS_HOST:$REMOTE_WEB_DIR/"
+
+      - name: Install production dependencies and reload PM2
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -i ~/.ssh/tifora_deploy -p "$VPS_PORT" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new \
+            "$VPS_USER@$VPS_HOST" "REMOTE_REPO_DIR='$REMOTE_REPO_DIR' bash -se" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$REMOTE_REPO_DIR/Backend"
+
+          test -f .env || {
+            echo "Missing $REMOTE_REPO_DIR/Backend/.env; deployment stopped."
+            exit 1
+          }
+
+          npm ci --omit=dev
+
+          if pm2 describe tifora-api >/dev/null 2>&1; then
+            pm2 reload ecosystem.config.cjs --env production
+          else
+            pm2 start ecosystem.config.cjs --env production
+          fi
+
+          pm2 save
+          curl --fail --silent --show-error \
+            --retry 10 --retry-delay 3 --retry-connrefused \
+            http://127.0.0.1:5000/ready
+          REMOTE
