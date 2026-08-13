@@ -570,7 +570,7 @@ export default function CategoryPage() {
             ...categoriesArray.map((cat) => ({
               id: cat.slug || cat.id,
               name: cat.name,
-              image: cat.image || foodImages[0],
+              image: cat.image ? normalizeImageUrl(cat.image?.url || cat.image, BACKEND_ORIGIN) : foodImages[0],
               slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
               type: cat.type,
             }))
@@ -1307,8 +1307,8 @@ export default function CategoryPage() {
                         </span>
                       </div>
                     )}
-                    <span className={`text-xs md:text-sm font-medium whitespace-nowrap ${isSelected ? 'text-primary dark:text-primary' : 'text-gray-600 dark:text-gray-400'
-                      }`}>
+                    <span className={`text-[11px] md:text-sm font-medium block truncate w-[68px] md:w-20 text-center ${isSelected ? 'text-primary dark:text-primary' : 'text-gray-600 dark:text-gray-400'
+                      }`} title={cat.name}>
                       {cat.name}
                     </span>
                   </button>
