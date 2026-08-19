@@ -2,6 +2,7 @@ import express from 'express';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import { verifyAccessToken } from '../../../../core/auth/token.util.js';
+import { upload } from '../../../../middleware/upload.js';
 
 // Restaurant Controllers
 import {
@@ -125,9 +126,9 @@ const restaurantAuth = (req, res, next) => {
 };
 
 // --- Restaurant Tiffin Routes ---
-router.post(['/restaurant/plans', '/plans'], restaurantAuth, createTiffinPlan);
+router.post(['/restaurant/plans', '/plans'], restaurantAuth, upload.any(), createTiffinPlan);
 router.get(['/restaurant/plans', '/plans'], restaurantAuth, getRestaurantTiffinPlans);
-router.put(['/restaurant/plans/:planId', '/plans/:planId'], restaurantAuth, updateTiffinPlan);
+router.put(['/restaurant/plans/:planId', '/plans/:planId'], restaurantAuth, upload.any(), updateTiffinPlan);
 router.delete(['/restaurant/plans/:planId', '/plans/:planId'], restaurantAuth, deleteTiffinPlan);
 router.get(['/restaurant/prep-dashboard', '/prep-dashboard'], restaurantAuth, getDailyPrepDashboard);
 router.get(['/restaurant/unassigned-deliveries', '/unassigned-deliveries'], restaurantAuth, getUnassignedDeliveries);
@@ -189,8 +190,8 @@ router.get(['/admin/subscriptions', '/subscriptions'], adminAuth, getAllSubscrip
 router.patch(['/admin/subscriptions/:subscriptionId/status', '/subscriptions/:subscriptionId/status'], adminAuth, adminToggleSubscriptionStatus);
 
 router.get(['/admin/plans', '/admin-plans'], adminAuth, getAllTiffinPlans);
-router.post(['/admin/plans', '/admin-plans'], adminAuth, adminCreatePlan);
-router.put(['/admin/plans/:planId', '/admin-plans/:planId'], adminAuth, adminUpdatePlan);
+router.post(['/admin/plans', '/admin-plans'], adminAuth, upload.any(), adminCreatePlan);
+router.put(['/admin/plans/:planId', '/admin-plans/:planId'], adminAuth, upload.any(), adminUpdatePlan);
 router.delete(['/admin/plans/:planId', '/admin-plans/:planId'], adminAuth, adminDeletePlan);
 
 router.get(['/admin/deliveries/today', '/deliveries/today', '/deliveries-today'], adminAuth, getTodayDeliveries);

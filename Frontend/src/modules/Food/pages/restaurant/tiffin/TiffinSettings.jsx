@@ -52,7 +52,9 @@ export default function TiffinSettings() {
         price: '',
         itemsDescription: '',
         isVegetarian: true,
-        isActive: true
+        isActive: true,
+        imageFile: null,
+        items: [] // array of { name: '', quantity: '', imageFile: null, imageUrl: '' }
     });
 
     useEffect(() => {
@@ -91,7 +93,9 @@ export default function TiffinSettings() {
             price: '',
             itemsDescription: '',
             isVegetarian: true,
-            isActive: true
+            isActive: true,
+            imageFile: null,
+            items: []
         });
         setShowModal(true);
     };
@@ -105,7 +109,9 @@ export default function TiffinSettings() {
             price: plan.price || '',
             itemsDescription: plan.itemsDescription || '',
             isVegetarian: plan.isVegetarian !== undefined ? plan.isVegetarian : true,
-            isActive: plan.isActive !== undefined ? plan.isActive : true
+            isActive: plan.isActive !== undefined ? plan.isActive : true,
+            imageFile: null,
+            items: Array.isArray(plan.items) ? plan.items.map(item => ({ ...item, imageFile: null, imageUrl: item.image })) : []
         });
         setShowModal(true);
     };
@@ -133,25 +139,42 @@ export default function TiffinSettings() {
 
         try {
             setIsSubmitting(true);
-            const payload = {
-                name: formData.name.trim(),
-                durationDays: Number(formData.durationDays),
-                mealType: formData.mealType,
-                price: Number(formData.price),
-                itemsDescription: formData.itemsDescription.trim(),
-                isVegetarian: Boolean(formData.isVegetarian),
-                isActive: Boolean(formData.isActive)
-            };
+            const submitData = new FormData();
+            submitData.append('name', formData.name.trim());
+            submitData.append('durationDays', Number(formData.durationDays));
+            submitData.append('mealType', formData.mealType);
+            submitData.append('price', Number(formData.price));
+            submitData.append('itemsDescription', formData.itemsDescription.trim());
+            submitData.append('isVegetarian', Boolean(formData.isVegetarian));
+            submitData.append('isActive', Boolean(formData.isActive));
+            
+            if (formData.imageFile) {
+                submitData.append('imageFile', formData.imageFile);
+            }
+
+            // Append items array and item images
+            const itemsToSave = formData.items.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                image: item.imageUrl || '' // Existing image url if no new file is uploaded
+            }));
+            submitData.append('items', JSON.stringify(itemsToSave));
+
+            formData.items.forEach((item, index) => {
+                if (item.imageFile) {
+                    submitData.append(`items[${index}][imageFile]`, item.imageFile);
+                }
+            });
 
             if (editingPlan) {
-                const res = await api.put(`/food/tiffin/restaurant/plans/${editingPlan._id}`, payload);
+                const res = await api.put(`/food/tiffin/restaurant/plans/${editingPlan._id}`, submitData, { headers: { 'Content-Type': 'multipart/form-data' } });
                 if (res?.data?.success) {
                     toast.success('Tiffin plan updated successfully! 🎉');
                     setPlans(plans.map(p => p._id === editingPlan._id ? res.data.data : p));
                     setShowModal(false);
                 }
             } else {
-                const res = await api.post('/food/tiffin/restaurant/plans', payload);
+                const res = await api.post('/food/tiffin/restaurant/plans', submitData, { headers: { 'Content-Type': 'multipart/form-data' } });
                 if (res?.data?.success) {
                     toast.success('Tiffin plan created successfully! 🎉');
                     setPlans([res.data.data, ...plans]);
@@ -485,19 +508,33 @@ export default function TiffinSettings() {
 
                         {/* Modal Form */}
                         <form onSubmit={handleSubmitPlan} className="p-6 space-y-5">
-                            {/* Plan Name */}
-                            <div>
-                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
-                                    Plan Name <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    placeholder="e.g. Standard Veg Thali, Executive Non-Veg Box"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
-                                />
+                            <div className="grid md:grid-cols-2 gap-5">
+                                {/* Plan Name */}
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
+                                        Plan Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. Standard Veg Thali, Executive Non-Veg Box"
+                                        value={formData.name}
+                                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                        className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
+                                    />
+                                </div>
+                                {/* Plan Main Image */}
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
+                                        Plan Cover Image
+                                    </label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setFormData({ ...formData, imageFile: e.target.files[0] })}
+                                        className="w-full px-4 py-2 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                                    />
+                                </div>
                             </div>
 
                             {/* Dietary Preference */}
@@ -620,15 +657,92 @@ export default function TiffinSettings() {
                             {/* Items Description */}
                             <div>
                                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
-                                    Meal Items Included <span className="text-gray-400 font-normal">(Shown to customers)</span>
+                                    Short Menu Description <span className="text-gray-400 font-normal">(Shown as subtext)</span>
                                 </label>
                                 <textarea
-                                    rows="3"
-                                    placeholder="e.g. 4 Tawa Rotis, Paneer Butter Masala / Mix Veg, Dal Tadka, Jeera Rice, Fresh Salad & Pickle."
+                                    rows="2"
+                                    placeholder="e.g. Pure veg thali with rotating daily items."
                                     value={formData.itemsDescription}
                                     onChange={(e) => setFormData({ ...formData, itemsDescription: e.target.value })}
                                     className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition"
                                 />
+                            </div>
+
+                            {/* Dynamic Items Array */}
+                            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
+                                            Individual Meal Items
+                                        </label>
+                                        <span className="text-[11px] text-gray-500">List specific items (e.g. Roti, Dal) with optional images.</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({
+                                            ...formData, 
+                                            items: [...formData.items, { name: '', quantity: '', imageFile: null, imageUrl: '' }]
+                                        })}
+                                        className="inline-flex items-center gap-1.5 bg-white border border-gray-300 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-sm"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add Item
+                                    </button>
+                                </div>
+                                <div className="space-y-3">
+                                    {formData.items.length === 0 ? (
+                                        <div className="text-center py-4 text-xs font-medium text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                                            No items added. Click "Add Item" to start.
+                                        </div>
+                                    ) : formData.items.map((item, index) => (
+                                        <div key={index} className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl shadow-sm relative group">
+                                            <input
+                                                type="text"
+                                                placeholder="Item Name (e.g. Dal Tadka)"
+                                                value={item.name}
+                                                onChange={(e) => {
+                                                    const newItems = [...formData.items];
+                                                    newItems[index].name = e.target.value;
+                                                    setFormData({ ...formData, items: newItems });
+                                                }}
+                                                className="flex-1 w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Qty (e.g. 1 Bowl)"
+                                                value={item.quantity}
+                                                onChange={(e) => {
+                                                    const newItems = [...formData.items];
+                                                    newItems[index].quantity = e.target.value;
+                                                    setFormData({ ...formData, items: newItems });
+                                                }}
+                                                className="w-full sm:w-32 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
+                                            />
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                    const newItems = [...formData.items];
+                                                    newItems[index].imageFile = e.target.files[0];
+                                                    setFormData({ ...formData, items: newItems });
+                                                }}
+                                                className="w-full sm:w-48 text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-orange-50 file:text-orange-700 cursor-pointer"
+                                                title="Upload item image"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const newItems = [...formData.items];
+                                                    newItems.splice(index, 1);
+                                                    setFormData({ ...formData, items: newItems });
+                                                }}
+                                                className="absolute -top-2 -right-2 sm:relative sm:top-auto sm:right-auto p-1.5 bg-white sm:bg-transparent text-red-400 hover:text-red-600 rounded-full border sm:border-0 border-gray-200 shadow-sm sm:shadow-none hover:bg-red-50 transition"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* Active Toggle */}

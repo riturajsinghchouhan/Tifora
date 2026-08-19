@@ -1359,7 +1359,8 @@ export const listApprovedRestaurants = async (query = {}) => {
         discount: 1,
         itemDiscounts: 1,
         discountRules: 1,
-        menu: 1
+        menu: 1,
+        plans: 1
     };
 
     // Use $geoNear only when geo is explicitly needed (radius filter or nearest sorting).
@@ -1406,6 +1407,17 @@ export const listApprovedRestaurants = async (query = {}) => {
                             []
                         ] 
                     }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'food_tiffin_plans',
+                    let: { restId: '$_id' },
+                    pipeline: [
+                        { $match: { $expr: { $and: [{ $eq: ['$restaurantId', '$$restId'] }, { $eq: ['$isActive', true] }] } } },
+                        { $project: { _id: 1, name: 1, itemsDescription: 1, price: 1, durationDays: 1, mealType: 1 } }
+                    ],
+                    as: 'plans'
                 }
             }
         ];
@@ -1494,6 +1506,7 @@ export const listApprovedRestaurants = async (query = {}) => {
                 closingTime: r.closingTime || null,
                 openDays: Array.isArray(r.openDays) ? r.openDays : [],
                 menuImages: Array.isArray(r.menuImages) ? r.menuImages.map((img) => normalizeMediaUrl(img)).filter(Boolean) : [],
+                plans: Array.isArray(r.plans) ? r.plans : [],
                 distanceInfo: drivingInfo || null,
                 distanceText: drivingInfo ? drivingInfo.distanceText : null
             };
@@ -1529,6 +1542,17 @@ export const listApprovedRestaurants = async (query = {}) => {
                         []
                     ] 
                 }
+            }
+        },
+        {
+            $lookup: {
+                from: 'food_tiffin_plans',
+                let: { restId: '$_id' },
+                pipeline: [
+                    { $match: { $expr: { $and: [{ $eq: ['$restaurantId', '$$restId'] }, { $eq: ['$isActive', true] }] } } },
+                    { $project: { _id: 1, name: 1, itemsDescription: 1, price: 1, durationDays: 1, mealType: 1 } }
+                ],
+                as: 'plans'
             }
         }
     ];
@@ -1617,6 +1641,7 @@ export const listApprovedRestaurants = async (query = {}) => {
             openDays: Array.isArray(r.openDays) ? r.openDays : [],
             // Keep menuImages as an array for fallbacks; allow both string and {url} on client.
             menuImages: Array.isArray(r.menuImages) ? r.menuImages.map((img) => normalizeMediaUrl(img)).filter(Boolean) : [],
+            plans: Array.isArray(r.plans) ? r.plans : [],
             distanceInfo: drivingInfo || null,
             distanceText: drivingInfo ? drivingInfo.distanceText : null
         };
@@ -1720,9 +1745,15 @@ export const getApprovedRestaurantByIdOrSlug = async (idOrSlug, query = {}) => {
 
     const offers = await fetchOffers(doc._id);
 
+    const { TiffinPlan } = await import('../../tiffin/models/tiffinPlan.model.js');
+    const plans = await TiffinPlan.find({ restaurantId: doc._id, isActive: true })
+        .select('_id name itemsDescription price durationDays mealType')
+        .lean();
+
     return {
         ...doc,
         offers,
+        plans,
         restaurantOffers: {
             ...(doc.restaurantOffers || {}),
             coupons: offers

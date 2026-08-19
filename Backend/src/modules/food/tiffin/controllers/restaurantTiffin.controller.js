@@ -3,6 +3,7 @@ import { TiffinDelivery } from '../models/tiffinDelivery.model.js';
 import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
 import { generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
+import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import mongoose from 'mongoose';
 
 const getRestaurantId = (req) => {
@@ -25,10 +26,39 @@ export const createTiffinPlan = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized: Restaurant ID not found' });
         }
 
-        const { name, durationDays, mealType, price, itemsDescription, isVegetarian, image, items } = req.body;
+        let { name, durationDays, mealType, price, itemsDescription, isVegetarian, image, items } = req.body;
 
         if (!name || !durationDays || !price) {
             return res.status(400).json({ success: false, message: 'Name, duration, and price are required' });
+        }
+
+        // Parse items if it's sent as a string (from FormData)
+        let parsedItems = [];
+        if (typeof items === 'string') {
+            try {
+                parsedItems = JSON.parse(items);
+            } catch (e) {
+                parsedItems = [];
+            }
+        } else if (Array.isArray(items)) {
+            parsedItems = items;
+        }
+
+        // Process files
+        if (req.files && Array.isArray(req.files)) {
+            // Main plan image
+            const mainImageFile = req.files.find(f => f.fieldname === 'imageFile');
+            if (mainImageFile) {
+                image = await uploadImageBuffer(mainImageFile.buffer, 'food/tiffin/plans');
+            }
+
+            // Process dynamic item images
+            for (let i = 0; i < parsedItems.length; i++) {
+                const itemImageFile = req.files.find(f => f.fieldname === `items[${i}][imageFile]`);
+                if (itemImageFile) {
+                    parsedItems[i].image = await uploadImageBuffer(itemImageFile.buffer, 'food/tiffin/items');
+                }
+            }
         }
 
         const newPlan = new TiffinPlan({
@@ -39,7 +69,7 @@ export const createTiffinPlan = async (req, res) => {
             price: Number(price),
             itemsDescription: itemsDescription || '',
             image: image || '',
-            items: Array.isArray(items) ? items : [],
+            items: parsedItems,
             isVegetarian: isVegetarian !== undefined ? Boolean(isVegetarian) : true,
             isActive: true
         });
@@ -68,9 +98,37 @@ export const updateTiffinPlan = async (req, res) => {
         const restaurantId = getRestaurantId(req);
         const { planId } = req.params;
 
+        let updateData = { ...req.body };
+
+        // Parse items if sent as string
+        if (typeof updateData.items === 'string') {
+            try {
+                updateData.items = JSON.parse(updateData.items);
+            } catch (e) {
+                updateData.items = [];
+            }
+        }
+
+        // Process files
+        if (req.files && Array.isArray(req.files)) {
+            const mainImageFile = req.files.find(f => f.fieldname === 'imageFile');
+            if (mainImageFile) {
+                updateData.image = await uploadImageBuffer(mainImageFile.buffer, 'food/tiffin/plans');
+            }
+
+            if (Array.isArray(updateData.items)) {
+                for (let i = 0; i < updateData.items.length; i++) {
+                    const itemImageFile = req.files.find(f => f.fieldname === `items[${i}][imageFile]`);
+                    if (itemImageFile) {
+                        updateData.items[i].image = await uploadImageBuffer(itemImageFile.buffer, 'food/tiffin/items');
+                    }
+                }
+            }
+        }
+
         const plan = await TiffinPlan.findOneAndUpdate(
             { _id: planId, restaurantId },
-            { $set: req.body },
+            { $set: updateData },
             { new: true }
         );
 

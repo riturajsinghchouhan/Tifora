@@ -47,14 +47,12 @@ function HomeRestaurantCard({
   const plansData = useMemo(() => {
     if (restaurant?.plans?.length > 0) {
       return restaurant.plans.map(p => ({
-        menu: `${p.name}: ${p.itemsDescription || "Dal, Roti, Sabzi"}`,
-        price: p.price || restaurant.monthlyPrice || "1500"
+        menu: `${p.name}: ${p.itemsDescription || "Contact for items"}`,
+        price: p.price || "--"
       }));
     }
     return [
-      { menu: "Mini Tiffin: Dal, Rice, Sabzi, 2 Roti", price: "1200" },
-      { menu: "Regular Tiffin: Dal, 2 Sabzi, 4 Roti, Salad", price: "1500" },
-      { menu: "Special Box: Paneer, Veg, Pulao, 4 Roti, Sweet", price: "2500" }
+      { menu: "No active plans available", price: "--" }
     ];
   }, [restaurant?.plans, restaurant?.monthlyPrice]);
 

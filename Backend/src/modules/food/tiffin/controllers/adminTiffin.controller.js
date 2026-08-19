@@ -6,6 +6,7 @@ import { TiffinCommissionSetting } from '../models/tiffinCommission.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { ensureTodayDeliveriesSync } from '../scripts/tiffinScheduler.js';
+import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import mongoose from 'mongoose';
 
 /**
@@ -193,6 +194,35 @@ export const adminCreatePlan = async (req, res) => {
             }
         }
 
+        // Parse items if it's sent as a string (from FormData)
+        let parsedItems = [];
+        if (typeof items === 'string') {
+            try {
+                parsedItems = JSON.parse(items);
+            } catch (e) {
+                parsedItems = [];
+            }
+        } else if (Array.isArray(items)) {
+            parsedItems = items;
+        }
+
+        // Process files
+        if (req.files && Array.isArray(req.files)) {
+            // Main plan image
+            const mainImageFile = req.files.find(f => f.fieldname === 'imageFile');
+            if (mainImageFile) {
+                image = await uploadImageBuffer(mainImageFile.buffer, 'food/tiffin/plans');
+            }
+
+            // Process dynamic item images
+            for (let i = 0; i < parsedItems.length; i++) {
+                const itemImageFile = req.files.find(f => f.fieldname === `items[${i}][imageFile]`);
+                if (itemImageFile) {
+                    parsedItems[i].image = await uploadImageBuffer(itemImageFile.buffer, 'food/tiffin/items');
+                }
+            }
+        }
+
         const newPlan = new TiffinPlan({
             restaurantId,
             name,
@@ -201,7 +231,7 @@ export const adminCreatePlan = async (req, res) => {
             price: Number(price) || 0,
             itemsDescription: itemsDescription || '',
             image: image || '/food/tiffin/tiffin_box_default.png',
-            items: Array.isArray(items) ? items : [],
+            items: parsedItems,
             isVegetarian: isVegetarian !== undefined ? isVegetarian : true,
             isActive: isActive !== undefined ? isActive : true
         });
@@ -222,7 +252,33 @@ export const adminCreatePlan = async (req, res) => {
 export const adminUpdatePlan = async (req, res) => {
     try {
         const { planId } = req.params;
-        const updates = req.body;
+        let updates = req.body;
+
+        // Parse items if sent as string
+        if (typeof updates.items === 'string') {
+            try {
+                updates.items = JSON.parse(updates.items);
+            } catch (e) {
+                updates.items = [];
+            }
+        }
+
+        // Process files
+        if (req.files && Array.isArray(req.files)) {
+            const mainImageFile = req.files.find(f => f.fieldname === 'imageFile');
+            if (mainImageFile) {
+                updates.image = await uploadImageBuffer(mainImageFile.buffer, 'food/tiffin/plans');
+            }
+
+            if (Array.isArray(updates.items)) {
+                for (let i = 0; i < updates.items.length; i++) {
+                    const itemImageFile = req.files.find(f => f.fieldname === `items[${i}][imageFile]`);
+                    if (itemImageFile) {
+                        updates.items[i].image = await uploadImageBuffer(itemImageFile.buffer, 'food/tiffin/items');
+                    }
+                }
+            }
+        }
 
         const updated = await TiffinPlan.findByIdAndUpdate(
             planId,

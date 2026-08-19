@@ -84,6 +84,7 @@ export default function AdminTiffinManagement() {
         image: '/food/tiffin/tiffin_box_default.png',
         isVegetarian: true,
         isActive: true,
+        imageFile: null,
         items: [...DEFAULT_ITEM_PRESETS]
     });
 
@@ -237,9 +238,10 @@ export default function AdminTiffinManagement() {
                 price: plan.price || 0,
                 itemsDescription: plan.itemsDescription || '',
                 image: plan.image || '/food/tiffin/tiffin_box_default.png',
+                imageFile: null,
                 isVegetarian: plan.isVegetarian !== undefined ? plan.isVegetarian : true,
                 isActive: plan.isActive !== undefined ? plan.isActive : true,
-                items: plan.items?.length > 0 ? plan.items : [...DEFAULT_ITEM_PRESETS]
+                items: plan.items?.length > 0 ? plan.items.map(item => ({ ...item, imageFile: null, imageUrl: item.image })) : [...DEFAULT_ITEM_PRESETS]
             });
         } else {
             setEditingPlan(null);
@@ -250,6 +252,7 @@ export default function AdminTiffinManagement() {
                 price: 4500,
                 itemsDescription: '4 Fresh Rotis, Dal, Sabzi, Rice & Salad',
                 image: '/food/tiffin/tiffin_box_default.png',
+                imageFile: null,
                 isVegetarian: true,
                 isActive: true,
                 items: [...DEFAULT_ITEM_PRESETS]
@@ -261,9 +264,35 @@ export default function AdminTiffinManagement() {
     const handleSavePlan = async (e) => {
         e.preventDefault();
         try {
+            const submitData = new FormData();
+            submitData.append('name', planForm.name);
+            submitData.append('durationDays', Number(planForm.durationDays));
+            submitData.append('mealType', planForm.mealType);
+            submitData.append('price', Number(planForm.price));
+            submitData.append('itemsDescription', planForm.itemsDescription);
+            submitData.append('isVegetarian', Boolean(planForm.isVegetarian));
+            submitData.append('isActive', Boolean(planForm.isActive));
+            
+            if (planForm.imageFile) {
+                submitData.append('imageFile', planForm.imageFile);
+            }
+
+            const itemsToSave = planForm.items.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                image: item.imageUrl || ''
+            }));
+            submitData.append('items', JSON.stringify(itemsToSave));
+
+            planForm.items.forEach((item, index) => {
+                if (item.imageFile) {
+                    submitData.append(`items[${index}][imageFile]`, item.imageFile);
+                }
+            });
+
             if (editingPlan) {
-                const res = await api.put(`/food/tiffin/admin/plans/${editingPlan._id}`, planForm, { contextModule: 'admin' }).catch(() => null)
-                    || await api.put(`/admin/tiffin/plans/${editingPlan._id}`, planForm, { contextModule: 'admin' }).catch(() => null);
+                const res = await api.put(`/food/tiffin/admin/plans/${editingPlan._id}`, submitData, { headers: { 'Content-Type': 'multipart/form-data' }, contextModule: 'admin' }).catch(() => null)
+                    || await api.put(`/admin/tiffin/plans/${editingPlan._id}`, submitData, { headers: { 'Content-Type': 'multipart/form-data' }, contextModule: 'admin' }).catch(() => null);
                 if (res?.data?.success) {
                     setPlans(prev => prev.map(p => p._id === editingPlan._id ? res.data.data : p));
                     alert('Plan updated successfully in database!');
@@ -272,8 +301,8 @@ export default function AdminTiffinManagement() {
                     alert(res?.data?.message || 'Failed to update plan');
                 }
             } else {
-                const res = await api.post('/food/tiffin/admin/plans', planForm, { contextModule: 'admin' }).catch(() => null)
-                    || await api.post('/admin/tiffin/plans', planForm, { contextModule: 'admin' }).catch(() => null);
+                const res = await api.post('/food/tiffin/admin/plans', submitData, { headers: { 'Content-Type': 'multipart/form-data' }, contextModule: 'admin' }).catch(() => null)
+                    || await api.post('/admin/tiffin/plans', submitData, { headers: { 'Content-Type': 'multipart/form-data' }, contextModule: 'admin' }).catch(() => null);
                 if (res?.data?.success) {
                     setPlans(prev => [res.data.data, ...prev]);
                     alert('Plan created successfully in database!');
@@ -1015,15 +1044,94 @@ export default function AdminTiffinManagement() {
                             </div>
 
                             {/* Plan Image */}
-                            <div>
-                                <label className="text-xs font-bold text-gray-700 block mb-1">Plan Thumbnail Image</label>
-                                <input
-                                    type="text"
-                                    value={planForm.image}
-                                    onChange={(e) => setPlanForm({ ...planForm, image: e.target.value })}
-                                    placeholder="/food/tiffin/tiffin_box_default.png or image URL"
-                                    className="w-full text-xs font-semibold p-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
-                                />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-700 block mb-1">Plan Thumbnail Image</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setPlanForm({ ...planForm, imageFile: e.target.files[0] })}
+                                        className="w-full text-xs font-semibold py-2 px-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c] file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-[#be123c]/10 file:text-[#be123c]"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-700 block mb-1">Or Image URL</label>
+                                    <input
+                                        type="text"
+                                        value={planForm.image}
+                                        onChange={(e) => setPlanForm({ ...planForm, image: e.target.value })}
+                                        placeholder="/food/tiffin/tiffin_box_default.png"
+                                        className="w-full text-xs font-semibold p-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Dynamic Items Array */}
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mt-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <label className="text-xs font-bold text-gray-700">Individual Meal Items (Dynamic)</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPlanForm({
+                                            ...planForm, 
+                                            items: [...planForm.items, { name: '', quantity: '', imageFile: null, imageUrl: '' }]
+                                        })}
+                                        className="inline-flex items-center gap-1 bg-white border border-gray-300 px-2.5 py-1 rounded text-[10px] font-bold text-gray-700 hover:bg-gray-100"
+                                    >
+                                        <Plus className="w-3 h-3" /> Add Item
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    {planForm.items.length === 0 ? (
+                                        <div className="text-center py-3 text-xs text-gray-400 border border-dashed rounded-lg">No items. Click Add Item.</div>
+                                    ) : planForm.items.map((item, index) => (
+                                        <div key={index} className="flex flex-col sm:flex-row items-center gap-2 bg-white p-2 rounded-lg border border-gray-200">
+                                            <input
+                                                type="text"
+                                                placeholder="Item Name"
+                                                value={item.name}
+                                                onChange={(e) => {
+                                                    const newItems = [...planForm.items];
+                                                    newItems[index].name = e.target.value;
+                                                    setPlanForm({ ...planForm, items: newItems });
+                                                }}
+                                                className="w-full sm:flex-1 text-xs px-2 py-1.5 border border-gray-300 rounded outline-none"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Qty"
+                                                value={item.quantity}
+                                                onChange={(e) => {
+                                                    const newItems = [...planForm.items];
+                                                    newItems[index].quantity = e.target.value;
+                                                    setPlanForm({ ...planForm, items: newItems });
+                                                }}
+                                                className="w-full sm:w-20 text-xs px-2 py-1.5 border border-gray-300 rounded outline-none"
+                                            />
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                    const newItems = [...planForm.items];
+                                                    newItems[index].imageFile = e.target.files[0];
+                                                    setPlanForm({ ...planForm, items: newItems });
+                                                }}
+                                                className="w-full sm:w-40 text-[10px] file:mr-1 file:py-1 file:px-1.5 file:rounded file:border-0 file:bg-gray-100"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const newItems = [...planForm.items];
+                                                    newItems.splice(index, 1);
+                                                    setPlanForm({ ...planForm, items: newItems });
+                                                }}
+                                                className="p-1.5 text-red-500 hover:bg-red-50 rounded transition"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
 
                             <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
