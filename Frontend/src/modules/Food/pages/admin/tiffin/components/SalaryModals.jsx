@@ -180,3 +180,84 @@ export const PayRateConfigModal = ({
         </div>
     );
 };
+
+export const RiderDetailsModal = ({ isOpen, rider, onClose }) => {
+    if (!isOpen || !rider) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+            <div className="bg-white dark:bg-neutral-900 border border-slate-200 dark:border-neutral-800 rounded-3xl p-6 w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        {rider.profileImage ? (
+                            <img src={rider.profileImage} alt={rider.name} className="w-12 h-12 rounded-full object-cover border-2 border-slate-200 dark:border-neutral-700" />
+                        ) : (
+                            <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xl">
+                                {rider.name?.charAt(0) || 'R'}
+                            </div>
+                        )}
+                        <div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{rider.name}</h3>
+                            <p className="text-sm text-slate-500">{rider.phone}</p>
+                        </div>
+                    </div>
+                    <button type="button" onClick={onClose} className="p-2 rounded-xl bg-slate-100 dark:bg-neutral-800 text-slate-500 hover:text-slate-900 dark:hover:text-white">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Bank Details */}
+                    <div className="space-y-4">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-neutral-800 pb-2">Bank Details</h4>
+                        <div className="space-y-3 bg-slate-50 dark:bg-neutral-800/50 p-4 rounded-2xl border border-slate-100 dark:border-neutral-800">
+                            <div>
+                                <span className="block text-xs font-semibold text-slate-500 mb-1">Bank Name</span>
+                                <span className="block text-sm font-bold text-slate-900 dark:text-white">{rider.bankName || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="block text-xs font-semibold text-slate-500 mb-1">Account Holder Name</span>
+                                <span className="block text-sm font-bold text-slate-900 dark:text-white">{rider.bankAccountHolderName || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="block text-xs font-semibold text-slate-500 mb-1">Account Number</span>
+                                <span className="block text-sm font-mono font-bold text-slate-900 dark:text-white">{rider.bankAccountNumber || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="block text-xs font-semibold text-slate-500 mb-1">IFSC Code</span>
+                                <span className="block text-sm font-mono font-bold text-slate-900 dark:text-white">{rider.bankIfscCode || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KYC & UPI Details */}
+                    <div className="space-y-4">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-neutral-800 pb-2">KYC & UPI</h4>
+                        <div className="space-y-3 bg-slate-50 dark:bg-neutral-800/50 p-4 rounded-2xl border border-slate-100 dark:border-neutral-800">
+                            <div>
+                                <span className="block text-xs font-semibold text-slate-500 mb-1">PAN Number</span>
+                                <span className="block text-sm font-mono font-bold text-slate-900 dark:text-white">{rider.panNumber || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="block text-xs font-semibold text-slate-500 mb-1">Aadhar Number</span>
+                                <span className="block text-sm font-mono font-bold text-slate-900 dark:text-white">{rider.aadharNumber || 'N/A'}</span>
+                            </div>
+                            <div className="pt-2 border-t border-slate-200 dark:border-neutral-700/50">
+                                <span className="block text-xs font-semibold text-slate-500 mb-1">UPI ID</span>
+                                <span className="block text-sm font-bold text-blue-600 dark:text-blue-400">{rider.upiId || 'N/A'}</span>
+                            </div>
+                            {rider.upiQrCode && (
+                                <div className="mt-2">
+                                    <span className="block text-xs font-semibold text-slate-500 mb-2">UPI QR Code</span>
+                                    <div className="bg-white p-2 rounded-xl inline-block border border-slate-200">
+                                        <img src={rider.upiQrCode} alt="UPI QR" className="w-24 h-24 object-contain" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};

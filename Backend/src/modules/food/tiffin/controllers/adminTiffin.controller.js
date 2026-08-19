@@ -732,7 +732,7 @@ export const getTiffinDeliverySalaries = async (req, res) => {
 
         // Fetch all delivery partners
         const partners = await FoodDeliveryPartner.find({})
-            .select('name phone email profileImage status vehicleType active isOnline walletBalance')
+            .select('name phone email profileImage status vehicleType active isOnline walletBalance bankAccountHolderName bankAccountNumber bankIfscCode bankName upiId upiQrCode panNumber aadharNumber vehicleNumber')
             .lean();
 
         // Aggregate completed tiffin drops by delivery partner
@@ -799,6 +799,15 @@ export const getTiffinDeliverySalaries = async (req, res) => {
                 profileImage: p.profileImage,
                 status: p.status || 'approved',
                 vehicleType: p.vehicleType || 'Bike',
+                vehicleNumber: p.vehicleNumber || '',
+                bankAccountHolderName: p.bankAccountHolderName || '',
+                bankAccountNumber: p.bankAccountNumber || '',
+                bankIfscCode: p.bankIfscCode || '',
+                bankName: p.bankName || '',
+                upiId: p.upiId || '',
+                upiQrCode: p.upiQrCode || '',
+                panNumber: p.panNumber || '',
+                aadharNumber: p.aadharNumber || '',
                 ratePerDrop: baseDropRate,
                 totalDeliveries: dropData.totalDeliveries,
                 morningDeliveries: dropData.morningDeliveries,

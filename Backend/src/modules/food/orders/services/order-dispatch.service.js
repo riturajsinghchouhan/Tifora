@@ -77,7 +77,7 @@ async function filterPartnersByCashLimit(partners = [], options = {}) {
   // Since we are removing cash limit checks, we simply map partners to ensure they have expected shape.
   // We allow all partners to bypass cash limit.
   if (!Array.isArray(partners) || partners.length === 0) return [];
-  
+
   return partners.map((p) => ({
     ...p,
     availableCashLimit: Number.MAX_SAFE_INTEGER,
@@ -528,14 +528,14 @@ export async function tryAutoAssign(orderId, options = {}) {
       requiredAmount: 0,
       allowOverLimitFallback: true,
     };
-    
+
     logger.info(`[Dispatch] Order ${order._id} attempt=${attempt} maxKm=${maxKm} isResend=${Boolean(options.isResend)}`);
     const partnerSearch = options.isResend
       ? await listResendEligibleDeliveryPartners(order.restaurantId, {
-          maxKm,
-          requiredAmount: 0,
-          allowOverLimitFallback: true,
-        })
+        maxKm,
+        requiredAmount: 0,
+        allowOverLimitFallback: true,
+      })
       : await listNearbyOnlineDeliveryPartners(order.restaurantId, searchOptions);
     const { partners } = partnerSearch;
 
@@ -544,7 +544,7 @@ export async function tryAutoAssign(orderId, options = {}) {
 
     if (eligible.length === 0) {
       logger.info(`[Dispatch] No eligible partners in ${maxKm}km for order ${order._id} (Attempt ${attempt}). Advancing to next tier.`);
-      
+
       // No new riders in this radius. Advance to the next tier immediately.
       order.dispatch.status = 'unassigned';
       order.dispatch.deliveryPartnerId = null;
@@ -668,11 +668,11 @@ export async function processDispatchTimeout(orderId, partnerId, options = {}) {
       o => String(o.partnerId) === String(partnerId) && o.action === 'offered'
     );
     if (offer) offer.action = 'timeout';
-    
+
     order.dispatch.status = 'unassigned';
     order.dispatch.deliveryPartnerId = null;
     await order.save();
-    
+
     await removeDeliveryOffersForPartners([partnerId], orderId);
     logger.info(`[PM2 LOG] [Firebase DB] Removed timed-out offer from rider ${partnerId}`);
 
@@ -691,7 +691,7 @@ export async function processDispatchTimeout(orderId, partnerId, options = {}) {
         updated = true;
       }
     }
-    
+
     if (updated) {
       logger.info(`[PM2 LOG] [Dispatch] Marked broadcasted offers as timeout for order ${orderId}. Advancing cycle.`);
       await order.save();
@@ -771,16 +771,16 @@ async function resendDeliveryNotificationForOrder(order) {
     : 0;
   const notifiedPartnerIds = Array.isArray(refreshed?.dispatch?.offeredTo)
     ? refreshed.dispatch.offeredTo
-        .filter((entry) => entry?.action === 'offered' && entry?.partnerId)
-        .map((entry) => String(entry.partnerId))
+      .filter((entry) => entry?.action === 'offered' && entry?.partnerId)
+      .map((entry) => String(entry.partnerId))
     : [];
   const io = getIO();
   const connectedSocketCount = io
     ? notifiedPartnerIds.reduce((count, pid) => {
-        const roomName = rooms.delivery(pid);
-        const roomSize = io?.sockets?.adapter?.rooms?.get(roomName)?.size || 0;
-        return count + roomSize;
-      }, 0)
+      const roomName = rooms.delivery(pid);
+      const roomSize = io?.sockets?.adapter?.rooms?.get(roomName)?.size || 0;
+      return count + roomSize;
+    }, 0)
     : 0;
 
   return {

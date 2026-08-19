@@ -17,7 +17,7 @@ import {
     Send
 } from 'lucide-react';
 import api from '@/services/api';
-import { DisburseSalaryModal, PayRateConfigModal } from './components/SalaryModals';
+import { DisburseSalaryModal, PayRateConfigModal, RiderDetailsModal } from './components/SalaryModals';
 
 const TiffinDeliverySalary = () => {
     const [loading, setLoading] = useState(true);
@@ -38,6 +38,14 @@ const TiffinDeliverySalary = () => {
     const [baseRate, setBaseRate] = useState(25);
     const [isSavingRate, setIsSavingRate] = useState(false);
     const [isRateModalOpen, setIsRateModalOpen] = useState(false);
+
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [selectedDetailsRider, setSelectedDetailsRider] = useState(null);
+
+    const handleOpenDetailsModal = (rider) => {
+        setSelectedDetailsRider(rider);
+        setIsDetailsModalOpen(true);
+    };
 
     const [selectedRider, setSelectedRider] = useState(null);
     const [isDisburseModalOpen, setIsDisburseModalOpen] = useState(false);
@@ -249,9 +257,14 @@ const TiffinDeliverySalary = () => {
                                             )}
                                         </td>
                                         <td className="py-4 px-4 text-right">
-                                            <button onClick={() => handleOpenDisburseModal(r)} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white flex items-center gap-1 ml-auto">
-                                                <Send className="w-3 h-3" /> <span>Pay</span>
-                                            </button>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button onClick={() => handleOpenDetailsModal(r)} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-neutral-800 text-slate-700 dark:text-neutral-300 flex items-center gap-1 border border-slate-200 dark:border-neutral-700 hover:bg-slate-200 dark:hover:bg-neutral-700">
+                                                    <User className="w-3 h-3" /> <span>Details</span>
+                                                </button>
+                                                <button onClick={() => handleOpenDisburseModal(r)} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white flex items-center gap-1">
+                                                    <Send className="w-3 h-3" /> <span>Pay</span>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -290,6 +303,7 @@ const TiffinDeliverySalary = () => {
 
             <DisburseSalaryModal isOpen={isDisburseModalOpen} selectedRider={selectedRider} form={disburseForm} setForm={setDisburseForm} submitting={submittingDisburse} onSubmit={handleSubmitDisburse} onClose={() => setIsDisburseModalOpen(false)} />
             <PayRateConfigModal isOpen={isRateModalOpen} baseRate={baseRate} setBaseRate={setBaseRate} isSaving={isSavingRate} onSave={handleSaveRateConfig} onClose={() => setIsRateModalOpen(false)} />
+            <RiderDetailsModal isOpen={isDetailsModalOpen} rider={selectedDetailsRider} onClose={() => setIsDetailsModalOpen(false)} />
         </div>
     );
 };
