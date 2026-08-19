@@ -3867,15 +3867,27 @@ function OrderCard({
   // OTP column
   if (normalizedStatus === "pending" || normalizedStatus === "confirmed" || normalizedStatus === "created" || isPreparing || isReady) {
     if (type === "Home Delivery") {
-      cols.push(
-        <div key="otp" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
-          <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0 lg:w-4 lg:h-4" />
-          <div className="flex flex-col items-start leading-[1.1]">
-            <span className="text-[8px] font-bold text-slate-600 whitespace-nowrap lg:text-[9px]">OTP shown upon</span>
-            <span className="text-[8px] font-bold text-slate-600 whitespace-nowrap lg:text-[9px]">rider arrival</span>
+      if (deliveryPartnerId && pickupOtp) {
+        cols.push(
+          <div key="otp" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+            <Lock className="w-3.5 h-3.5 text-emerald-500 shrink-0 lg:w-4 lg:h-4" />
+            <div className="flex flex-col items-start leading-tight">
+              <span className="text-[8px] font-bold text-slate-500 whitespace-nowrap lg:text-[9px]">Pickup OTP</span>
+              <span className="text-[11px] font-black text-emerald-700 tracking-widest lg:text-[12px]">{pickupOtp}</span>
+            </div>
           </div>
-        </div>
-      );
+        );
+      } else {
+        cols.push(
+          <div key="otp" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+            <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0 lg:w-4 lg:h-4" />
+            <div className="flex flex-col items-start leading-[1.1]">
+              <span className="text-[8px] font-bold text-slate-600 whitespace-nowrap lg:text-[9px]">OTP shown upon</span>
+              <span className="text-[8px] font-bold text-slate-600 whitespace-nowrap lg:text-[9px]">rider arrival</span>
+            </div>
+          </div>
+        );
+      }
     } else if (pickupOtp) {
       cols.push(
         <div key="otp" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
