@@ -21,6 +21,13 @@ import {
   Users,
   MessageSquare,
   FileText,
+  User,
+  Bike,
+  UserCheck,
+  UserX,
+  Timer,
+  Lock,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import notificationSound from "@food/assets/audio/alert.mp3";
@@ -3742,194 +3749,260 @@ function OrderCard({
   const normalizedStatus = String(status || "").toLowerCase();
   const isReady = normalizedStatus === "ready";
   const isPreparing = normalizedStatus === "preparing";
-  const brandColor = "#7e3866";
-
-  let statusLabel = String(status || "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-
-  // If the restaurant hasn't accepted it yet, show it as Pending instead of Confirmed
+  
+  let statusBadgeColor = "bg-slate-500 text-white";
+  let statusLabel = String(status || "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  
   if (normalizedStatus === "confirmed" || normalizedStatus === "created") {
     statusLabel = "Pending";
+    statusBadgeColor = "bg-amber-500 text-white";
+  } else if (isPreparing) {
+    statusBadgeColor = "bg-[#7e3866] text-white";
+  } else if (isReady) {
+    statusBadgeColor = "bg-emerald-500 text-white";
+  } else if (normalizedStatus === "out_for_delivery") {
+    statusBadgeColor = "bg-blue-500 text-white";
+  }
+
+  const itemsArray = itemsSummary ? itemsSummary.split(", ") : [];
+  const displayItems = itemsArray.slice(0, 3).join(", ");
+  const extraItemsCount = itemsArray.length > 3 ? itemsArray.length - 3 : 0;
+
+  // Dynamic columns for the Info Bar based on state
+  const cols = [];
+
+  // Col 1: Always Time Placed
+  cols.push(
+    <div key="time" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0 lg:w-4 lg:h-4" />
+      <div className="flex flex-col items-start leading-tight">
+        <span className="text-[10px] font-black text-slate-900 whitespace-nowrap lg:text-[11px]">{timePlaced}</span>
+        <span className="text-[8px] font-semibold text-slate-400 whitespace-nowrap lg:text-[9px]">Time Placed</span>
+      </div>
+    </div>
+  );
+
+  // Remaining columns based on status
+  if (normalizedStatus === "pending" || normalizedStatus === "confirmed" || normalizedStatus === "created") {
+    if (eta) {
+      cols.push(
+        <div key="eta" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+          <Timer className="w-3.5 h-3.5 text-slate-400 shrink-0 lg:w-4 lg:h-4" />
+          <span className="text-[10px] font-black text-slate-600 whitespace-nowrap lg:text-[11px]">
+            ETA: <span className="text-orange-500">{eta}</span>
+          </span>
+        </div>
+      );
+    }
+  } else if (isPreparing) {
+    cols.push(
+      <div key="rider" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+        {deliveryPartnerId ? (
+          <>
+            <UserCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 lg:w-4 lg:h-4" />
+            <span className="text-[9px] font-black text-emerald-600 leading-tight lg:text-[11px]">Rider<br/>Assigned</span>
+          </>
+        ) : (
+          <>
+            <UserX className="w-3.5 h-3.5 text-red-500 shrink-0 lg:w-4 lg:h-4" />
+            <span className="text-[10px] font-black text-red-600 whitespace-nowrap lg:text-[11px]">No Rider</span>
+          </>
+        )}
+      </div>
+    );
+    if (eta) {
+      cols.push(
+        <div key="eta" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+          <Timer className="w-3.5 h-3.5 text-slate-400 shrink-0 lg:w-4 lg:h-4" />
+          <span className="text-[10px] font-black text-slate-600 whitespace-nowrap lg:text-[11px]">
+            ETA: <span className="text-[#7e3866]">{eta}</span>
+          </span>
+        </div>
+      );
+    }
+  } else if (isReady) {
+    cols.push(
+      <div key="rider" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+        {deliveryPartnerId ? (
+          <>
+            <UserCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 lg:w-4 lg:h-4" />
+            <span className="text-[10px] font-black text-emerald-600 whitespace-nowrap lg:text-[11px]">Rider Assigned</span>
+          </>
+        ) : (
+          <>
+            <UserX className="w-3.5 h-3.5 text-red-500 shrink-0 lg:w-4 lg:h-4" />
+            <span className="text-[10px] font-black text-red-600 whitespace-nowrap lg:text-[11px]">No Rider</span>
+          </>
+        )}
+      </div>
+    );
+  } else if (normalizedStatus === "out_for_delivery") {
+    cols.push(
+      <div key="rider" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+        {deliveryPartnerId ? (
+          <>
+            <UserCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0 lg:w-4 lg:h-4" />
+            <span className="text-[10px] font-black text-emerald-600 whitespace-nowrap lg:text-[11px]">Rider Assigned</span>
+          </>
+        ) : (
+          <>
+            <UserX className="w-3.5 h-3.5 text-red-500 shrink-0 lg:w-4 lg:h-4" />
+            <span className="text-[10px] font-black text-red-600 whitespace-nowrap lg:text-[11px]">No Rider</span>
+          </>
+        )}
+      </div>
+    );
+    if (eta) {
+      cols.push(
+        <div key="eta" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+          <Timer className="w-3.5 h-3.5 text-slate-400 shrink-0 lg:w-4 lg:h-4" />
+          <span className="text-[10px] font-black text-slate-600 whitespace-nowrap lg:text-[11px]">
+            ETA: <span className="text-blue-500">{eta}</span>
+          </span>
+        </div>
+      );
+    }
+  }
+
+  // OTP column
+  if (normalizedStatus === "pending" || normalizedStatus === "confirmed" || normalizedStatus === "created" || isPreparing || isReady) {
+    if (type === "Home Delivery") {
+      cols.push(
+        <div key="otp" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+          <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0 lg:w-4 lg:h-4" />
+          <div className="flex flex-col items-start leading-[1.1]">
+            <span className="text-[8px] font-bold text-slate-600 whitespace-nowrap lg:text-[9px]">OTP shown upon</span>
+            <span className="text-[8px] font-bold text-slate-600 whitespace-nowrap lg:text-[9px]">rider arrival</span>
+          </div>
+        </div>
+      );
+    } else if (pickupOtp) {
+      cols.push(
+        <div key="otp" className="flex-1 p-1 px-1.5 flex items-center justify-center gap-1.5 lg:p-2 lg:px-3">
+          <Lock className="w-3.5 h-3.5 text-emerald-500 shrink-0 lg:w-4 lg:h-4" />
+          <div className="flex flex-col items-start leading-tight">
+            <span className="text-[8px] font-bold text-slate-500 whitespace-nowrap lg:text-[9px]">Pickup OTP</span>
+            <span className="text-[11px] font-black text-emerald-700 tracking-widest lg:text-[12px]">{pickupOtp}</span>
+          </div>
+        </div>
+      );
+    }
   }
 
   return (
-    <div className="restaurant-bento-card restaurant-order-list-card w-full p-3 mb-3 lg:mb-0 h-full relative overflow-hidden active:bg-slate-50 transition-colors lg:p-4">
-      <div
-        className="absolute top-0 left-0 w-1 h-full"
-        style={{ backgroundColor: brandColor }}
-      />
-
-      <div
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm active:bg-slate-50 transition-colors w-full mb-3 lg:mb-0">
+      <div 
         onClick={() => onSelect?.({ orderId, mongoId, status, customerName, type, tableOrToken, timePlaced, eta, itemsSummary, paymentMethod, scheduledAt, restaurantNote, pickupOtp, deliveryPartnerId, dispatchStatus, cancellationReason, rejectionReason })}
-        className="flex gap-3 items-start cursor-pointer pl-1 lg:grid lg:grid-cols-[88px_minmax(0,1.6fr)_minmax(220px,0.95fr)_auto] lg:items-center lg:gap-5 lg:pl-2"
+        className="cursor-pointer"
       >
-        <div className="h-14 w-14 rounded-lg overflow-hidden bg-slate-50 flex-shrink-0 border border-slate-100 mt-0.5 lg:h-[88px] lg:w-[88px] lg:rounded-2xl lg:mt-0">
-          {photoUrl ? (
-            <img src={photoUrl} alt={photoAlt} className="h-full w-full object-cover" />
-          ) : (
-            <div className="h-full w-full flex items-center justify-center p-1 bg-slate-50">
-              <span className="text-[8px] font-bold text-slate-300 text-center leading-none uppercase lg:text-[10px]">
-                {photoAlt}
-              </span>
-            </div>
-          )}
-        </div>
+        {/* Top Section */}
+        <div className="p-3 flex gap-3 items-start lg:p-4">
+           {/* Image */}
+           <div className="w-[84px] h-[84px] shrink-0 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 lg:w-[100px] lg:h-[100px]">
+             {photoUrl ? (
+               <img src={photoUrl} alt={photoAlt} className="w-full h-full object-cover" />
+             ) : (
+               <div className="w-full h-full flex items-center justify-center p-1">
+                 <span className="text-[9px] font-bold text-slate-400 text-center uppercase">{photoAlt}</span>
+               </div>
+             )}
+           </div>
 
-        <div className="flex-1 min-w-0 flex flex-col lg:min-h-[88px] lg:justify-center">
-          <div className="flex items-center justify-between gap-2 mb-1 lg:mb-1.5">
-            <div className="min-w-0">
-              <h3 className="text-[13px] font-black text-slate-900 truncate lg:text-[17px]">
-                #<span style={{ color: brandColor }}>{orderId}</span>
-              </h3>
-              <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold uppercase tracking-tight mt-1 lg:text-[10px] lg:justify-start lg:gap-3">
-                <span className="truncate max-w-[60%] lg:max-w-none">{customerName}</span>
-                <span className="whitespace-nowrap">{type}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-shrink-0 lg:hidden">
-              {scheduledAt && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-50 text-green-600 border border-green-100 text-[8px] font-black uppercase">
-                  <Calendar className="w-2 h-2" />
-                  Scheduled
-                </span>
-              )}
-              <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black border uppercase tracking-wider ${
-                isReady ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                normalizedStatus === "confirmed" ? "bg-amber-50 text-amber-600 border-amber-100" :
-                "bg-slate-50 text-slate-500 border-slate-100"
-              }`}>
-                {statusLabel}
-              </span>
-            </div>
-          </div>
-
-          <p className="text-[10px] text-slate-600 font-bold truncate italic mb-1 lg:mb-1.5 lg:text-[12px] lg:not-italic">
-            {itemsSummary}
-          </p>
-
-          {restaurantNote && (
-            <div className="mb-2 px-2 py-1 bg-blue-50 border border-blue-100 rounded-md lg:mb-0 lg:max-w-[440px]">
-              <p className="text-[9px] text-blue-700 font-bold line-clamp-1 italic lg:text-[10px]">
-                Note: {restaurantNote}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 w-full lg:w-auto lg:min-w-[220px] lg:justify-center">
-          <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:gap-2">
-            {scheduledAt && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 text-green-600 border border-green-100 text-[10px] font-black uppercase">
-                <Calendar className="w-3 h-3" />
-                Scheduled
-              </span>
-            )}
-            <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black border uppercase tracking-wider ${
-              isReady ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-              normalizedStatus === "confirmed" ? "bg-amber-50 text-amber-600 border-amber-100" :
-              "bg-slate-50 text-slate-500 border-slate-100"
-            }`}>
-              {statusLabel}
-            </span>
-            {deliveryPartnerId ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase text-emerald-700 border border-emerald-100">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Rider Assigned
-              </span>
-            ) : isPreparing ? (
-              <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-1 text-[10px] font-black uppercase text-slate-500 border border-slate-100">
-                No Rider
-              </span>
-            ) : null}
-          </div>
-
-          {pickupOtp ? (
-            <div className="px-2 py-1.5 bg-emerald-50 border border-emerald-100 rounded flex justify-between items-center" onClick={(e) => e.stopPropagation()}>
-              <span className="text-[9px] font-bold text-emerald-700 uppercase">Pickup OTP</span>
-              <span className="text-[13px] font-black text-emerald-800 tracking-[0.2em]">{pickupOtp}</span>
-            </div>
-          ) : (isReady || isPreparing || normalizedStatus === "confirmed") && type === "Home Delivery" ? (
-            <div className="px-2 py-1 bg-gray-50 border border-gray-100 rounded flex justify-center items-center lg:justify-start">
-              <span className="text-[8px] font-bold text-gray-500 uppercase tracking-wider text-center lg:text-left">OTP shown upon rider arrival</span>
-            </div>
-          ) : null}
-
-          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-50 lg:border-t-0 lg:pt-0">
-            {scheduledAt ? (
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[8px] font-bold text-green-600 uppercase">Scheduled For</span>
-                <span className="text-[10px] font-black text-green-700 lg:text-[11px]">
-                  {new Date(scheduledAt).toLocaleString("en-US", {
-                    day: "numeric",
-                    month: "short",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}
+           {/* Details */}
+           <div className="flex-1 min-w-0 flex flex-col justify-between">
+              {/* Row 1: Order ID & Status */}
+              <div className="flex justify-between items-start mb-1.5">
+                <h3 className="text-[15px] font-black text-slate-900 leading-none">
+                  #{orderId}
+                </h3>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide shrink-0 ${statusBadgeColor}`}>
+                  {statusLabel}
                 </span>
               </div>
-            ) : (
-              <div className="flex flex-col gap-0.5 lg:gap-1">
-                {!isReady && eta && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[8px] font-bold text-slate-400 uppercase">ETA</span>
-                    <span className="text-[11px] font-black text-slate-800 lg:text-[13px]">{eta}</span>
+
+              {/* Row 2: Customer & Type */}
+              <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-500 font-medium mb-2">
+                <div className="flex items-center gap-1">
+                  <User className="w-3 h-3 text-slate-400" />
+                  <span className="truncate max-w-[100px]">{customerName}</span>
+                </div>
+                <span className="text-slate-300">•</span>
+                <div className="flex items-center gap-1">
+                  <Bike className="w-3 h-3 text-slate-400" />
+                  <span className="whitespace-nowrap">{type}</span>
+                </div>
+              </div>
+
+              {/* Row 3: Items */}
+              <div className="text-[12px] font-medium text-slate-700 leading-snug">
+                {displayItems}
+              </div>
+
+              {/* Row 4: Extra Items and Floating Resend Button (if not preparing) */}
+              <div className="mt-1 flex items-end justify-between">
+                <div className="text-[10px] text-slate-500 font-bold">
+                  {extraItemsCount > 0 ? `+ ${extraItemsCount} more ${extraItemsCount === 1 ? 'item' : 'items'}` : '\u00A0'}
+                </div>
+                
+                {/* Resend button inside Top Section for Pending/Ready/OutForDelivery */}
+                {!isPreparing && dispatchStatus !== "accepted" && (normalizedStatus === "pending" || normalizedStatus === "confirmed" || normalizedStatus === "created" || isReady) && (
+                  <div className="shrink-0 -mb-1">
+                    <ResendNotificationButton
+                      orderId={orderId}
+                      mongoId={mongoId}
+                      onSuccess={onSelect}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-white text-red-600 border border-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                    />
                   </div>
                 )}
-                <span className="text-[7px] text-slate-300 font-bold uppercase lg:text-[9px] lg:text-slate-400">{timePlaced}</span>
               </div>
-            )}
 
-            <div className="flex items-center gap-1.5 flex-shrink-0 lg:hidden">
-              {(isPreparing || isReady || normalizedStatus === "confirmed") && dispatchStatus !== "accepted" && (
-                <ResendNotificationButton
-                  orderId={orderId}
-                  mongoId={mongoId}
-                  onSuccess={onSelect}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 flex-shrink-0 w-full justify-end lg:w-auto lg:min-w-[168px] lg:justify-end">
-          {(isPreparing || isReady || normalizedStatus === "confirmed") && (
-            <>
-              {deliveryPartnerId && (
-                <div className="h-5 w-5 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 lg:hidden" title="Driver Assigned">
-                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+              {/* Note */}
+              {restaurantNote && (
+                <div className="mt-2 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md line-clamp-1 italic">
+                  Note: {restaurantNote}
                 </div>
               )}
+           </div>
+        </div>
 
-              {dispatchStatus !== "accepted" && (
-                <ResendNotificationButton
-                  orderId={orderId}
-                  mongoId={mongoId}
-                  onSuccess={onSelect}
-                />
-              )}
-            </>
-          )}
-
-          {isPreparing && onMarkReady && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMarkReady({ orderId, mongoId, customerName });
-              }}
-              disabled={isMarkingReady}
-              className="px-3 py-1.5 rounded-lg text-[9px] font-black text-white shadow-sm transition-transform active:scale-95 disabled:opacity-50 lg:min-w-[112px] lg:px-4 lg:py-2 lg:text-[11px]"
-              style={{ backgroundColor: brandColor }}>
-              {isMarkingReady ? "..." : "MARK READY"}
-            </button>
-          )}
+        {/* Middle Section (Info Bar) */}
+        <div className="border-t border-slate-100 flex items-stretch divide-x divide-slate-100 min-h-[44px]">
+           {cols}
         </div>
       </div>
+
+      {/* Bottom Section (Buttons) - ONLY FOR PREPARING */}
+      {isPreparing && onMarkReady && (
+        <div className="p-3 pt-2 flex gap-2 w-full lg:p-4 lg:pt-3 bg-white">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMarkReady({ orderId, mongoId, customerName });
+            }}
+            disabled={isMarkingReady}
+            className="flex-1 bg-[#7e3866] hover:bg-[#682e54] text-white rounded-lg h-10 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            <span className="text-[12px] font-bold uppercase tracking-wider">
+              {isMarkingReady ? "Marking..." : "Mark Ready"}
+            </span>
+          </button>
+
+          {/* Resend button inside Bottom Section for Preparing */}
+          {dispatchStatus !== "accepted" && (
+            <div className="shrink-0 flex items-center">
+              <ResendNotificationButton
+                orderId={orderId}
+                mongoId={mongoId}
+                onSuccess={onSelect}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-bold bg-white text-red-600 border border-red-500 hover:bg-red-50 disabled:opacity-50 transition-colors h-10"
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

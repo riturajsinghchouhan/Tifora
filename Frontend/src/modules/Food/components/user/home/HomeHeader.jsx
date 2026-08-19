@@ -298,7 +298,7 @@ export default function HomeHeader({
       {/* Sticky Search Bar and VEG MODE Row (Mobile Only) */}
       <div
         id="home-header-search-row"
-        className={`md:hidden sticky z-[60] px-0 pb-2 transition-all duration-300 ${
+        className={`md:hidden sticky z-[60] -mx-3.5 sm:-mx-6 px-3.5 sm:px-6 pb-2 transition-all duration-300 ${
           isCategoryStuck
             ? 'top-0 pt-2 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-2xl shadow-sm'
             : 'top-0 pt-1.5 bg-gradient-to-b from-white/90 to-transparent dark:from-[#0a0a0a]/90 dark:to-transparent'
