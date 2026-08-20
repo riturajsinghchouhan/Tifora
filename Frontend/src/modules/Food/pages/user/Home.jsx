@@ -1524,6 +1524,7 @@ export default function Home() {
                 discount: restaurant.discount || 0,
                 distanceText: restaurant.distanceText || null,
                 distanceInfo: restaurant.distanceInfo || null,
+                plans: Array.isArray(restaurant.plans) ? restaurant.plans : [],
               };
             },
             );

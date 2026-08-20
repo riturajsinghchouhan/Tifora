@@ -382,6 +382,7 @@ export default function SearchResults() {
                 restaurantId: restaurantId,
                 hasPaneer: false, // Will be updated after menu fetch
                 category: 'all',
+                plans: Array.isArray(restaurant.plans) ? restaurant.plans : [],
               }
             })
 

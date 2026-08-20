@@ -47,7 +47,7 @@ function HomeRestaurantCard({
   const plansData = useMemo(() => {
     if (restaurant?.plans?.length > 0) {
       return restaurant.plans.map(p => ({
-        menu: `${p.name}: ${p.itemsDescription || "Contact for items"}`,
+        menu: p.itemsDescription || "Contact for items",
         price: p.price || "--"
       }));
     }
@@ -209,7 +209,7 @@ function HomeRestaurantCard({
                        >
                           {plansData.map((plan, idx) => (
                              <p key={idx} className="h-[28px] text-base lg:text-lg font-black text-gray-900 dark:text-white flex items-center">
-                               ₹{plan.price}<span className="text-xs font-medium text-gray-500 ml-1">/mo</span>
+                               ₹{plan.price}<span className="text-xs font-medium text-gray-500 ml-1">/month</span>
                              </p>
                           ))}
                        </div>
