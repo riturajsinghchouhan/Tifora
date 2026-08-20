@@ -428,59 +428,7 @@ function RestaurantDetailsContent() {
           const formattedAddress = formatRestaurantAddress(locationObj)
           debugLog('? Final Formatted Address:', formattedAddress)
 
-          // Calculate distance from user to restaurant (with routing multiplier)
-          const calculateDistance = (lat1, lng1, lat2, lng2) => {
-            const R = 6371 // Earth's radius in kilometers
-            const dLat = (lat2 - lat1) * Math.PI / 180
-            const dLng = (lng2 - lng1) * Math.PI / 180
-            const a =
-              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLng / 2) * Math.sin(dLng / 2)
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-            return (R * c) * 1.35 // Distance in kilometers with multiplier
-          }
 
-          // Get restaurant coordinates
-          // Priority: latitude/longitude fields > coordinates array (GeoJSON format: [lng, lat])
-          const restaurantLat = locationObj?.latitude || (locationObj?.coordinates && Array.isArray(locationObj.coordinates) ? locationObj.coordinates[1] : null)
-          const restaurantLng = locationObj?.longitude || (locationObj?.coordinates && Array.isArray(locationObj.coordinates) ? locationObj.coordinates[0] : null)
-
-          debugLog('? Restaurant coordinates:', { restaurantLat, restaurantLng, locationObj })
-
-          // Get user coordinates
-          const userLat = userLocation?.latitude
-          const userLng = userLocation?.longitude
-
-          debugLog('? User location:', { userLat, userLng, userLocation })
-
-          // Calculate distance if both coordinates are available
-          let calculatedDistance = null
-          if (apiRestaurant?.distanceText) {
-            calculatedDistance = apiRestaurant.distanceText
-          } else if (actualRestaurant?.distanceText) {
-            calculatedDistance = actualRestaurant.distanceText
-          } else if (userLat && userLng && restaurantLat && restaurantLng &&
-            !isNaN(userLat) && !isNaN(userLng) && !isNaN(restaurantLat) && !isNaN(restaurantLng)) {
-            const distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
-            // Format distance: show 1 decimal place if >= 1km, otherwise show in meters
-            if (distanceInKm >= 1) {
-              calculatedDistance = `${distanceInKm.toFixed(1)} km`
-            } else {
-              const distanceInMeters = Math.round(distanceInKm * 1000)
-              calculatedDistance = `${distanceInMeters} m`
-            }
-            debugLog('? Calculated distance from user to restaurant:', calculatedDistance, 'km:', distanceInKm)
-          } else {
-            debugWarn('? Cannot calculate distance - missing coordinates:', {
-              hasUserLocation: !!(userLat && userLng),
-              hasRestaurantLocation: !!(restaurantLat && restaurantLng),
-              userLat,
-              userLng,
-              restaurantLat,
-              restaurantLng
-            })
-          }
 
           // Resolve display category/cuisine with broad API compatibility
           const categoryFromArray = (list) => {
@@ -566,7 +514,6 @@ function RestaurantDetailsContent() {
             rating: actualRestaurant?.rating || apiRestaurant?.rating || actualRestaurant?.averageRating || apiRestaurant?.averageRating || null,
             reviews: actualRestaurant?.totalRatings || apiRestaurant?.totalRatings || actualRestaurant?.reviewCount || apiRestaurant?.reviewCount || actualRestaurant?.reviews?.length || apiRestaurant?.reviews?.length || 0,
             deliveryTime: actualRestaurant?.estimatedDeliveryTime || apiRestaurant?.estimatedDeliveryTime || actualRestaurant?.deliveryTime || apiRestaurant?.deliveryTime || actualRestaurant?.avgDeliveryTime || apiRestaurant?.avgDeliveryTime || "25-30 mins",
-            distance: calculatedDistance || actualRestaurant?.distance || apiRestaurant?.distance || actualRestaurant?.distanceFromUser || apiRestaurant?.distanceFromUser || "1.2 km",
             location: formattedAddress,
             locationObject: locationObj, // Store full location object for reference
             profileImage: resolvedProfileImage,
@@ -618,9 +565,7 @@ function RestaurantDetailsContent() {
             discount: actualRestaurant?.discount || apiRestaurant?.discount || 0,
             itemDiscounts: Array.isArray(actualRestaurant?.itemDiscounts) ? actualRestaurant.itemDiscounts : (Array.isArray(apiRestaurant?.itemDiscounts) ? apiRestaurant.itemDiscounts : []),
             discountRules: Array.isArray(actualRestaurant?.discountRules) ? actualRestaurant.discountRules : (Array.isArray(apiRestaurant?.discountRules) ? apiRestaurant.discountRules : []),
-            // Preserve backend-computed road distance so it stays consistent with the Home page listing
-            distanceText: apiRestaurant?.distanceText || actualRestaurant?.distanceText || null,
-            distanceInfo: apiRestaurant?.distanceInfo || actualRestaurant?.distanceInfo || null,
+            zoneRank: actualRestaurant?.zoneRank || apiRestaurant?.zoneRank || null,
           }
 
           debugLog('? Transformed restaurant:', transformedRestaurant)
@@ -1106,93 +1051,6 @@ function RestaurantDetailsContent() {
   const prevCoordsRef = useRef({ userLat: null, userLng: null, restaurantLat: null, restaurantLng: null })
   const prevDistanceRef = useRef(null)
 
-  // Extract restaurant coordinates as stable values (not array references)
-  const restaurantLat = restaurant?.locationObject?.latitude ||
-    (restaurant?.locationObject?.coordinates && Array.isArray(restaurant.locationObject.coordinates)
-      ? restaurant.locationObject.coordinates[1]
-      : null)
-  const restaurantLng = restaurant?.locationObject?.longitude ||
-    (restaurant?.locationObject?.coordinates && Array.isArray(restaurant.locationObject.coordinates)
-      ? restaurant.locationObject.coordinates[0]
-      : null)
-
-  // Recalculate distance when user location updates
-  useEffect(() => {
-    if (!restaurant || !userLocation?.latitude || !userLocation?.longitude) return
-    if (!restaurantLat || !restaurantLng) return
-
-    const userLat = userLocation.latitude
-    const userLng = userLocation.longitude
-
-    // Check if coordinates have actually changed (with small threshold to avoid floating point issues)
-    const coordsChanged =
-      Math.abs(prevCoordsRef.current.userLat - userLat) > 0.0001 ||
-      Math.abs(prevCoordsRef.current.userLng - userLng) > 0.0001 ||
-      Math.abs(prevCoordsRef.current.restaurantLat - restaurantLat) > 0.0001 ||
-      Math.abs(prevCoordsRef.current.restaurantLng - restaurantLng) > 0.0001
-
-    // Skip recalculation if coordinates haven't changed
-    if (!coordsChanged && prevDistanceRef.current !== null) {
-      return
-    }
-
-    // Update refs with current coordinates
-    prevCoordsRef.current = { userLat, userLng, restaurantLat, restaurantLng }
-
-    if (userLat && userLng && restaurantLat && restaurantLng &&
-      !isNaN(userLat) && !isNaN(userLng) && !isNaN(restaurantLat) && !isNaN(restaurantLng)) {
-
-      // Calculate distance (with routing multiplier)
-      const calculateDistance = (lat1, lng1, lat2, lng2) => {
-        const R = 6371 // Earth's radius in kilometers
-        const dLat = (lat2 - lat1) * Math.PI / 180
-        const dLng = (lng2 - lng1) * Math.PI / 180
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-          Math.sin(dLng / 2) * Math.sin(dLng / 2)
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        return (R * c) * 1.35 // Distance in kilometers with multiplier
-      }
-
-      let calculatedDistance = null
-      let distanceInKm = null
-
-      if (restaurant?.distanceText) {
-        // Prefer backend-computed road distance (Google Distance Matrix) — same source as Home page
-        calculatedDistance = restaurant.distanceText
-        distanceInKm = restaurant.distanceInfo?.distanceValue ? (restaurant.distanceInfo.distanceValue / 1000) : null
-      } else {
-        distanceInKm = calculateDistance(userLat, userLng, restaurantLat, restaurantLng)
-        // Format distance: show 1 decimal place if >= 1km, otherwise show in meters
-        if (distanceInKm >= 1) {
-          calculatedDistance = `${distanceInKm.toFixed(1)} km`
-        } else {
-          const distanceInMeters = Math.round(distanceInKm * 1000)
-          calculatedDistance = `${distanceInMeters} m`
-        }
-      }
-
-      // Only update if distance actually changed
-      if (calculatedDistance !== prevDistanceRef.current) {
-        debugLog('? Recalculated distance from user to restaurant:', calculatedDistance, 'km:', distanceInKm)
-        prevDistanceRef.current = calculatedDistance
-
-        // Update restaurant distance
-        setRestaurant(prev => {
-          // Only update if distance actually changed to prevent infinite loop
-          if (prev?.distance === calculatedDistance) {
-            return prev
-          }
-          return {
-            ...prev,
-            distance: calculatedDistance
-          }
-        })
-      }
-    }
-  }, [userLocation?.latitude, userLocation?.longitude, restaurantLat, restaurantLng])
-
   // Sync quantities from cart on mount and when restaurant changes
   useEffect(() => {
     if (!restaurant || !restaurant.name) return
@@ -1562,8 +1420,7 @@ function RestaurantDetailsContent() {
         name: restaurant.name || "",
         cuisine: restaurant.cuisine || "",
         rating: restaurant.rating || 0,
-        deliveryTime: restaurant.deliveryTime || restaurant.estimatedDeliveryTime || "",
-        distance: restaurant.distance || "",
+        deliveryTime: restaurant.deliveryTime,
         priceRange: restaurant.priceRange || "",
         image: restaurant.profileImageUrl?.url || restaurant.image || ""
       })
@@ -2453,8 +2310,6 @@ function RestaurantDetailsContent() {
     return "North Indian"
   }, [restaurant?.cuisines, restaurant?.topCategory, restaurant?.cuisine])
 
-  const formattedDistance = restaurant?.distance || restaurant?.distanceText || "15 m"
-
   if (loadingRestaurant && !restaurant) {
     return (
       <>
@@ -2640,10 +2495,8 @@ function RestaurantDetailsContent() {
                   <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight leading-tight truncate">
                     {restaurant?.name || "Unknown Restaurant"}
                   </h1>
-                  <p className="mt-1 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {formattedCuisines}
-                    {formattedCuisines && formattedDistance ? " • " : ""}
-                    {formattedDistance}
                   </p>
                 </div>
 
@@ -2778,20 +2631,6 @@ function RestaurantDetailsContent() {
 
           {/* Tiffin Plans Section (Always visible for kitchens with active plans) */}
           <TiffinPlansSection restaurantId={restaurant?.restaurantId || restaurant?.id || restaurant?._id} />
-
-          {/* Restaurant Menu / Instant Orders header (Commented out as requested) */}
-          {/* <div className="mt-8 mb-4 px-4 sm:px-0">
-            <div className="flex flex-col items-center text-center bg-white dark:bg-[#1f1f1f] border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-md">
-               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary mb-1.5">
-                  <Timer className="h-3.5 w-3.5" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider">Restaurant Menu</span>
-               </div>
-               <h2 className="text-lg font-black text-gray-900 dark:text-white tracking-tight leading-none">
-                  Instant Orders
-               </h2>
-               <p className="text-xs text-gray-500 mt-1 font-medium">À la carte items delivered hot & fresh.</p>
-            </div>
-          </div> */}
 
           {/* Filter/Category Buttons */}
           <div className="border-y border-gray-200 py-3 -mx-4 px-4">
@@ -3486,10 +3325,6 @@ function RestaurantDetailsContent() {
                                 <div className="flex items-center gap-1">
                                   <Clock className="h-3.5 w-3.5" />
                                   <span>{outlet?.deliveryTime || "25-30 mins"}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <MapPin className="h-3.5 w-3.5" />
-                                  <span>{outlet?.distance || "1.2 km"}</span>
                                 </div>
                               </div>
                               <div className="flex flex-col items-end gap-0.5">

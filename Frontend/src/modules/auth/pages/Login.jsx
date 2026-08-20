@@ -134,7 +134,7 @@ export default function UnifiedOTPFastLogin() {
                   fcmToken = t.trim()
                   break
                 }
-              } catch (e) {}
+              } catch (e) { }
             }
           } else {
             fcmToken = localStorage.getItem("fcm_web_registered_token_user") || null
@@ -157,7 +157,7 @@ export default function UnifiedOTPFastLogin() {
         platform
       )
       const data = response?.data?.data || response?.data || {}
-      
+
       const needsName =
         data.needsName === true ||
         data.isNewUser === true ||
@@ -281,13 +281,13 @@ export default function UnifiedOTPFastLogin() {
   return (
     <div className="min-h-screen w-full bg-[#E5F5EF] flex items-center justify-center p-0 sm:p-4 select-none font-sans">
       {/* Centered Phone Canvas Wrapper with auth-bg.png Background */}
-      <div 
+      <div
         className="relative w-full max-w-[440px] min-h-screen sm:min-h-[920px] sm:max-h-[960px] sm:rounded-[40px] shadow-2xl overflow-hidden flex flex-col justify-between bg-cover bg-top bg-no-repeat border border-emerald-100/50"
         style={{ backgroundImage: `url(${authBg})` }}
       >
         {/* Main Content Overlay */}
         <div className="relative z-10 w-full px-5 sm:px-6 pt-10 sm:pt-12 pb-4 flex flex-col items-center">
-          
+
           {/* Top Logo & Branding */}
           <div className="flex flex-col items-center text-center mb-5 sm:mb-6">
             {/* Tifora Emerald Emblem */}
@@ -295,9 +295,7 @@ export default function UnifiedOTPFastLogin() {
               <img src={logoNew} alt="Tifora" className="w-full h-full object-contain" />
             </div>
 
-            <span className="text-2xl font-black text-slate-900 tracking-tight">
-              Tifora
-            </span>
+
 
             <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-3">
               Welcome to <span className="text-[#00C28A]">Tifora</span>

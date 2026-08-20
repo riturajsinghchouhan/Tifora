@@ -159,8 +159,6 @@ function HomeRestaurantCard({
                     <div className="flex items-center gap-1.5 text-[11px] lg:text-xs text-gray-500 dark:text-gray-400 mt-1">
                        <MapPin className="h-3.5 w-3.5 shrink-0" />
                        <span className="truncate max-w-[120px]">{typeof restaurant.address === 'object' ? restaurant.address?.locality || restaurant.address?.city : restaurant.address || restaurant.locationName || "Nearby"}</span>
-                       <span className="mx-0.5">•</span>
-                       <span className="font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">{restaurant.distance || restaurant.distanceText || ""}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

@@ -17,7 +17,9 @@ import { API_BASE_URL } from "@food/api/config"
 import { initRazorpayPayment } from "@food/utils/razorpay"
 import { toast } from "sonner"
 import { getCompanyNameAsync } from "@food/utils/businessSettings"
-import { calculateDistance } from "@food/utils/common"
+import {
+  extractImages,
+} from "@food/utils/common"
 import { useCompanyName } from "@food/hooks/useCompanyName"
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation"
@@ -1043,16 +1045,7 @@ export default function Cart() {
 
   // Use backend pricing if available, otherwise fallback to database fee settings
   const subtotal = pricing?.subtotal || cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0)
-  const orderDistanceKm = useMemo(() => {
-    const rCoords = restaurantData?.location?.coordinates
-    const dCoords = defaultAddress?.location?.coordinates
-    if (!Array.isArray(rCoords) || !Array.isArray(dCoords)) return null
-    if (rCoords.length !== 2 || dCoords.length !== 2) return null
-    const [rLng, rLat] = rCoords
-    const [dLng, dLat] = dCoords
-    return calculateDistance(rLat, rLng, dLat, dLng)
-  }, [restaurantData, defaultAddress])
-
+  // Fallback to basic delivery fee if pricing calculation fails
   const fallbackDeliveryFee = (() => {
     if (appliedCoupon?.freeDelivery) {
       return 0
@@ -1061,27 +1054,6 @@ export default function Cart() {
     const freeUpTo = Number(feeSettings.freeDeliveryUpTo || 0)
     if (Number.isFinite(freeUpTo) && freeUpTo > 0 && subtotal >= freeUpTo) {
       return 0
-    }
-
-    const distanceKm = orderDistanceKm
-
-    const ranges = Array.isArray(feeSettings.deliveryFeeRanges) ? [...feeSettings.deliveryFeeRanges] : []
-    if (ranges.length > 0 && Number.isFinite(distanceKm)) {
-      const sortedRanges = ranges.sort((a, b) => Number(a.min) - Number(b.min))
-      for (let i = 0; i < sortedRanges.length; i += 1) {
-        const range = sortedRanges[i]
-        const min = Number(range.min)
-        const max = Number(range.max)
-        const fee = Number(range.fee)
-        const isLastRange = i === sortedRanges.length - 1
-        const inRange = isLastRange
-          ? distanceKm >= min
-          : distanceKm >= min && distanceKm < max
-
-        if (inRange) return fee
-      }
-
-      return Number(feeSettings.deliveryFee || 0)
     }
 
     return Number(feeSettings.deliveryFee || 0)
