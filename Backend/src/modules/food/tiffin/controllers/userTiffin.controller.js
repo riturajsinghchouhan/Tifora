@@ -1,6 +1,6 @@
 import { TiffinPlan } from '../models/tiffinPlan.model.js';
 import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
-import { ensureSubscriptionDeliveriesForDate, generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
+import { buildTiffinDeliveryAddressSnapshot, ensureSubscriptionDeliveriesForDate, generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
 import mongoose from 'mongoose';
 
 const getUserId = (req) => {
@@ -319,7 +319,7 @@ export const updateSubscriptionAddress = async (req, res) => {
     try {
         const userId = getUserId(req);
         const { subscriptionId } = req.params;
-        const { street, area, landmark, zone, city, state, zipCode, phone, name, fullName, label, location } = req.body;
+        const { street, area, landmark, zone, zoneId, city, state, zipCode, phone, name, fullName, label, location } = req.body;
 
         if (!street || !city) {
             return res.status(400).json({ success: false, message: 'Street address and City are required' });
@@ -364,6 +364,18 @@ export const updateSubscriptionAddress = async (req, res) => {
             normalizedLoc = subscription.deliveryAddress?.location || { type: 'Point', coordinates: [75.8577, 22.7196] };
         }
 
+        let normalizedZoneId = subscription.deliveryAddress?.zoneId || null;
+        if (zoneId !== undefined) {
+            const rawZoneId = String(zoneId || '').trim();
+            if (!rawZoneId) {
+                normalizedZoneId = null;
+            } else if (!mongoose.Types.ObjectId.isValid(rawZoneId)) {
+                return res.status(400).json({ success: false, message: 'Invalid zoneId' });
+            } else {
+                normalizedZoneId = new mongoose.Types.ObjectId(rawZoneId);
+            }
+        }
+
         subscription.deliveryAddress = {
             label: label || subscription.deliveryAddress?.label || 'Home',
             name: name || fullName || subscription.deliveryAddress?.name || '',
@@ -372,6 +384,8 @@ export const updateSubscriptionAddress = async (req, res) => {
             area: area ? area.trim() : subscription.deliveryAddress?.area || '',
             landmark: landmark ? landmark.trim() : subscription.deliveryAddress?.landmark || '',
             zone: zone ? zone.trim() : subscription.deliveryAddress?.zone || '',
+            zoneId: normalizedZoneId,
+            additionalDetails: subscription.deliveryAddress?.additionalDetails || '',
             city: city.trim(),
             state: state ? state.trim() : (subscription.deliveryAddress?.state || 'Madhya Pradesh'),
             zipCode: zipCode ? zipCode.trim() : subscription.deliveryAddress?.zipCode || '',
@@ -389,7 +403,7 @@ export const updateSubscriptionAddress = async (req, res) => {
                 status: 'pending'
             },
             {
-                $set: { deliveryAddress: subscription.deliveryAddress }
+                $set: { deliveryAddress: buildTiffinDeliveryAddressSnapshot(subscription.deliveryAddress) }
             }
         );
 

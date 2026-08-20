@@ -25,12 +25,18 @@ const tiffinDeliverySchema = new mongoose.Schema(
                 coordinates: { type: [Number], default: [75.8577, 22.7196] }
             },
             fullAddress: { type: String, default: '' },
+            street: { type: String, default: '' },
+            additionalDetails: { type: String, default: '' },
             phone: { type: String, default: '' },
             name: { type: String, default: '' },
+            fullName: { type: String, default: '' },
             area: { type: String, default: '' },
             landmark: { type: String, default: '' },
             zone: { type: String, default: '' },
-            zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodZone', default: null }
+            zoneId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodZone', default: null },
+            city: { type: String, default: '' },
+            state: { type: String, default: '' },
+            zipCode: { type: String, default: '' }
         },
         type: {
             type: String,

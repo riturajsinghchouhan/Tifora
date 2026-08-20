@@ -29,6 +29,60 @@ const getNextDay = (value) => {
     return next;
 };
 
+const toTrimmedString = (value) => (value != null ? String(value).trim() : '');
+
+export const buildTiffinDeliveryAddressSnapshot = (address = {}) => {
+    const source = typeof address?.toObject === 'function' ? address.toObject() : { ...(address || {}) };
+    const street = toTrimmedString(source.street || source.fullAddress);
+    const area = toTrimmedString(source.area);
+    const landmark = toTrimmedString(source.landmark);
+    const city = toTrimmedString(source.city);
+    const state = toTrimmedString(source.state);
+    const zipCode = toTrimmedString(source.zipCode);
+    const additionalDetails = toTrimmedString(source.additionalDetails);
+    const zone = toTrimmedString(source.zone);
+    const name = toTrimmedString(source.name || source.fullName);
+    const fullName = toTrimmedString(source.fullName || source.name);
+    const phone = toTrimmedString(source.phone);
+
+    const fullAddressParts = [
+        street,
+        area,
+        landmark,
+        additionalDetails,
+        city,
+        state,
+        zipCode
+    ].filter(Boolean);
+
+    const coordinates = Array.isArray(source.location?.coordinates) &&
+        source.location.coordinates.length === 2 &&
+        Number.isFinite(Number(source.location.coordinates[0])) &&
+        Number.isFinite(Number(source.location.coordinates[1]))
+        ? [Number(source.location.coordinates[0]), Number(source.location.coordinates[1])]
+        : [75.8577, 22.7196];
+
+    return {
+        location: {
+            type: 'Point',
+            coordinates
+        },
+        fullAddress: toTrimmedString(source.fullAddress) || fullAddressParts.join(', '),
+        street,
+        additionalDetails,
+        phone,
+        name,
+        fullName,
+        area,
+        landmark,
+        zone,
+        zoneId: source.zoneId || null,
+        city,
+        state,
+        zipCode
+    };
+};
+
 export const ensureSubscriptionDeliveriesForDate = async (subscription, targetDate = new Date(), providedPlan = null) => {
     if (!subscription || subscription.status !== 'active') {
         return 0;
@@ -71,7 +125,7 @@ export const ensureSubscriptionDeliveriesForDate = async (subscription, targetDa
             subscriptionId: subscription._id,
             restaurantId: subscription.restaurantId,
             userId: subscription.userId,
-            deliveryAddress: subscription.deliveryAddress,
+            deliveryAddress: buildTiffinDeliveryAddressSnapshot(subscription.deliveryAddress),
             type: 'Morning',
             date: new Date(dayStart),
             status: 'pending',
@@ -84,7 +138,7 @@ export const ensureSubscriptionDeliveriesForDate = async (subscription, targetDa
             subscriptionId: subscription._id,
             restaurantId: subscription.restaurantId,
             userId: subscription.userId,
-            deliveryAddress: subscription.deliveryAddress,
+            deliveryAddress: buildTiffinDeliveryAddressSnapshot(subscription.deliveryAddress),
             type: 'Evening',
             date: new Date(dayStart),
             status: 'pending',

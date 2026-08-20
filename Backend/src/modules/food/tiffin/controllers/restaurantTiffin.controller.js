@@ -1,8 +1,9 @@
 import { TiffinPlan } from '../models/tiffinPlan.model.js';
 import { TiffinDelivery } from '../models/tiffinDelivery.model.js';
 import { TiffinSubscription } from '../models/tiffinSubscription.model.js';
-import { generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
+import { buildTiffinDeliveryAddressSnapshot, generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
+import { FoodZone } from '../../admin/models/zone.model.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import mongoose from 'mongoose';
 
@@ -17,6 +18,65 @@ const getRestaurantId = (req) => {
     }
 
     return null;
+};
+
+const toTrimmedString = (value) => (value != null ? String(value).trim() : '');
+
+const normalizeZoneLabel = (zoneDoc) =>
+    toTrimmedString(zoneDoc?.zoneName || zoneDoc?.name || zoneDoc?.serviceLocation);
+
+const isPointInPolygon = (lat, lng, polygon) => {
+    if (!Array.isArray(polygon) || polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = Number(polygon[i]?.longitude);
+        const yi = Number(polygon[i]?.latitude);
+        const xj = Number(polygon[j]?.longitude);
+        const yj = Number(polygon[j]?.latitude);
+        if (![xi, yi, xj, yj].every(Number.isFinite)) continue;
+        const intersect = ((yi > lat) !== (yj > lat)) &&
+            (lng < ((xj - xi) * (lat - yi)) / ((yj - yi) || Number.EPSILON) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+};
+
+const zoneLabelsForMatch = (zoneDoc) => [
+    zoneDoc?.name,
+    zoneDoc?.zoneName,
+    zoneDoc?.serviceLocation
+].map((value) => toTrimmedString(value).toLowerCase()).filter(Boolean);
+
+const findZoneByLabel = (rawLabel, zones) => {
+    const normalized = toTrimmedString(rawLabel).toLowerCase();
+    if (!normalized) return null;
+    return zones.find((zone) =>
+        zoneLabelsForMatch(zone).some((label) =>
+            label === normalized || label.includes(normalized) || normalized.includes(label)
+        )
+    ) || null;
+};
+
+const findZoneByCoordinates = (address, zones) => {
+    const coords = address?.location?.coordinates;
+    if (!Array.isArray(coords) || coords.length !== 2) return null;
+    const lng = Number(coords[0]);
+    const lat = Number(coords[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return zones.find((zone) => isPointInPolygon(lat, lng, zone.coordinates)) || null;
+};
+
+const resolveAdminZoneForAddress = (address, zones) => {
+    const rawZoneId = address?.zoneId ? String(address.zoneId) : '';
+    if (rawZoneId) {
+        const directZone = zones.find((zone) => String(zone._id) === rawZoneId);
+        if (directZone) return directZone;
+    }
+
+    const labelMatch = findZoneByLabel(address?.zone, zones) || findZoneByLabel(address?.area, zones);
+    if (labelMatch) return labelMatch;
+
+    return findZoneByCoordinates(address, zones);
 };
 
 export const createTiffinPlan = async (req, res) => {
@@ -261,6 +321,7 @@ export const getUnassignedDeliveries = async (req, res) => {
         .populate('userId', 'name phone profileImage avatar')
         .populate({
             path: 'subscriptionId',
+            select: 'deliveryAddress planId',
             populate: { path: 'planId', select: 'name itemsDescription mealType isVegetarian price' }
         })
         .lean();
@@ -276,64 +337,93 @@ export const getUnassignedDeliveries = async (req, res) => {
             console.log('Error loading FoodDeliveryPartner records:', e.message);
         }
 
-        // Compute zones summary and ensure each delivery has resolved zone information
-        const zonesMap = {};
-        const enrichedDeliveries = deliveries.map(d => {
-            const addr = d.deliveryAddress || {};
-            // Resolve micro-zone name from zone, area, landmark, or fullAddress
-            let resolvedZone = addr.zone || addr.area || '';
-            const rawAddr = `${addr.fullAddress || ''} ${addr.street || ''} ${addr.landmark || ''} ${addr.area || ''}`.toLowerCase();
-            
-            if (!resolvedZone || resolvedZone === 'Indore' || resolvedZone === 'General') {
-                if (rawAddr.includes('silicon') || rawAddr.includes('gamle') || rawAddr.includes('puliya')) {
-                    resolvedZone = 'Silicon City - Gamle Wali Puliya';
-                } else if (rawAddr.includes('vijay nagar') || rawAddr.includes('scheme 54') || rawAddr.includes('meghdoot')) {
-                    resolvedZone = 'Vijay Nagar - Scheme 54';
-                } else if (rawAddr.includes('bhawarkua') || rawAddr.includes('it park') || rawAddr.includes('holkar')) {
-                    resolvedZone = 'Bhawarkua - IT Park';
-                } else if (rawAddr.includes('palasia') || rawAddr.includes('saket') || rawAddr.includes('old palasia')) {
-                    resolvedZone = 'Palasia - Saket Club';
-                } else if (rawAddr.includes('annapurna') || rawAddr.includes('dravid nagar') || rawAddr.includes('sudama')) {
-                    resolvedZone = 'Annapurna - Dravid Nagar';
-                } else if (rawAddr.includes('rau') || rawAddr.includes('bypass') || rawAddr.includes('cat')) {
-                    resolvedZone = 'Rau - Bypass Road';
-                } else {
-                    resolvedZone = 'Silicon City - Gamle Wali Puliya'; // Default primary local cluster
-                }
-            }
+        const activeZones = await FoodZone.find({ isActive: true })
+            .select('name zoneName serviceLocation coordinates isActive')
+            .sort({ createdAt: -1 })
+            .lean();
 
-            // Aggregate counts per zone
-            if (!zonesMap[resolvedZone]) {
-                zonesMap[resolvedZone] = {
-                    zoneName: resolvedZone,
+        const zoneStatsMap = new Map(
+            activeZones.map((zone) => [
+                String(zone._id),
+                {
+                    id: String(zone._id),
+                    name: normalizeZoneLabel(zone),
                     total: 0,
                     morning: 0,
                     evening: 0
-                };
+                }
+            ])
+        );
+
+        let unassignedZoneStats = {
+            id: 'unassigned',
+            name: 'Unassigned Zone',
+            total: 0,
+            morning: 0,
+            evening: 0
+        };
+
+        const enrichedDeliveries = deliveries.map(d => {
+            const subscriptionAddr = d.subscriptionId?.deliveryAddress || {};
+            const mergedAddr = buildTiffinDeliveryAddressSnapshot({
+                ...subscriptionAddr,
+                ...d.deliveryAddress,
+                zoneId: d.deliveryAddress?.zoneId || subscriptionAddr.zoneId || null,
+                zone: d.deliveryAddress?.zone || subscriptionAddr.zone || '',
+                area: d.deliveryAddress?.area || subscriptionAddr.area || '',
+                landmark: d.deliveryAddress?.landmark || subscriptionAddr.landmark || '',
+                phone: d.deliveryAddress?.phone || subscriptionAddr.phone || d.userId?.phone || '',
+                name: d.deliveryAddress?.name || subscriptionAddr.name || subscriptionAddr.fullName || d.userId?.name || '',
+                fullName: d.deliveryAddress?.fullName || subscriptionAddr.fullName || subscriptionAddr.name || d.userId?.name || ''
+            });
+            const matchedZone = resolveAdminZoneForAddress(mergedAddr, activeZones);
+            const resolvedZoneId = matchedZone?._id ? String(matchedZone._id) : 'unassigned';
+            const resolvedZoneName = matchedZone ? normalizeZoneLabel(matchedZone) : 'Unassigned Zone';
+
+            const stats = resolvedZoneId === 'unassigned'
+                ? unassignedZoneStats
+                : zoneStatsMap.get(resolvedZoneId);
+            if (stats) {
+                stats.total += 1;
+                if (d.type === 'Morning') stats.morning += 1;
+                if (d.type === 'Evening') stats.evening += 1;
             }
-            zonesMap[resolvedZone].total += 1;
-            if (d.type === 'Morning') zonesMap[resolvedZone].morning += 1;
-            if (d.type === 'Evening') zonesMap[resolvedZone].evening += 1;
 
             return {
                 ...d,
-                zone: resolvedZone,
+                zone: resolvedZoneName,
+                zoneMeta: {
+                    id: resolvedZoneId,
+                    name: resolvedZoneName
+                },
                 deliveryAddress: {
-                    ...addr,
-                    zone: resolvedZone,
-                    area: addr.area || resolvedZone.split(' - ')[0] || 'Indore',
-                    landmark: addr.landmark || (resolvedZone.includes(' - ') ? resolvedZone.split(' - ')[1] : '')
+                    ...mergedAddr,
+                    zone: resolvedZoneName,
+                    zoneId: matchedZone?._id || mergedAddr.zoneId || null
                 }
             };
         });
 
-        const zonesSummary = Object.values(zonesMap).sort((a, b) => b.total - a.total);
+        const activeZonesSummary = Array.from(zoneStatsMap.values()).sort((a, b) => {
+            if (b.total !== a.total) return b.total - a.total;
+            return a.name.localeCompare(b.name);
+        });
+        const zonesSummary = unassignedZoneStats.total > 0
+            ? [...activeZonesSummary, unassignedZoneStats]
+            : activeZonesSummary;
 
         res.status(200).json({
             success: true,
             data: {
                 deliveries: enrichedDeliveries,
                 zonesSummary,
+                activeZones: zonesSummary.map((zone) => ({
+                    id: zone.id,
+                    name: zone.name,
+                    total: zone.total,
+                    morning: zone.morning,
+                    evening: zone.evening
+                })),
                 partners
             }
         });

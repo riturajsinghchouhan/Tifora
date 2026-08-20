@@ -30,6 +30,7 @@ import RestaurantPageShell from '@food/components/restaurant/RestaurantPageShell
 export default function TiffinDispatchPanel() {
     const [deliveries, setDeliveries] = useState([]);
     const [zonesSummary, setZonesSummary] = useState([]);
+    const [activeZones, setActiveZones] = useState([]);
     const [partners, setPartners] = useState([]);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [selectedPartner, setSelectedPartner] = useState('');
@@ -75,6 +76,7 @@ export default function TiffinDispatchPanel() {
             if (res?.data?.success && res.data.data) {
                 setDeliveries(res.data.data.deliveries || []);
                 setZonesSummary(res.data.data.zonesSummary || []);
+                setActiveZones(res.data.data.activeZones || []);
                 setPartners(res.data.data.partners || []);
             }
         } catch (error) {
@@ -89,20 +91,28 @@ export default function TiffinDispatchPanel() {
     const filteredDeliveries = useMemo(() => {
         return deliveries.filter(d => {
             const matchesSlot = selectedSlot === 'all' || d.type === selectedSlot;
-            const itemZone = d.zone || d.deliveryAddress?.zone || 'General City Zone';
-            const matchesZone = selectedZone === 'all' || itemZone === selectedZone;
+            const itemZoneId = d.zoneMeta?.id || (d.deliveryAddress?.zoneId ? String(d.deliveryAddress.zoneId) : 'unassigned');
+            const itemZoneName = d.zoneMeta?.name || d.zone || d.deliveryAddress?.zone || 'Unassigned Zone';
+            const matchesZone = selectedZone === 'all' || itemZoneId === selectedZone;
 
             const q = searchQuery.toLowerCase().trim();
             if (!q) return matchesSlot && matchesZone;
 
             const name = (d?.userId?.name || d?.name || '').toLowerCase();
             const phone = (d?.userId?.phone || d?.deliveryAddress?.phone || '').toLowerCase();
-            const address = (d?.deliveryAddress?.fullAddress || d?.deliveryAddress?.street || d?.address || '').toLowerCase();
+            const address = (
+                d?.deliveryAddress?.fullAddress ||
+                [d?.deliveryAddress?.street, d?.deliveryAddress?.area, d?.deliveryAddress?.city]
+                    .filter(Boolean)
+                    .join(', ') ||
+                d?.address ||
+                ''
+            ).toLowerCase();
             const landmark = (d?.deliveryAddress?.landmark || '').toLowerCase();
             const area = (d?.deliveryAddress?.area || '').toLowerCase();
             const planName = (d?.subscriptionId?.planId?.name || '').toLowerCase();
 
-            const matchesSearch = name.includes(q) || phone.includes(q) || address.includes(q) || landmark.includes(q) || area.includes(q) || planName.includes(q) || itemZone.toLowerCase().includes(q);
+            const matchesSearch = name.includes(q) || phone.includes(q) || address.includes(q) || landmark.includes(q) || area.includes(q) || planName.includes(q) || itemZoneName.toLowerCase().includes(q);
 
             return matchesSlot && matchesZone && matchesSearch;
         });
@@ -112,7 +122,7 @@ export default function TiffinDispatchPanel() {
     const groupedByZone = useMemo(() => {
         const groups = {};
         filteredDeliveries.forEach(d => {
-            const zName = d.zone || d.deliveryAddress?.zone || 'General City Zone';
+            const zName = d.zoneMeta?.name || d.zone || d.deliveryAddress?.zone || 'Unassigned Zone';
             if (!groups[zName]) {
                 groups[zName] = [];
             }
@@ -120,19 +130,6 @@ export default function TiffinDispatchPanel() {
         });
         return groups;
     }, [filteredDeliveries]);
-
-    // Zone list with dynamic counts
-    const zonePills = useMemo(() => {
-        const counts = {};
-        deliveries.forEach(d => {
-            const zName = d.zone || d.deliveryAddress?.zone || 'General City Zone';
-            counts[zName] = (counts[zName] || 0) + 1;
-        });
-        return Object.keys(counts).map(name => ({
-            name,
-            count: counts[name]
-        }));
-    }, [deliveries]);
 
     // Selection handlers
     const handleSelectSingle = (id) => {
@@ -212,7 +209,7 @@ export default function TiffinDispatchPanel() {
         const zoneCounts = {};
         deliveries.forEach(d => {
             if (selectedIds.has(d._id)) {
-                const z = d.zone || d.deliveryAddress?.zone || 'General City Zone';
+                const z = d.zoneMeta?.name || d.zone || d.deliveryAddress?.zone || 'Unassigned Zone';
                 zoneCounts[z] = (zoneCounts[z] || 0) + 1;
             }
         });
@@ -269,7 +266,7 @@ export default function TiffinDispatchPanel() {
                     </div>
                     <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
                         <p className="text-xs font-medium text-gray-500">Active Zones</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{zonePills.length}</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{activeZones.filter(z => z.id !== 'unassigned').length}</p>
                     </div>
                 </div>
 
@@ -333,46 +330,28 @@ export default function TiffinDispatchPanel() {
                         </div>
                     </div>
 
-                    {/* Micro-Zones Pill Selector */}
-                    {zonePills.length > 0 && (
-                        <div className="pt-3 border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-                            <span className="font-semibold text-gray-500 whitespace-nowrap pr-1 flex items-center gap-1">
-                                <Filter className="w-3 h-3 text-gray-400" />
-                                Zones:
-                            </span>
-                            
-                            <button
-                                onClick={() => setSelectedZone('all')}
-                                className={`px-2.5 py-1 rounded-md whitespace-nowrap transition font-medium ${
-                                    selectedZone === 'all'
-                                        ? 'bg-gray-900 text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                    {/* Admin Zones Dropdown */}
+                    <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-2.5 text-xs">
+                        <span className="font-semibold text-gray-500 whitespace-nowrap pr-1 flex items-center gap-1">
+                            <Filter className="w-3 h-3 text-gray-400" />
+                            Zones:
+                        </span>
+                        <div className="relative w-full sm:w-80">
+                            <select
+                                value={selectedZone}
+                                onChange={(e) => setSelectedZone(e.target.value)}
+                                className="w-full appearance-none rounded-lg border border-gray-200 bg-white px-3 py-2 pr-9 text-xs font-medium text-gray-700 outline-none transition focus:border-[#B80B3D] focus:ring-1 focus:ring-[#B80B3D]"
                             >
-                                All Zones ({deliveries.length})
-                            </button>
-
-                            {zonePills.map(zp => (
-                                <button
-                                    key={zp.name}
-                                    onClick={() => setSelectedZone(zp.name)}
-                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md whitespace-nowrap transition font-medium border ${
-                                        selectedZone === zp.name
-                                            ? 'bg-rose-50 border-[#B80B3D] text-[#B80B3D] font-semibold'
-                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                                    }`}
-                                >
-                                    <MapPin className="w-3 h-3" />
-                                    <span>{zp.name}</span>
-                                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                                        selectedZone === zp.name ? 'bg-[#B80B3D] text-white' : 'bg-gray-100 text-gray-500'
-                                    }`}>
-                                        {zp.count}
-                                    </span>
-                                </button>
-                            ))}
+                                <option value="all">All Zones ({deliveries.length})</option>
+                                {activeZones.map((zone) => (
+                                    <option key={zone.id} value={zone.id}>
+                                        {zone.name} ({zone.total || 0})
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* Main Content Grid: Zone Deliveries (Left) + Rider Assignment (Right) */}
@@ -503,7 +482,13 @@ export default function TiffinDispatchPanel() {
                                                         const isSelected = selectedIds.has(d._id);
                                                         const customerName = d?.userId?.name || d?.name || 'Customer';
                                                         const phone = d?.userId?.phone || d?.deliveryAddress?.phone || '—';
-                                                        const street = d?.deliveryAddress?.fullAddress || d?.deliveryAddress?.street || d?.address || 'Indore';
+                                                        const street =
+                                                            d?.deliveryAddress?.fullAddress ||
+                                                            [d?.deliveryAddress?.street, d?.deliveryAddress?.area, d?.deliveryAddress?.city]
+                                                                .filter(Boolean)
+                                                                .join(', ') ||
+                                                            d?.address ||
+                                                            'Address not available';
                                                         const landmark = d?.deliveryAddress?.landmark;
                                                         const planName = d?.subscriptionId?.planId?.name || 'Standard Tiffin Meal';
 
