@@ -38,6 +38,7 @@ export const config = {
     smsHubApiKey: process.env.SMSHUB_API_KEY,
     smsHubSenderId: process.env.SMSHUB_SENDER_ID,
     smsHubTemplateId: process.env.SMSHUB_TEMPLATE_ID,
+    smsHubEntityId: process.env.SMSHUB_ENTITY_ID,
 
     // Rate limiting
     rateLimitWindowMinutes: Number(process.env.RATE_LIMIT_WINDOW || 15),
@@ -122,6 +123,7 @@ export const updateConfig = () => {
     config.smsHubApiKey = process.env.SMSHUB_API_KEY || config.smsHubApiKey;
     config.smsHubSenderId = process.env.SMSHUB_SENDER_ID || config.smsHubSenderId;
     config.smsHubTemplateId = process.env.SMSHUB_TEMPLATE_ID || config.smsHubTemplateId;
+    config.smsHubEntityId = process.env.SMSHUB_ENTITY_ID || config.smsHubEntityId;
     config.rateLimitWindowMinutes = Number(process.env.RATE_LIMIT_WINDOW || config.rateLimitWindowMinutes);
     config.rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX || config.rateLimitMaxRequests);
     config.authRateLimitWindowMinutes = Number(process.env.AUTH_RATE_LIMIT_WINDOW || config.authRateLimitWindowMinutes);

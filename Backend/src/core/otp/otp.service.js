@@ -44,16 +44,16 @@ const sendSmsViaMsg91 = async (phone, otp) => {
         if (parsed && parsed.type === 'error') {
             const errMsg = `MSG91 ERROR for ${phone}: ${parsed.message || resultText}`;
             logger.error(errMsg);
-            // eslint-disable-next-line no-console
-            console.error(`❌ [SMS ERROR] ${errMsg}`);
+            throw new ValidationError(parsed.message || "Failed to send OTP via MSG91");
         } else if (!response.ok) {
             logger.error(`SMS API HTTP error for ${phone}: ${response.status} – ${resultText}`);
+            throw new ValidationError(`SMS Provider Error: HTTP ${response.status}`);
         } else {
             logger.info(`✅ SMS sent successfully to ${msisdn} via MSG91`);
         }
     } catch (error) {
         logger.error(`Error sending SMS to ${phone} via MSG91: ${error.message}`);
-        // Do NOT throw — OTP is already stored in DB; SMS failure should not block the flow
+        throw error instanceof ValidationError ? error : new ValidationError(`Failed to send SMS: ${error.message}`);
     }
 };
 
@@ -78,17 +78,21 @@ const sendSmsViaSmsHub = async (phone, otp) => {
         // Change URL or parameters if your specific account uses a different endpoint structure
         const url = new URL('http://cloud.smsindiahub.in/vendorsms/pushsms.aspx');
         url.searchParams.append('APIKey', config.smsHubApiKey || '');
-        url.searchParams.append('senderid', config.smsHubSenderId || '');
-        url.searchParams.append('mobileno', msisdn);
-        
-        // Define the message here. If you have a specific DLT approved template, format it accordingly.
-        const message = `Your verification OTP is ${otp}. Please do not share it with anyone.`;
+        url.searchParams.append('sid', config.smsHubSenderId || '');
+        url.searchParams.append('msisdn', msisdn);
+        url.searchParams.append('fl', '0');
+        url.searchParams.append('gwid', '2');
+
+        // Define the message here using the approved DLT template
+        const message = `Welcome to the Tifora powered by Appzeto.Your OTP for registration is ${otp}.BGADEC`;
         url.searchParams.append('msg', message);
 
-        // Append DLT Template ID if configured
+        // Append DLT Template ID and Entity ID if configured
         if (config.smsHubTemplateId) {
-            // Some providers use 'templateid', others 'peid' or 'entityid'
             url.searchParams.append('templateid', config.smsHubTemplateId);
+        }
+        if (config.smsHubEntityId) {
+            url.searchParams.append('EntityID', config.smsHubEntityId);
         }
 
         logger.info(`[SMS] Sending OTP to ${msisdn} via SMS Hub India...`);
@@ -96,13 +100,25 @@ const sendSmsViaSmsHub = async (phone, otp) => {
         const resultText = await response.text();
         logger.info(`[SMS] Raw response for ${msisdn}: ${resultText}`);
 
-        if (!response.ok || (resultText && resultText.toLowerCase().includes('error'))) {
+        let isSuccess = false;
+        try {
+            const parsed = JSON.parse(resultText);
+            if (parsed.ErrorCode === '000' || parsed.ErrorMessage === 'Done') {
+                isSuccess = true;
+            }
+        } catch (e) {
+            // If it's not JSON, it might just be a success string, but let's assume it failed if it doesn't match success
+        }
+
+        if (!response.ok || !isSuccess) {
             logger.error(`SMS Hub ERROR for ${phone}: ${resultText}`);
+            throw new ValidationError(resultText || "Failed to send OTP via SMS Hub");
         } else {
             logger.info(`✅ SMS sent successfully to ${msisdn} via SMS Hub India`);
         }
     } catch (error) {
         logger.error(`Error sending SMS to ${phone} via SMS Hub India: ${error.message}`);
+        throw error instanceof ValidationError ? error : new ValidationError(`Failed to send SMS: ${error.message}`);
     }
 };
 
