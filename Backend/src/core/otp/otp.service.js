@@ -57,6 +57,55 @@ const sendSmsViaMsg91 = async (phone, otp) => {
     }
 };
 
+/**
+ * Sends SMS via SMS Hub India API
+ * @param {string} phone - 10-digit mobile number
+ * @param {string} otp
+ */
+const sendSmsViaSmsHub = async (phone, otp) => {
+    try {
+        const digits = String(phone || '').replace(/\D/g, '');
+        // Usually SMS Hub expects exactly 10 digits for Indian numbers, or with 91. 
+        // We'll pass the 10 digits and let the provider handle it, or pass exactly what they need.
+        let msisdn = digits;
+        if (msisdn.length === 10) {
+            msisdn = `91${msisdn}`;
+        } else if (!msisdn.startsWith('91')) {
+            msisdn = `91${msisdn}`;
+        }
+
+        // Example standard SMS Hub India endpoint
+        // Change URL or parameters if your specific account uses a different endpoint structure
+        const url = new URL('http://cloud.smsindiahub.in/vendorsms/pushsms.aspx');
+        url.searchParams.append('APIKey', config.smsHubApiKey || '');
+        url.searchParams.append('senderid', config.smsHubSenderId || '');
+        url.searchParams.append('mobileno', msisdn);
+        
+        // Define the message here. If you have a specific DLT approved template, format it accordingly.
+        const message = `Your verification OTP is ${otp}. Please do not share it with anyone.`;
+        url.searchParams.append('msg', message);
+
+        // Append DLT Template ID if configured
+        if (config.smsHubTemplateId) {
+            // Some providers use 'templateid', others 'peid' or 'entityid'
+            url.searchParams.append('templateid', config.smsHubTemplateId);
+        }
+
+        logger.info(`[SMS] Sending OTP to ${msisdn} via SMS Hub India...`);
+        const response = await fetch(url.toString(), { method: 'GET' });
+        const resultText = await response.text();
+        logger.info(`[SMS] Raw response for ${msisdn}: ${resultText}`);
+
+        if (!response.ok || (resultText && resultText.toLowerCase().includes('error'))) {
+            logger.error(`SMS Hub ERROR for ${phone}: ${resultText}`);
+        } else {
+            logger.info(`✅ SMS sent successfully to ${msisdn} via SMS Hub India`);
+        }
+    } catch (error) {
+        logger.error(`Error sending SMS to ${phone} via SMS Hub India: ${error.message}`);
+    }
+};
+
 export const createOrUpdateOtp = async (phone) => {
     const existing = await FoodOtp.findOne({ phone });
     const now = new Date();
@@ -115,7 +164,11 @@ export const createOrUpdateOtp = async (phone) => {
 
     // Only send SMS if not in default OTP mode
     if (!config.useDefaultOtp && !phone.endsWith('9755633147') && !phone.endsWith('8624862400')) {
-        await sendSmsViaMsg91(phone, otp);
+        if (config.smsProvider === 'smshub') {
+            await sendSmsViaSmsHub(phone, otp);
+        } else {
+            await sendSmsViaMsg91(phone, otp);
+        }
     }
 
     return otp;

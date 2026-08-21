@@ -33,6 +33,12 @@ export const config = {
     msg91AuthKey: process.env.MSG91_AUTH_KEY,
     msg91TemplateId: process.env.MSG91_TEMPLATE_ID,
 
+    // SMS Hub India
+    smsProvider: process.env.SMS_PROVIDER || 'msg91', // 'msg91' or 'smshub'
+    smsHubApiKey: process.env.SMSHUB_API_KEY,
+    smsHubSenderId: process.env.SMSHUB_SENDER_ID,
+    smsHubTemplateId: process.env.SMSHUB_TEMPLATE_ID,
+
     // Rate limiting
     rateLimitWindowMinutes: Number(process.env.RATE_LIMIT_WINDOW || 15),
     rateLimitMaxRequests: Number(process.env.RATE_LIMIT_MAX || 100),
@@ -112,6 +118,10 @@ export const updateConfig = () => {
     config.useDefaultOtp = process.env.USE_DEFAULT_OTP === 'true';
     config.msg91AuthKey = process.env.MSG91_AUTH_KEY || config.msg91AuthKey;
     config.msg91TemplateId = process.env.MSG91_TEMPLATE_ID || config.msg91TemplateId;
+    config.smsProvider = process.env.SMS_PROVIDER || config.smsProvider;
+    config.smsHubApiKey = process.env.SMSHUB_API_KEY || config.smsHubApiKey;
+    config.smsHubSenderId = process.env.SMSHUB_SENDER_ID || config.smsHubSenderId;
+    config.smsHubTemplateId = process.env.SMSHUB_TEMPLATE_ID || config.smsHubTemplateId;
     config.rateLimitWindowMinutes = Number(process.env.RATE_LIMIT_WINDOW || config.rateLimitWindowMinutes);
     config.rateLimitMaxRequests = Number(process.env.RATE_LIMIT_MAX || config.rateLimitMaxRequests);
     config.authRateLimitWindowMinutes = Number(process.env.AUTH_RATE_LIMIT_WINDOW || config.authRateLimitWindowMinutes);
