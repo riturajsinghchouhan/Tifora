@@ -80,7 +80,8 @@ export async function recordTransaction(payload) {
         entityType, entityId, type, amount,
         description = '', category = 'other',
         orderId = null, paymentId = null,
-        metadata = undefined, module = 'food'
+        metadata = undefined, module = 'food',
+        session: existingSession = null
     } = payload;
 
     if (!['credit', 'debit'].includes(type)) throw new Error('type must be credit or debit');
@@ -88,8 +89,11 @@ export async function recordTransaction(payload) {
 
     const { Model, filter } = resolveWallet(entityType, entityId);
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const ownsSession = !existingSession;
+    const session = existingSession || await mongoose.startSession();
+    if (ownsSession) {
+        session.startTransaction();
+    }
 
     try {
         // 1. Ensure wallet exists
@@ -152,7 +156,9 @@ export async function recordTransaction(payload) {
             await Model.updateOne(filter, { $set: { balance: newBalance } }, { session });
         }
 
-        await session.commitTransaction();
+        if (ownsSession) {
+            await session.commitTransaction();
+        }
 
         logger.info(`Transaction recorded: ${type} ${amount} INR for ${entityType}:${entityId} → balance ${newBalance}`);
 
@@ -161,11 +167,15 @@ export async function recordTransaction(payload) {
             wallet: { balance: newBalance }
         };
     } catch (err) {
-        await session.abortTransaction();
+        if (ownsSession) {
+            await session.abortTransaction();
+        }
         logger.error(`recordTransaction failed: ${err.message}`);
         throw err;
     } finally {
-        session.endSession();
+        if (ownsSession) {
+            session.endSession();
+        }
     }
 }
 

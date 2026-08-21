@@ -172,6 +172,8 @@ router.get('/delivery/available-partners', adminController.getAvailableDeliveryP
 router.get('/delivery/wallets', adminController.getDeliveryWallets);
 router.get('/delivery/bonus-transactions', adminController.getDeliveryPartnerBonusTransactions);
 router.get('/delivery/earnings', adminController.getDeliveryEarnings);
+router.post('/developer/reset-payment-data', requireSuperAdmin, adminController.resetPaymentFinanceData);
+router.post('/developer/clear-orders', requireSuperAdmin, adminController.clearAllOrdersData);
 router.post('/delivery/bonus', adminController.addDeliveryPartnerBonus);
 router.get('/delivery/commission-rules', adminController.getDeliveryCommissionRules);
 router.post('/delivery/commission-rules', adminController.createDeliveryCommissionRule);

@@ -4,6 +4,7 @@ import { DeliverySupportTicket } from '../models/supportTicket.model.js';
 import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransaction.model.js';
 import { FoodEarningAddon } from '../../admin/models/earningAddon.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
+import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
@@ -409,15 +410,28 @@ export const getDeliveryPartnerWallet = async (deliveryPartnerId) => {
             {
                 $match: {
                     'dispatch.deliveryPartnerId': partnerId,
-                    orderStatus: 'delivered',
-                    'payment.method': 'cash',
-                    'payment.status': 'paid'
+                    orderStatus: 'delivered'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'payment_food_transactions',
+                    localField: '_id',
+                    foreignField: 'orderId',
+                    as: 'tx'
+                }
+            },
+            {
+                $match: {
+                    'tx.paymentMethod': 'cash'
                 }
             },
             {
                 $group: {
                     _id: null,
-                    cashInHand: { $sum: { $ifNull: ['$riderEarning', 0] } }
+                    cashInHand: {
+                        $sum: { $ifNull: [{ $arrayElemAt: ['$tx.pricing.total', 0] }, 0] }
+                    }
                 }
             }
         ])
@@ -440,7 +454,7 @@ export const getDeliveryPartnerWallet = async (deliveryPartnerId) => {
             orderStatus: 'delivered',
         })
             .sort({ 'deliveryState.deliveredAt': -1, createdAt: -1 })
-            .select('orderId riderEarning payment orderStatus deliveryState createdAt deliveryState.deliveredAt')
+            .select('orderId riderEarning orderStatus deliveryState createdAt deliveryState.deliveredAt')
             .limit(2000)
             .lean(),
         DeliveryBonusTransaction.find({ deliveryPartnerId: partnerId })
@@ -449,9 +463,19 @@ export const getDeliveryPartnerWallet = async (deliveryPartnerId) => {
             .lean(),
     ]);
 
+    const paymentTxRows = paymentTxList.length > 0
+        ? await FoodTransaction.find({ orderId: { $in: paymentTxList.map((o) => o._id) } })
+            .select('orderId paymentMethod')
+            .lean()
+        : [];
+    const paymentTxMap = new Map(
+        paymentTxRows.map((row) => [String(row.orderId), row])
+    );
+
     const paymentTransactions = (paymentTxList || []).map((o) => {
         const deliveredAt = o?.deliveryState?.deliveredAt || o?.deliveredAt || null;
         const date = deliveredAt || o?.createdAt || new Date();
+        const paymentMethod = paymentTxMap.get(String(o._id))?.paymentMethod || '';
         return {
             _id: o._id,
             type: 'payment',
@@ -460,9 +484,9 @@ export const getDeliveryPartnerWallet = async (deliveryPartnerId) => {
             date,
             createdAt: date,
             orderId: o.orderId || String(o._id),
-            paymentMethod: o?.payment?.method || '',
+            paymentMethod,
             metadata: { orderId: o.orderId || String(o._id) },
-            description: o?.payment?.method === 'cash' ? 'COD delivery earning' : 'Online delivery earning'
+            description: paymentMethod === 'cash' ? 'COD delivery earning' : 'Online delivery earning'
         };
     });
 

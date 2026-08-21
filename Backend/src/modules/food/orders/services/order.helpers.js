@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { FoodTransaction } from '../models/foodTransaction.model.js';
 import { logger } from '../../../../utils/logger.js';
 import {
   sendNotificationToOwner,
@@ -6,12 +7,195 @@ import {
 } from "../../../../core/notifications/firebase.service.js";
 import { getIO, rooms } from '../../../../config/socket.js';
 import { addOrderJob } from '../../../../queues/producers/order.producer.js';
+import { addPaymentJob } from '../../../../queues/producers/payment.producer.js';
+
+function toMoney(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 0;
+  return Math.round(amount * 100) / 100;
+}
+
+export function extractOrderPricingSnapshot(orderLike = {}, transactionLike = null) {
+  const legacyPricing =
+    orderLike?.pricing && typeof orderLike.pricing === "object"
+      ? orderLike.pricing
+      : {};
+  const txPricing =
+    transactionLike?.pricing && typeof transactionLike.pricing === "object"
+      ? transactionLike.pricing
+      : {};
+  const source = Object.keys(txPricing).length > 0 ? txPricing : legacyPricing;
+
+  if (Object.keys(source).length === 0 && Object.keys(legacyPricing).length === 0) {
+    return {};
+  }
+
+  return {
+    ...legacyPricing,
+    ...source,
+    subtotal: toMoney(source.subtotal ?? legacyPricing.subtotal),
+    tax: toMoney(source.tax ?? legacyPricing.tax),
+    packagingFee: toMoney(source.packagingFee ?? legacyPricing.packagingFee),
+    deliveryFee: toMoney(source.deliveryFee ?? legacyPricing.deliveryFee),
+    platformFee: toMoney(source.platformFee ?? legacyPricing.platformFee),
+    restaurantCommission: toMoney(
+      source.restaurantCommission ?? legacyPricing.restaurantCommission,
+    ),
+    gstOnItem: toMoney(source.gstOnItem ?? legacyPricing.gstOnItem),
+    gstOnCommission: toMoney(
+      source.gstOnCommission ?? legacyPricing.gstOnCommission,
+    ),
+    paymentGatewayFee: toMoney(
+      source.paymentGatewayFee ?? legacyPricing.paymentGatewayFee,
+    ),
+    tcs: toMoney(source.tcs ?? legacyPricing.tcs),
+    discount: toMoney(source.discount ?? legacyPricing.discount),
+    total: toMoney(source.total ?? legacyPricing.total),
+    currency: String(source.currency || legacyPricing.currency || "INR"),
+    couponCode: source.couponCode || legacyPricing.couponCode || "",
+    couponDiscount: toMoney(
+      source.couponDiscount ?? legacyPricing.couponDiscount,
+    ),
+  };
+}
+
+export function mergeOrderPaymentSnapshot(orderLike = {}, transactionLike = null) {
+  const existingPayment =
+    orderLike?.payment && typeof orderLike.payment === "object"
+      ? orderLike.payment
+      : {};
+  const txPayment =
+    transactionLike?.payment && typeof transactionLike.payment === "object"
+      ? transactionLike.payment
+      : {};
+  const pricing = extractOrderPricingSnapshot(orderLike, transactionLike);
+
+  if (Object.keys(existingPayment).length === 0 && Object.keys(txPayment).length === 0) {
+    return existingPayment;
+  }
+
+  return {
+    ...existingPayment,
+    ...txPayment,
+    amountDue: toMoney(
+      txPayment.amountDue ?? existingPayment.amountDue ?? pricing.total ?? 0,
+    ),
+    razorpay: {
+      ...(existingPayment.razorpay || {}),
+      ...(txPayment.razorpay || {}),
+    },
+    qr: {
+      ...(existingPayment.qr || {}),
+      ...(txPayment.qr || {}),
+    },
+    refund: {
+      ...(existingPayment.refund || {}),
+      ...(txPayment.refund || {}),
+    },
+  };
+}
+
+export async function attachFinancialSnapshotToOrder(orderDoc, transactionDoc = null) {
+  if (!orderDoc) return orderDoc;
+
+  const order = orderDoc?.toObject ? orderDoc.toObject() : { ...(orderDoc || {}) };
+  const orderId = order?._id || orderDoc?._id || null;
+  let transaction = transactionDoc || null;
+
+  if (!transaction && orderId && mongoose.isValidObjectId(orderId)) {
+    transaction = await FoodTransaction.findOne({ orderId }).lean();
+  }
+
+  const pricing = extractOrderPricingSnapshot(order, transaction);
+  if (Object.keys(pricing).length > 0) {
+    order.pricing = pricing;
+  }
+
+  const mergedPayment = mergeOrderPaymentSnapshot(order, transaction);
+  if (mergedPayment && Object.keys(mergedPayment || {}).length > 0) {
+    order.payment = mergedPayment;
+  }
+
+  if (!order.amounts && transaction?.amounts) {
+    order.amounts = transaction.amounts;
+  }
+
+  if (!order.transactionId && transaction?._id) {
+    order.transactionId = transaction._id;
+  }
+
+  if (transaction?.status && !order.transactionStatus) {
+    order.transactionStatus = transaction.status;
+  }
+
+  return order;
+}
+
+export async function attachFinancialSnapshotsToOrders(orderDocs = []) {
+  if (!Array.isArray(orderDocs) || orderDocs.length === 0) return orderDocs;
+
+  const plainOrders = orderDocs.map((doc) =>
+    doc?.toObject ? doc.toObject() : { ...(doc || {}) },
+  );
+  const orderIds = plainOrders
+    .map((order) => order?._id)
+    .filter((id) => id && mongoose.isValidObjectId(id));
+
+  if (orderIds.length === 0) return plainOrders;
+
+  const transactions = await FoodTransaction.find({ orderId: { $in: orderIds } }).lean();
+  const txMap = new Map(
+    transactions.map((transaction) => [String(transaction.orderId), transaction]),
+  );
+
+  return Promise.all(plainOrders.map((order) =>
+    attachFinancialSnapshotToOrder(
+      order,
+      txMap.get(String(order?._id || "")) || null,
+    ),
+  ));
+}
+
+function mapPaymentQueueAction(action, payload = {}) {
+  if (action === 'delivery_completed') {
+    return 'delivery_completed';
+  }
+
+  if (action === 'payment_verified') {
+    return 'payment_verified';
+  }
+
+  if (action === 'order_cancelled_by_user') {
+    return 'order_cancelled';
+  }
+
+  if (
+    action === 'restaurant_order_status_updated' &&
+    String(payload?.to || '').toLowerCase().includes('cancel')
+  ) {
+    return 'order_cancelled';
+  }
+
+  return null;
+}
 
 export function enqueueOrderEvent(action, payload = {}) {
   try {
     void addOrderJob({ action, ...payload }).catch((err) => {
       logger.warn(`BullMQ enqueue order event failed: ${action} - ${err?.message || err}`);
     });
+
+    const paymentAction = mapPaymentQueueAction(action, payload);
+    if (paymentAction) {
+      void addPaymentJob(
+        { action: paymentAction, sourceAction: action, ...payload },
+        payload?.orderMongoId
+          ? { jobId: `payment-${paymentAction}-${String(payload.orderMongoId)}` }
+          : {}
+      ).catch((err) => {
+        logger.warn(`BullMQ enqueue payment event failed: ${paymentAction} - ${err?.message || err}`);
+      });
+    }
   } catch (err) {
     logger.warn(`BullMQ enqueue order event failed (sync): ${action} - ${err?.message || err}`);
   }
@@ -35,6 +219,14 @@ export function generateFourDigitDeliveryOtp() {
 
 export function sanitizeOrderForExternal(orderDoc) {
   const o = orderDoc?.toObject ? orderDoc.toObject() : { ...(orderDoc || {}) };
+  const pricing = extractOrderPricingSnapshot(o);
+  if (Object.keys(pricing).length > 0) {
+    o.pricing = pricing;
+  }
+  const payment = mergeOrderPaymentSnapshot(o);
+  if (payment && Object.keys(payment).length > 0) {
+    o.payment = payment;
+  }
   delete o.deliveryOtp;
   delete o.pickupOtp;
   const dv = o.deliveryVerification;
@@ -129,8 +321,18 @@ export function normalizeOrderForClient(orderDoc) {
   const order = orderDoc?.toObject ? orderDoc.toObject() : orderDoc || {};
   const mongoId = (order._id || orderDoc?._id || "").toString();
   const displayId = order.order_id || mongoId;
+  const pricing = extractOrderPricingSnapshot(order);
+  const payment = mergeOrderPaymentSnapshot(order);
   return {
     ...order,
+    pricing,
+    payment,
+    subtotal: pricing?.subtotal ?? 0,
+    total: pricing?.total ?? order?.total ?? 0,
+    deliveryFee: pricing?.deliveryFee ?? 0,
+    platformFee: pricing?.platformFee ?? 0,
+    tax: pricing?.tax ?? 0,
+    discount: pricing?.discount ?? 0,
     orderMongoId: mongoId,
     orderId: displayId,
     status: order?.orderStatus || order?.status || "",
@@ -172,6 +374,8 @@ export async function applyAggregateRating(model, entityId, newRating) {
 
 export function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
   const order = orderDoc?.toObject ? orderDoc.toObject() : orderDoc || {};
+  const pricing = extractOrderPricingSnapshot(order);
+  const payment = mergeOrderPaymentSnapshot(order);
   const restaurant = restaurantDoc || order?.restaurantId || null;
   const restaurantLocation = restaurant?.location || {};
   const deliveryAddress = order?.deliveryAddress || {};
@@ -195,10 +399,10 @@ export function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
     orderId: displayOrderId,
     status: orderDoc?.orderStatus || order?.orderStatus,
     items: order?.items || [],
-    pricing: order?.pricing,
-    total: order?.pricing?.total,
-    payment: order?.payment,
-    paymentMethod: order?.payment?.method,
+    pricing,
+    total: pricing?.total ?? 0,
+    payment,
+    paymentMethod: payment?.method,
     restaurantId:
       order?.restaurantId?._id?.toString?.() ||
       order?.restaurantId?.toString?.() ||
@@ -231,8 +435,8 @@ export function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
     note: order?.note || "",
     riderEarning: order?.riderEarning || 0,
     deliveryBonusAmount: order?.deliveryBonusAmount || 0,
-    earnings: order?.riderEarning || order?.pricing?.deliveryFee || 0,
-    deliveryFee: order?.pricing?.deliveryFee || 0,
+    earnings: order?.riderEarning || pricing?.deliveryFee || 0,
+    deliveryFee: pricing?.deliveryFee || 0,
     deliveryFleet: order?.deliveryFleet,
     dispatch: order?.dispatch,
     createdAt: order?.createdAt,

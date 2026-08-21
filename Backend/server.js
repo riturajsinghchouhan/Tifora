@@ -9,7 +9,7 @@ import { initializeQueues, closeBullMQConnection } from './src/queues/index.js';
 import { logger } from './src/utils/logger.js';
 import { initializeFirebaseRealtime } from './src/config/firebase.js';
 import { loadEnvFromDb } from './src/config/envLoader.js';
-import { initRedisEmitter } from './src/config/socket.js';
+import { initRedisEmitter, initSocket } from './src/config/socket.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10000;
 let server = null;
@@ -54,16 +54,15 @@ const startServer = async () => {
         // 2. Create HTTP server from Express app
         const httpServer = http.createServer(app);
 
-        logger.info('[Bootstrap] Local Socket.IO init skipped in API server; expecting socket-server.js or Redis emitter for broadcasts');
-
+        // ALWAYS initialize socket.io on the main server for monolith/dev setups
+        logger.info('[Bootstrap] Initializing Local Socket.IO on API server');
+        await initSocket(httpServer);
 
         if (config.redisEnabled) {
-            logger.info('[Bootstrap] Redis is enabled for API server; connecting Redis client for socket emitter/queues');
+            logger.info('[Bootstrap] Redis is enabled for API server; connecting Redis client for queues/socket adapter');
             await connectRedis();
-            initRedisEmitter(getRedisClient());
-            logger.info('[Bootstrap] Redis emitter setup attempted from API server');
         } else {
-            logger.warn('[Bootstrap] Redis is disabled in API server; getIO() will warn unless socket events stay inside socket-server.js');
+            logger.warn('[Bootstrap] Redis is disabled in API server; running with local memory sockets/queues');
         }
         
         // Watchdog recovered stuck orders is moved to scheduler-server.js

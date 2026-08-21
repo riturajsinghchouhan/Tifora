@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 const foodTransactionSchema = new mongoose.Schema({
     // Identifiers
@@ -52,6 +53,21 @@ const foodTransactionSchema = new mongoose.Schema({
             shortUrl: { type: String, default: '' },
             status: { type: String, default: '' },
             expiresAt: { type: Date, default: null }
+        },
+        refund: {
+            status: {
+                type: String,
+                enum: ['none', 'initiated', 'pending', 'processed', 'failed'],
+                default: 'none'
+            },
+            destination: {
+                type: String,
+                enum: ['source', 'wallet'],
+                default: 'source'
+            },
+            amount: { type: Number, default: 0 },
+            refundId: { type: String, default: '' },
+            processedAt: { type: Date, default: null }
         }
     },
 
@@ -84,8 +100,58 @@ const foodTransactionSchema = new mongoose.Schema({
         isRestaurantSettled: { type: Boolean, default: false },
         restaurantSettledAt: Date,
         isRiderSettled: { type: Boolean, default: false },
-        riderSettledAt: Date
+        riderSettledAt: Date,
+        isPlatformSettled: { type: Boolean, default: false },
+        platformSettledAt: Date
     },
+
+    // Immutable finance-time snapshot for audit and reconciliation.
+    orderSnapshot: {
+        orderDisplayId: { type: String, default: '', trim: true },
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodUser', default: null },
+        restaurantId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodRestaurant', default: null },
+        deliveryPartnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodDeliveryPartner', default: null },
+        items: [{
+            itemId: { type: String, default: '', trim: true },
+            name: { type: String, default: '', trim: true },
+            variantId: { type: String, default: '', trim: true },
+            variantName: { type: String, default: '', trim: true },
+            price: { type: Number, default: 0 },
+            quantity: { type: Number, default: 0 },
+            notes: { type: String, default: '', trim: true }
+        }],
+        deliveryAddress: {
+            label: { type: String, default: '', trim: true },
+            name: { type: String, default: '', trim: true },
+            fullName: { type: String, default: '', trim: true },
+            street: { type: String, default: '', trim: true },
+            additionalDetails: { type: String, default: '', trim: true },
+            city: { type: String, default: '', trim: true },
+            state: { type: String, default: '', trim: true },
+            zipCode: { type: String, default: '', trim: true },
+            phone: { type: String, default: '', trim: true }
+        },
+        pricing: {
+            subtotal: { type: Number, default: 0 },
+            tax: { type: Number, default: 0 },
+            packagingFee: { type: Number, default: 0 },
+            deliveryFee: { type: Number, default: 0 },
+            platformFee: { type: Number, default: 0 },
+            restaurantCommission: { type: Number, default: 0 },
+            gstOnItem: { type: Number, default: 0 },
+            gstOnCommission: { type: Number, default: 0 },
+            paymentGatewayFee: { type: Number, default: 0 },
+            tcs: { type: Number, default: 0 },
+            discount: { type: Number, default: 0 },
+            total: { type: Number, default: 0 },
+            currency: { type: String, default: 'INR', trim: true }
+        },
+        paymentMethod: { type: String, default: 'cash', trim: true },
+        orderStatus: { type: String, default: '', trim: true },
+        createdAt: { type: Date, default: Date.now }
+    },
+    snapshotVersion: { type: Number, default: 1 },
+    snapshotHash: { type: String, default: '', trim: true },
 
     // Audit History (Replacing FoodOrderPayment ledger)
     history: [{
@@ -99,8 +165,9 @@ const foodTransactionSchema = new mongoose.Schema({
         }
     }]
 }, { 
-    collection: 'food_transactions', 
-    timestamps: true 
+    collection: PAYMENT_COLLECTIONS.PAYMENT_FOOD_TRANSACTIONS,
+    timestamps: true,
+    autoCreate: false
 });
 
 // Powerful indexes for Finance & Analytics

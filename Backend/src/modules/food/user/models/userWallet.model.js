@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 const walletTransactionSchema = new mongoose.Schema(
     {
@@ -25,7 +26,7 @@ const userWalletSchema = new mongoose.Schema(
         referralEarnings: { type: Number, default: 0 },
         transactions: { type: [walletTransactionSchema], default: [] }
     },
-    { collection: 'food_user_wallets', timestamps: true }
+    { collection: PAYMENT_COLLECTIONS.PAYMENT_USER_WALLETS, timestamps: true }
 );
 
 export const FoodUserWallet = mongoose.model('FoodUserWallet', userWalletSchema);

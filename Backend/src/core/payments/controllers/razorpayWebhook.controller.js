@@ -1,19 +1,45 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 import { FoodOrder } from '../../../modules/food/orders/models/order.model.js';
+import { FoodTransaction } from '../../../modules/food/orders/models/foodTransaction.model.js';
 import * as foodTransactionService from '../../../modules/food/orders/services/foodTransaction.service.js';
 import { config } from '../../../config/env.js';
 import { logger } from '../../../utils/logger.js';
+import { syncOrderFinanceDocuments } from '../foodFinance.service.js';
+import {
+    registerGatewayEvent,
+    markGatewayEventFailed,
+    markGatewayEventProcessed
+} from '../gatewayEvent.service.js';
+
+function extractWebhookRefs(event, payload) {
+    const paymentEntity = payload?.payment?.entity || null;
+    const refundEntity = payload?.refund?.entity || null;
+
+    return {
+        providerOrderId: String(
+            paymentEntity?.order_id ||
+            refundEntity?.notes?.order_id ||
+            ''
+        ),
+        providerPaymentId: String(
+            paymentEntity?.id ||
+            refundEntity?.payment_id ||
+            ''
+        ),
+        providerRefundId: String(refundEntity?.id || ''),
+        fallbackEventId: `${event}:${paymentEntity?.id || refundEntity?.id || paymentEntity?.order_id || Date.now()}`
+    };
+}
 
 /**
- * ✅ NEW: Centralized Razorpay Webhook Handler (Core Layer)
- * Manages atomic updates for order payments and refunds across all modules.
+ * Centralized Razorpay webhook handler.
+ * Stores the event first, then applies business updates in a duplicate-safe path.
  */
 export const handleRazorpayWebhook = async (req, res) => {
     const signature = req.headers['x-razorpay-signature'];
     const secret = config.razorpayWebhookSecret;
 
-    // 1. Verify Signature using raw body buffer
     if (!signature || !secret || !req.rawBody) {
         logger.warn('Razorpay Webhook: Missing signature or rawBody buffer.');
         return res.status(400).send('Invalid signature');
@@ -30,86 +56,172 @@ export const handleRazorpayWebhook = async (req, res) => {
     }
 
     const { event, payload } = req.body;
+    const refs = extractWebhookRefs(event, payload);
+    const providerEventId = String(
+        req.headers['x-razorpay-event-id'] || refs.fallbackEventId
+    );
+
     logger.info(`Razorpay Webhook Received: ${event}`);
 
+    const registeredEvent = await registerGatewayEvent({
+        provider: 'razorpay',
+        providerEventId,
+        eventType: event,
+        payload,
+        providerOrderId: refs.providerOrderId,
+        providerPaymentId: refs.providerPaymentId,
+        providerRefundId: refs.providerRefundId,
+        metadata: {
+            signaturePresent: !!signature
+        }
+    });
+
+    if (registeredEvent.isDuplicate) {
+        if (registeredEvent.payloadMismatch) {
+            logger.error(
+                `Razorpay Webhook duplicate payload mismatch for event ${providerEventId}`
+            );
+        } else {
+            logger.info(`Razorpay Webhook duplicate ignored: ${providerEventId}`);
+        }
+
+        return res.status(200).json({
+            status: 'duplicate',
+            eventId: providerEventId
+        });
+    }
+
+    let orderId = null;
+    let transactionId = null;
+
     try {
-        // --- 🟢 Handle Payment Captured (Success) ---
         if (event === 'payment.captured') {
-            const paymentObj = payload.payment.entity;
+            const paymentObj = payload?.payment?.entity || {};
             const rzOrderId = paymentObj.order_id;
             const rzPaymentId = paymentObj.id;
 
-            // Atomic update to mark as paid if not already
-            const order = await FoodOrder.findOneAndUpdate(
-                { 
-                    "payment.razorpay.orderId": rzOrderId, 
-                    "payment.status": { $ne: 'paid' } 
-                },
-                { 
-                    $set: { 
-                        "payment.status": 'paid', 
-                        "payment.razorpay.paymentId": rzPaymentId 
-                    } 
-                },
-                { new: true }
-            );
+            const session = await mongoose.startSession();
+            try {
+                await session.withTransaction(async () => {
+                    const existingTransaction = await FoodTransaction.findOne({
+                        $or: [
+                            { 'payment.razorpay.orderId': rzOrderId },
+                            { 'gateway.razorpayOrderId': rzOrderId }
+                        ]
+                    }).session(session);
+                    if (!existingTransaction?.orderId) return;
 
-            if (order) {
-                // ✅ UPDATED: Wrapped in try-catch to prevent secondary failures from breaking the webhook response
-                try {
-                    await foodTransactionService.updateTransactionStatus(order._id, 'captured', {
-                        status: 'captured',
+                    const order = await FoodOrder.findById(existingTransaction.orderId).session(session);
+
+                    if (!order) return;
+
+                    const transaction = await foodTransactionService.applyPaymentCapture({
+                        orderId: order._id,
+                        razorpayOrderId: rzOrderId,
                         razorpayPaymentId: rzPaymentId,
-                        note: 'Payment status synced via Webhook (payment.captured)'
+                        note: 'Payment status synced via webhook payment.captured',
+                        recordedByRole: 'SYSTEM',
+                        session
                     });
-                } catch (ledgerErr) {
-                    logger.error(`Webhook Ledger Error (Order ${order.orderId}): ${ledgerErr.message}`);
-                }
-                logger.info(`Webhook [payment.captured]: Synced Order ${order.orderId} (Status=paid)`);
+
+                    await syncOrderFinanceDocuments({
+                        orderId: order._id,
+                        orderDoc: order,
+                        transactionDoc: transaction,
+                        source: 'razorpay_webhook_payment_captured',
+                        rawResponse: paymentObj,
+                        session
+                    });
+
+                    orderId = order._id;
+                    transactionId = transaction?._id || null;
+                });
+            } finally {
+                session.endSession();
+            }
+
+            if (orderId) {
+                logger.info(`Webhook [payment.captured]: Synced order ${String(orderId)} (Status=paid)`);
             } else {
-                // ✅ ADDED: Log warn if order not found but payment was captured
                 logger.warn(`Webhook [payment.captured]: Order not found or already paid for RZ-Order: ${rzOrderId}`);
             }
         }
 
-        // --- 🔴 Handle Refund Processed ---
         if (event === 'refund.processed') {
-            const refundObj = payload.refund.entity;
+            const refundObj = payload?.refund?.entity || {};
             const rzPaymentId = refundObj.payment_id;
             const rzRefundId = refundObj.id;
-            const refundAmount = refundObj.amount / 100; // to major unit
+            const refundAmount = Number(refundObj.amount || 0) / 100;
 
-            // Sync refund fields in the order
-            const order = await FoodOrder.findOneAndUpdate(
-                { 
-                    "payment.razorpay.paymentId": rzPaymentId,
-                    "payment.refund.status": { $ne: 'processed' }
-                },
-                { 
-                    $set: { 
-                        "payment.status": 'refunded',
-                        "payment.refund": {
-                            status: 'processed',
-                            amount: refundAmount,
-                            refundId: rzRefundId,
-                            processedAt: new Date()
-                        }
-                    } 
-                },
-                { new: true }
-            );
+            const session = await mongoose.startSession();
+            try {
+                await session.withTransaction(async () => {
+                    const existingTransaction = await FoodTransaction.findOne({
+                        $or: [
+                            { 'payment.razorpay.paymentId': rzPaymentId },
+                            { 'gateway.razorpayPaymentId': rzPaymentId }
+                        ]
+                    }).session(session);
+                    if (!existingTransaction?.orderId) return;
 
-            if (order) {
-                logger.info(`Webhook [refund.processed]: Synced Order ${order.orderId} (Refunded)`);
+                    const order = await FoodOrder.findById(existingTransaction.orderId).session(session);
+
+                    if (!order) return;
+
+                    const transaction = await foodTransactionService.applyRefundUpdate({
+                        orderId: order._id,
+                        refundAmount,
+                        refundId: rzRefundId,
+                        destination: existingTransaction.payment?.refund?.destination || 'source',
+                        refundStatus: 'processed',
+                        note: 'Refund status synced via webhook refund.processed',
+                        recordedByRole: 'SYSTEM',
+                        session
+                    });
+
+                    await syncOrderFinanceDocuments({
+                        orderId: order._id,
+                        orderDoc: order,
+                        transactionDoc: transaction,
+                        source: 'razorpay_webhook_refund_processed',
+                        rawResponse: refundObj,
+                        refundReason: 'Refund processed via Razorpay webhook',
+                        session
+                    });
+
+                    orderId = order._id;
+                    transactionId = transaction?._id || null;
+                });
+            } finally {
+                session.endSession();
+            }
+
+            if (orderId) {
+                logger.info(`Webhook [refund.processed]: Synced order ${String(orderId)} (Refunded)`);
             } else {
-                // ✅ ADDED: Log warn if order not found for refund
                 logger.warn(`Webhook [refund.processed]: Order not found or already refunded for RZ-Payment: ${rzPaymentId}`);
             }
         }
 
-        res.status(200).json({ status: 'ok' });
+        await markGatewayEventProcessed(registeredEvent.eventDoc._id, {
+            orderId,
+            transactionId,
+            processingResult: {
+                event,
+                status: 'ok'
+            }
+        });
+
+        return res.status(200).json({ status: 'ok' });
     } catch (err) {
         logger.error(`Razorpay Webhook Logic Error: ${err.message}`);
-        res.status(500).json({ message: 'Internal Server Error' });
+        await markGatewayEventFailed(registeredEvent.eventDoc._id, err, {
+            orderId,
+            transactionId,
+            processingResult: {
+                event
+            }
+        });
+        return res.status(500).json({ message: 'Internal Server Error' });
     }
 };

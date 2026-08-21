@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../paymentCollections.js';
 
 /**
  * Settlement — batch payout request for restaurants /delivery partners.
@@ -45,7 +46,11 @@ const settlementSchema = new mongoose.Schema(
         notes: { type: String, default: '', trim: true },
         metadata: { type: mongoose.Schema.Types.Mixed, default: undefined }
     },
-    { collection: 'settlements', timestamps: true }
+    {
+        collection: PAYMENT_COLLECTIONS.PAYMENT_SETTLEMENTS,
+        timestamps: true,
+        autoCreate: false
+    }
 );
 
 settlementSchema.index({ entityType: 1, entityId: 1, status: 1, createdAt: -1 });

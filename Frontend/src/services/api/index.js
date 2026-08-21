@@ -222,6 +222,14 @@ export const adminAPI = {
 
   getSidebarBadges: () =>
     adminClient.get("/food/admin/sidebar-badges"),
+  resetPaymentFinanceData: (confirmation) =>
+    adminClient.post("/food/admin/developer/reset-payment-data", {
+      confirmation: String(confirmation || "").trim(),
+    }),
+  clearAllOrdersData: (confirmation) =>
+    adminClient.post("/food/admin/developer/clear-orders", {
+      confirmation: String(confirmation || "").trim(),
+    }),
   getEnvSettings: () => adminClient.get("/food/admin/env"),
   updateEnvSettings: (data) => adminClient.put("/food/admin/env", data),
   getBusinessSettings: () => adminClient.get("/food/admin/business-settings"),

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 const deliveryFeeRangeSchema = new mongoose.Schema(
     {
@@ -33,7 +34,7 @@ const feeSettingsSchema = new mongoose.Schema(
         applyGlobalTaxes: { type: Boolean, default: true },
         isActive: { type: Boolean, default: true, index: true }
     },
-    { collection: 'food_fee_settings', timestamps: true }
+    { collection: PAYMENT_COLLECTIONS.PAYMENT_FEE_SETTINGS, timestamps: true }
 );
 
 feeSettingsSchema.index({ isActive: 1, createdAt: -1 });

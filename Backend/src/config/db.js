@@ -4,6 +4,7 @@ import { config } from './env.js';
 import { logger } from '../utils/logger.js';
 
 dns.setServers(['8.8.8.8', '1.1.1.1']);
+mongoose.set('autoCreate', false);
 
 export const connectDB = async () => {
     try {

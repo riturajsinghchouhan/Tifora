@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 /**
  * AdminWallet — tracks the platform's overall financial balance.
@@ -17,7 +18,7 @@ const adminWalletSchema = new mongoose.Schema(
         /** Total refunds issued */
         totalRefunds: { type: Number, default: 0, min: 0 }
     },
-    { collection: 'food_admin_wallets', timestamps: true }
+    { collection: PAYMENT_COLLECTIONS.PAYMENT_ADMIN_WALLETS, timestamps: true }
 );
 
 export const FoodAdminWallet = mongoose.model('FoodAdminWallet', adminWalletSchema);

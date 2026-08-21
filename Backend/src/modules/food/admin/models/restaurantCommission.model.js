@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 const restaurantCommissionSchema = new mongoose.Schema(
     {
@@ -20,7 +21,7 @@ const restaurantCommissionSchema = new mongoose.Schema(
         notes: { type: String, trim: true, default: '' },
         status: { type: Boolean, default: true, index: true }
     },
-    { collection: 'food_restaurant_commissions', timestamps: true }
+    { collection: PAYMENT_COLLECTIONS.PAYMENT_RESTAURANT_COMMISSIONS, timestamps: true }
 );
 
 

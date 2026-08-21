@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import { Worker } from 'bullmq';
 import { config } from '../../config/env.js';
+import { connectDB, disconnectDB } from '../../config/db.js';
+import { loadEnvFromDb } from '../../config/envLoader.js';
 import { logger } from '../../utils/logger.js';
 import { getBullMQConnection } from '../connection.js';
 import { PAYMENT_QUEUE } from '../queue.constants.js';
@@ -11,21 +13,32 @@ const defaultJobOptions = {
     backoff: { type: 'exponential', delay: 1000 }
 };
 
-const startPaymentWorker = () => {
+const startPaymentWorker = async () => {
     if (!config.bullmqEnabled) {
         logger.info('BullMQ is disabled. Payment worker not started.');
         return null;
     }
+
+    logger.info(
+        `[Bootstrap] Starting payment worker bullmqEnabled=${config.bullmqEnabled} redisEnabled=${config.redisEnabled}`
+    );
+
+    await connectDB();
+    await loadEnvFromDb();
+    logger.info('[Bootstrap] Payment worker initialized MongoDB and env overrides');
+
     const connection = getBullMQConnection();
     if (!connection) {
         logger.error('Payment worker: Redis connection unavailable. Exiting.');
         process.exit(1);
     }
+
     const worker = new Worker(PAYMENT_QUEUE, processPaymentJob, {
         connection,
         concurrency: 5,
         defaultJobOptions
     });
+
     worker.on('completed', (job) => logger.info(`Payment job ${job.id} completed`));
     worker.on('failed', (job, err) => logger.error(`Payment job ${job?.id} failed: ${err.message}`));
     worker.on('error', (err) => logger.error(`Payment worker error: ${err.message}`));
@@ -33,10 +46,11 @@ const startPaymentWorker = () => {
     return worker;
 };
 
-const worker = startPaymentWorker();
+const worker = await startPaymentWorker();
 if (worker) {
     const shutdown = async () => {
         await worker.close();
+        await disconnectDB();
         process.exit(0);
     };
     process.on('SIGTERM', shutdown);

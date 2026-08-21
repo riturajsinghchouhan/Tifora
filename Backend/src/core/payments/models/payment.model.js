@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../paymentCollections.js';
 
 /**
  * Payment — one record per payment attempt on an order.
@@ -50,7 +51,11 @@ const paymentSchema = new mongoose.Schema(
 
         metadata: { type: mongoose.Schema.Types.Mixed, default: undefined }
     },
-    { collection: 'payments', timestamps: true }
+    {
+        collection: PAYMENT_COLLECTIONS.PAYMENT_RECORDS,
+        timestamps: true,
+        autoCreate: false
+    }
 );
 
 paymentSchema.index({ orderId: 1, createdAt: -1 });

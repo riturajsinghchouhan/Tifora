@@ -35,78 +35,6 @@ const deliveryAddressSchema = new mongoose.Schema(
     { _id: false }
 );
 
-const pricingSchema = new mongoose.Schema(
-    {
-        subtotal: { type: Number, required: true, min: 0 },
-        tax: { type: Number, default: 0, min: 0 },
-        packagingFee: { type: Number, default: 0, min: 0 },
-        deliveryFee: { type: Number, default: 0, min: 0 },
-        platformFee: { type: Number, default: 0, min: 0 },
-        restaurantCommission: { type: Number, default: 0, min: 0 },
-        gstOnItem: { type: Number, default: 0, min: 0 },
-        gstOnCommission: { type: Number, default: 0, min: 0 },
-        paymentGatewayFee: { type: Number, default: 0, min: 0 },
-        tcs: { type: Number, default: 0, min: 0 },
-        discount: { type: Number, default: 0, min: 0 },
-        total: { type: Number, required: true, min: 0 },
-        currency: { type: String, default: 'INR' }
-    },
-    { _id: false }
-);
-
-const paymentSchema = new mongoose.Schema(
-    {
-        method: {
-            type: String,
-            enum: ['cash', 'razorpay', 'razorpay_qr', 'wallet'],
-            required: true
-        },
-        status: {
-            type: String,
-            enum: [
-                'cod_pending',
-                'created',
-                'authorized',
-                'paid',
-                'failed',
-                'refunded',
-                'pending_qr'
-            ],
-            default: 'cod_pending'
-        },
-        amountDue: { type: Number, min: 0 },
-        razorpay: {
-            orderId: { type: String },
-            paymentId: { type: String },
-            signature: { type: String }
-        },
-        qr: {
-            qrId: { type: String },
-            imageUrl: { type: String },
-            paymentLinkId: { type: String },
-            shortUrl: { type: String },
-            status: { type: String },
-            expiresAt: { type: Date }
-        },
-        // ✅ NEW: Added refund object to track refund status without breaking existing flow
-        refund: {
-            status: { 
-                type: String, 
-                enum: ['none', 'pending', 'processed', 'failed'], 
-                default: 'none' 
-            },
-            destination: {
-                type: String,
-                enum: ['source', 'wallet'],
-                default: 'source'
-            },
-            amount: { type: Number, default: 0 },
-            refundId: { type: String, default: '' },
-            processedAt: { type: Date }
-        }
-    },
-    { _id: false }
-);
 
 const dispatchSchema = new mongoose.Schema(
     {
@@ -119,7 +47,6 @@ const dispatchSchema = new mongoose.Schema(
         deliveryPartnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodDeliveryPartner', default: null },
         assignedAt: { type: Date },
         acceptedAt: { type: Date },
-        /** List of partners who were offered this order (to avoid repeats and track timeouts) */
         offeredTo: [{
             partnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodDeliveryPartner' },
             at: { type: Date, default: Date.now },
@@ -127,7 +54,6 @@ const dispatchSchema = new mongoose.Schema(
             allowOverLimit: { type: Boolean, default: false },
             requiredCashForOrder: { type: Number, default: 0 }
         }],
-        /** Current radius-expansion attempt (1 = first tier, increments every ~20s) */
         dispatchAttempt: { type: Number, default: 1, min: 1 },
         dispatchingAt: { type: Date }
     },
@@ -209,7 +135,6 @@ const orderSchema = new mongoose.Schema(
             sparse: true,
             index: true
         },
-        /** Compatibility alias: satisfies rogue unique index 'orderId_1' found in legacy deployments. */
         orderId: {
             type: String,
             unique: true,
@@ -247,18 +172,6 @@ const orderSchema = new mongoose.Schema(
         },
         customerName: { type: String, default: '', trim: true },
         customerPhone: { type: String, default: '', trim: true },
-        pricing: {
-            type: pricingSchema,
-            required: false
-        },
-        /**
-         * Denormalized payment snapshot for fast reads & legacy clients.
-         * Authoritative audit trail: collection `food_order_payments` (FoodOrderPayment model).
-         */
-        payment: {
-            type: paymentSchema,
-            required: false
-        },
         orderStatus: {
             type: String,
             enum: [
@@ -301,20 +214,16 @@ const orderSchema = new mongoose.Schema(
         riderEarning: { type: Number, default: 0, min: 0 },
         deliveryBonusAmount: { type: Number, default: 0, min: 0 },
         platformProfit: { type: Number, default: 0, min: 0 },
-        /** Plain 4-digit OTP for pickup at restaurant. */
         pickupOtp: { type: String, default: '', select: false },
-        /** Plain 4-digit OTP for handover; cleared after successful verify (never expose to partner in API responses). */
         deliveryOtp: { type: String, default: '', select: false },
         deliveryVerification: {
             type: deliveryVerificationSchema,
             default: () => ({})
         },
-        /** Latest rider location for this specific order (GeoJSON Point) */
         lastRiderLocation: {
             type: { type: String, enum: ['Point'] },
             coordinates: { type: [Number] }
         },
-        /** Petpooja integration sync state */
         petpoojaIntegration: {
             syncStatus: { type: String, enum: ['pending', 'synced', 'failed', 'not_applicable'], default: 'not_applicable' },
             petpoojaOrderId: { type: String, default: '' },
@@ -336,8 +245,6 @@ orderSchema.index({ 'dispatch.deliveryPartnerId': 1, orderStatus: 1 });
 orderSchema.index({ 'dispatch.status': 1, orderStatus: 1 });
 orderSchema.index({ 'dispatch.status': 1, orderStatus: 1, updatedAt: -1 });
 orderSchema.index({ 'dispatch.deliveryPartnerId': 1, 'dispatch.status': 1, updatedAt: -1 });
-orderSchema.index({ 'payment.status': 1, createdAt: -1 });
-orderSchema.index({ 'payment.method': 1, createdAt: -1 });
 
 orderSchema.pre('save', async function (next) {
     if (!this.order_id) {
@@ -345,7 +252,6 @@ orderSchema.pre('save', async function (next) {
         const random = Math.floor(100 + Math.random() * 900);
         this.order_id = `FOD-${timestamp}${random}`;
     }
-    // Synchronize camelCase alias to satisfy unique index 'orderId_1'
     if (this.order_id) {
         this.orderId = this.order_id;
     }

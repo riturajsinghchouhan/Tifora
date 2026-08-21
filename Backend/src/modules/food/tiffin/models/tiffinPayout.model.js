@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 const tiffinPayoutSchema = new mongoose.Schema(
     {
@@ -85,7 +86,7 @@ const tiffinPayoutSchema = new mongoose.Schema(
         }
     },
     {
-        collection: 'food_tiffin_payouts',
+        collection: PAYMENT_COLLECTIONS.PAYMENT_TIFFIN_PAYOUTS,
         timestamps: true
     }
 );

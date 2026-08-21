@@ -136,6 +136,7 @@ const DiningManagement = lazy(() => import("@food/pages/admin/system/DiningManag
 const DiningList = lazy(() => import("@food/pages/admin/system/DiningList"));
 const DiningRequests = lazy(() => import("@food/pages/admin/system/DiningRequests"));
 const EnvManagements = lazy(() => import("@food/pages/admin/system/EnvManagements"));
+const DeveloperSettings = lazy(() => import("@food/pages/admin/system/DeveloperSettings"));
 const EditRestaurant = lazy(() => import("@food/pages/admin/restaurant/EditRestaurant"));
 const AdminLogin = lazy(() => import("@food/pages/admin/auth/AdminLogin"));
 const AdminSignup = lazy(() => import("@food/pages/admin/auth/AdminSignup"));
@@ -286,6 +287,7 @@ export default function AdminRouter() {
             {/* SYSTEM & BUSINESS SETTINGS */}
             <Route path="business-setup" element={<BusinessSetup />} />
             <Route path="env-managements" element={<EnvManagements />} />
+            <Route path="developer-settings" element={<DeveloperSettings />} />
             <Route path="toggle-management" element={<ToggleManagement />} />
             <Route path="email-template" element={<EmailTemplate />} />
             <Route path="theme-settings" element={<ThemeSettings />} />

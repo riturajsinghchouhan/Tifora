@@ -48,7 +48,7 @@ export async function initiateRefund({ paymentId, orderId, userId, amount, reaso
             refund.processedAt = new Date();
             await refund.save();
 
-            // Also credit back to the existing FoodUserWallet for backward compat
+            // Mirror legacy wallet history without changing the balance a second time.
             await addRefundToLegacyWallet(userId || payment.userId, refund.amount, orderId);
 
             // Mark payment as refunded
@@ -143,6 +143,7 @@ export async function listRefunds({ status, page = 1, limit = 20 } = {}) {
 
 /**
  * Backward compatibility: add a refund transaction to the legacy FoodUserWallet embedded array.
+ * Do not mutate legacy wallet balance here, because the universal ledger already did it.
  */
 async function addRefundToLegacyWallet(userId, amount, orderId) {
     try {
@@ -156,7 +157,6 @@ async function addRefundToLegacyWallet(userId, amount, orderId) {
                 description: 'Order refund',
                 metadata: { source: 'order_refund', orderId: String(orderId) }
             });
-            wallet.balance = (Number(wallet.balance) || 0) + amount;
             await wallet.save();
         }
     } catch (err) {

@@ -33,6 +33,7 @@ import {
   sanitizeOrderForExternal,
   isStatusAdvance,
 } from './order.helpers.js';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 function normalizeOtpValue(value) {
   return String(value ?? '').replace(/\D/g, '').trim();
@@ -79,7 +80,7 @@ export async function getPartnerCashCapacity(deliveryPartnerId) {
       },
       {
         $lookup: {
-          from: 'food_transactions',
+          from: PAYMENT_COLLECTIONS.PAYMENT_FOOD_TRANSACTIONS,
           localField: '_id',
           foreignField: 'orderId',
           as: 'tx',
@@ -87,16 +88,17 @@ export async function getPartnerCashCapacity(deliveryPartnerId) {
       },
       {
         $match: {
-          $or: [
-            { 'tx.paymentMethod': 'cash' },
-            { 'tx': { $size: 0 }, 'payment.method': 'cash' }
-          ]
+          'tx.paymentMethod': 'cash'
         }
       },
       {
         $group: {
           _id: null,
-          grossCashCollected: { $sum: { $ifNull: ['$pricing.total', 0] } },
+          grossCashCollected: {
+            $sum: {
+              $ifNull: [{ $arrayElemAt: ['$tx.pricing.total', 0] }, 0],
+            },
+          },
         },
       },
     ]),
@@ -186,7 +188,10 @@ function emitOrderUpdate(order, deliveryPartnerId, options = {}) {
 
       if (order.payment?.method === 'cash' || order.paymentMethod === 'cash') {
         riderTitle = 'Payment collected!';
-        const amt = order.pricing?.total || order.amounts?.totalCustomerPaid || 0;
+        const amt =
+          order.amounts?.totalCustomerPaid ||
+          order.payment?.amountDue ||
+          0;
         riderBody = `You have collected Rs ${amt} cash for Order #${orderId}.`;
       }
     }
@@ -220,7 +225,11 @@ function emitOrderUpdate(order, deliveryPartnerId, options = {}) {
             orderId,
             orderMongoId: order._id?.toString?.() || '',
             paymentMethod: order.payment?.method || order.paymentMethod,
-            amountCollected: String(order.pricing?.total || order.amounts?.totalCustomerPaid || 0),
+            amountCollected: String(
+              order.amounts?.totalCustomerPaid ||
+              order.payment?.amountDue ||
+              0,
+            ),
           },
         },
       );
@@ -233,7 +242,7 @@ function emitOrderUpdate(order, deliveryPartnerId, options = {}) {
 async function syncRazorpayQrPayment(orderDoc) {
   // Phase 2: FoodTransaction is source of truth; avoid relying on FoodOrder.payment.
   const tx = await FoodTransaction.findOne({ orderId: orderDoc?._id }).lean();
-  const payment = tx?.payment || orderDoc?.payment || null;
+  const payment = tx?.payment || null;
   if (!payment) return null;
   if (payment.method !== 'razorpay_qr') return payment;
   if (payment.status === 'paid') return payment;
@@ -250,11 +259,11 @@ async function syncRazorpayQrPayment(orderDoc) {
         error?.message || error
       }`,
     );
-    return orderDoc.payment;
+    return payment;
   }
 
   const linkStatus = String(link?.status || '').toLowerCase();
-  if (!linkStatus) return orderDoc.payment;
+  if (!linkStatus) return payment;
 
   await FoodTransaction.updateOne(
     { orderId: orderDoc?._id },

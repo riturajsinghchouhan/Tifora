@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 /**
  * DeliveryWallet — tracks the financial balance for each delivery partner.
@@ -27,7 +28,7 @@ const deliveryWalletSchema = new mongoose.Schema(
         /** Total number of completed deliveries */
         totalDeliveries: { type: Number, default: 0, min: 0 }
     },
-    { collection: 'food_delivery_wallets', timestamps: true }
+    { collection: PAYMENT_COLLECTIONS.PAYMENT_DELIVERY_WALLETS, timestamps: true }
 );
 
 export const FoodDeliveryWallet = mongoose.model('FoodDeliveryWallet', deliveryWalletSchema);

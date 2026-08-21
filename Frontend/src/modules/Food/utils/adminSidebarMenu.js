@@ -287,9 +287,7 @@ export const adminSidebarMenu = [
     items: [
       { type: "link", label: "Env Managements", path: "/admin/food/env-managements", icon: "Database" },
       { type: "link", label: "Broadcast Notification", path: "/admin/food/broadcast-notification", icon: "Bell" },
-      { type: "link", label: "Toggle Management", path: "/admin/food/toggle-management", icon: "ToggleLeft" },
       { type: "link", label: "Business Setup", path: "/admin/food/business-setup", icon: "Settings" },
-      { type: "link", label: "Theme Settings", path: "/admin/food/theme-settings", icon: "Palette" },
     ],
   },
   {
@@ -302,6 +300,15 @@ export const adminSidebarMenu = [
       { type: "link", label: "Refund Policy", path: "/admin/food/pages-social-media/refund", icon: "Receipt" },
       { type: "link", label: "Shipping Policy", path: "/admin/food/pages-social-media/shipping", icon: "Truck" },
       { type: "link", label: "Cancellation Policy", path: "/admin/food/pages-social-media/cancellation", icon: "X" },
+    ],
+  },
+  {
+    type: "section",
+    label: "DEVELOPER SETTINGS",
+    items: [
+      { type: "link", label: "Developer Settings", path: "/admin/food/developer-settings", icon: "Code2" },
+      { type: "link", label: "Toggle Management", path: "/admin/food/toggle-management", icon: "ToggleLeft" },
+      { type: "link", label: "Theme Settings", path: "/admin/food/theme-settings", icon: "Palette" },
     ],
   },
 ];

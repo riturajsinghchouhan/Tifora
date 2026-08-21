@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 const customKitchenCommissionSchema = new mongoose.Schema(
     {
@@ -63,7 +64,7 @@ const tiffinCommissionSchema = new mongoose.Schema(
         }
     },
     {
-        collection: 'food_tiffin_commission_settings',
+        collection: PAYMENT_COLLECTIONS.PAYMENT_TIFFIN_COMMISSION_SETTINGS,
         timestamps: true
     }
 );

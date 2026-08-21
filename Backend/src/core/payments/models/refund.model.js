@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../paymentCollections.js';
 
 /**
  * Refund — tracks refund requests against a Payment.
@@ -52,8 +53,9 @@ const refundSchema = new mongoose.Schema(
         metadata: { type: mongoose.Schema.Types.Mixed, default: undefined }
     },
     {
-        collection: 'refunds',
-        timestamps: true
+        collection: PAYMENT_COLLECTIONS.PAYMENT_REFUNDS,
+        timestamps: true,
+        autoCreate: false
     }
 );
 

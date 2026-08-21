@@ -21,13 +21,13 @@ import {
 async function syncRazorpayQrPayment(orderDoc) {
   // Phase 2: avoid relying on FoodOrder.payment as the source of truth.
   const tx = await FoodTransaction.findOne({ orderId: orderDoc?._id }).lean();
-  const payment = tx?.payment || orderDoc?.payment || null;
+  const payment = tx?.payment || null;
   if (!payment) return null;
   if (payment.method !== 'razorpay_qr') return payment;
   if (payment.status === 'paid') return payment;
 
   const paymentLinkId = payment?.qr?.paymentLinkId;
-  if (!paymentLinkId || !isRazorpayConfigured()) return orderDoc.payment;
+  if (!paymentLinkId || !isRazorpayConfigured()) return payment;
 
   let link;
   try {
@@ -38,11 +38,11 @@ async function syncRazorpayQrPayment(orderDoc) {
         error?.message || error
       }`,
     );
-    return orderDoc.payment;
+    return payment;
   }
 
   const linkStatus = String(link?.status || '').toLowerCase();
-  if (!linkStatus) return orderDoc.payment;
+  if (!linkStatus) return payment;
 
   // Write back to FoodTransaction (ledger) only.
   await FoodTransaction.updateOne(
@@ -83,12 +83,12 @@ export async function createCollectQr(
     throw new ForbiddenError('Not your order');
   }
   const tx = await FoodTransaction.findOne({ orderId: order._id }).lean();
-  const payment = tx?.payment || order.payment || {};
+  const payment = tx?.payment || {};
   if (payment.method !== 'cash' && payment.status === 'paid') {
     throw new ValidationError('Order already paid');
   }
 
-  const amountDue = payment.amountDue ?? tx?.pricing?.total ?? order.pricing?.total ?? 0;
+  const amountDue = payment.amountDue ?? tx?.pricing?.total ?? tx?.amounts?.totalCustomerPaid ?? 0;
   if (amountDue < 1) throw new ValidationError('No amount due');
   if (!isRazorpayConfigured()) {
     throw new ValidationError('QR payment not configured');

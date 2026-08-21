@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { FoodRestaurant } from '../models/restaurant.model.js';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { AccountDeletion } from '../../admin/models/accountDeletion.model.js';
 
@@ -23,7 +24,7 @@ export async function deleteRestaurantAccount(userId) {
         let totalEarnings = 0;
         try {
             const walletDoc = await mongoose.connection.db
-                .collection('food_restaurant_wallets')
+                .collection(PAYMENT_COLLECTIONS.PAYMENT_RESTAURANT_WALLETS)
                 .findOne({ restaurantId: new mongoose.Types.ObjectId(userId) });
             walletBalance = walletDoc?.balance || 0;
             totalEarnings = walletDoc?.totalEarnings || 0;
@@ -49,7 +50,7 @@ export async function deleteRestaurantAccount(userId) {
         let totalCommissionPaid = 0;
         try {
             const commissionAgg = await mongoose.connection.db
-                .collection('food_restaurant_commissions')
+                .collection(PAYMENT_COLLECTIONS.PAYMENT_RESTAURANT_COMMISSIONS)
                 .aggregate([
                     { $match: { restaurantId: new mongoose.Types.ObjectId(userId) } },
                     { $group: { _id: null, total: { $sum: '$amount' } } }
@@ -109,7 +110,7 @@ export async function deleteRestaurantAccount(userId) {
 
         // --- 4. Anonymize transactions ---
         try {
-            await mongoose.connection.db.collection('food_transactions').updateMany(
+            await mongoose.connection.db.collection(PAYMENT_COLLECTIONS.PAYMENT_FOOD_TRANSACTIONS).updateMany(
                 { restaurantId: new mongoose.Types.ObjectId(userId) },
                 { $set: { restaurantId: null, restaurantName: 'Deleted Restaurant' } },
                 { session }
@@ -118,14 +119,14 @@ export async function deleteRestaurantAccount(userId) {
 
         // --- 5. Delete restaurant-specific data ---
         const collectionsToClean = [
-            { col: 'food_restaurant_wallets', field: 'restaurantId' },
+            { col: PAYMENT_COLLECTIONS.PAYMENT_RESTAURANT_WALLETS, field: 'restaurantId' },
             { col: 'food_restaurant_support_tickets', field: 'restaurantId' },
             { col: 'food_restaurant_withdrawals', field: 'restaurantId' },
             { col: 'food_items', field: 'restaurantId' },
             { col: 'food_addons', field: 'restaurantId' },
             { col: 'food_restaurant_menus', field: 'restaurantId' },
             { col: 'food_restaurant_outlet_timings', field: 'restaurantId' },
-            { col: 'food_restaurant_commissions', field: 'restaurantId' },
+            { col: PAYMENT_COLLECTIONS.PAYMENT_RESTAURANT_COMMISSIONS, field: 'restaurantId' },
             { col: 'food_dining_restaurants', field: 'restaurantId' },
             { col: 'food_dining_requests', field: 'restaurantId' }
         ];

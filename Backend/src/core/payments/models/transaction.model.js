@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../paymentCollections.js';
 
 /**
  * Transaction — universal financial ledger.
@@ -84,7 +85,11 @@ const transactionSchema = new mongoose.Schema(
 
         metadata: { type: mongoose.Schema.Types.Mixed, default: undefined }
     },
-    { collection: 'transactions', timestamps: true }
+    {
+        collection: PAYMENT_COLLECTIONS.PAYMENT_TRANSACTIONS,
+        timestamps: true,
+        autoCreate: false
+    }
 );
 
 transactionSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });

@@ -1,25 +1,14 @@
 import { logger } from '../../utils/logger.js';
 import { creditWallet } from '../../core/payments/wallet.service.js';
-import { createPayment, markPaymentSuccess } from '../../core/payments/payment.service.js';
-import { initiateRefund } from '../../core/payments/refund.service.js';
+import { syncOrderFinanceDocuments } from '../../core/payments/foodFinance.service.js';
+import { FoodTransaction } from '../../modules/food/orders/models/foodTransaction.model.js';
 import { checkEarningAddonCompletions } from '../../modules/food/admin/services/admin.service.js';
 
-/**
- * Post-delivery financial settlement processor.
- * Called by BullMQ when a delivery_completed event fires.
- *
- * Splits the order total into:
- * 1. Restaurant commission credit
- * 2. Delivery partner earning credit
- * 3. Platform profit credit (admin wallet)
- *
- * Also handles refunds on order cancellation.
- *
- * @param {import('bullmq').Job} job
- */
 export const processPaymentJob = async (job) => {
     const { action, orderMongoId, orderId } = job.data || {};
-    logger.info(`[PaymentProcessor] Processing ${action} for order ${orderId || orderMongoId} (job ${job.id})`);
+    logger.info(
+        `[PaymentProcessor] action=${action} order=${orderId || orderMongoId || 'unknown'} job=${job.id}`
+    );
 
     try {
         switch (action) {
@@ -40,146 +29,228 @@ export const processPaymentJob = async (job) => {
         }
     } catch (err) {
         logger.error(`[PaymentProcessor] Error processing ${action}: ${err.message}`);
-        throw err; // Let BullMQ retry
+        throw err;
     }
 
     return { processed: true, action, jobId: job.id };
 };
 
-/**
- * After delivery is completed and payment is confirmed:
- * Split money to all parties.
- */
 async function handleDeliveryCompleted(data) {
-    const {
-        orderMongoId, orderId,
-        restaurantId, deliveryPartnerId,
-        riderEarning = 0, platformProfit = 0,
-        commissionAmount = 0,
-        total = 0, paymentMethod
-    } = data;
+    const orderMongoId = data?.orderMongoId;
+    if (!orderMongoId) {
+        throw new Error('orderMongoId is required for delivery_completed');
+    }
 
-    // 1. Credit restaurant wallet with their commission (payout)
-    if (restaurantId && commissionAmount > 0) {
+    const [order, transaction] = await Promise.all([
+        FoodOrder.findById(orderMongoId).lean(),
+        FoodTransaction.findOne({ orderId: orderMongoId })
+    ]);
+
+    if (!transaction) {
+        throw new Error(`FoodTransaction not found for order ${orderMongoId}`);
+    }
+
+    const displayOrderId =
+        order?.order_id ||
+        order?.orderId ||
+        transaction?.orderSnapshot?.orderDisplayId ||
+        String(orderMongoId);
+
+    const paymentSnapshotStatus = String(transaction.payment?.status || '').toLowerCase();
+    if (!['paid', 'refunded'].includes(paymentSnapshotStatus) && transaction.status !== 'captured') {
+        logger.warn(
+            `[PaymentProcessor] Skipping settlement for ${displayOrderId}; payment not captured yet`
+        );
+        return;
+    }
+
+    const failures = [];
+    const settlement = transaction.settlement || {};
+
+    if (
+        transaction.restaurantId &&
+        !settlement.isRestaurantSettled &&
+        Number(transaction.amounts?.restaurantShare || 0) > 0
+    ) {
         try {
             await creditWallet({
                 entityType: 'restaurant',
-                entityId: restaurantId,
-                amount: commissionAmount,
-                description: `Order ${orderId} - restaurant commission`,
-                category: 'commission',
-                orderId: orderMongoId,
-                metadata: { orderId, paymentMethod }
+                entityId: String(transaction.restaurantId),
+                amount: Number(transaction.amounts.restaurantShare),
+                description: `Order ${displayOrderId} - restaurant payout`,
+                category: 'order_payment',
+                orderId: String(orderMongoId),
+                metadata: {
+                    orderId: displayOrderId,
+                    source: 'delivery_completed',
+                    paymentMethod: transaction.payment?.method || transaction.paymentMethod || 'cash'
+                }
             });
-            logger.info(`[PaymentProcessor] Restaurant ${restaurantId} credited ${commissionAmount} for order ${orderId}`);
+
+            await FoodTransaction.updateOne(
+                {
+                    _id: transaction._id,
+                    'settlement.isRestaurantSettled': { $ne: true }
+                },
+                {
+                    $set: {
+                        'settlement.isRestaurantSettled': true,
+                        'settlement.restaurantSettledAt': new Date()
+                    },
+                    $push: {
+                        history: {
+                            kind: 'restaurant_wallet_credited',
+                            amount: Number(transaction.amounts.restaurantShare),
+                            at: new Date(),
+                            note: 'Restaurant payout credited by payment worker',
+                            recordedBy: { role: 'SYSTEM' }
+                        }
+                    }
+                }
+            );
         } catch (err) {
-            logger.error(`[PaymentProcessor] Failed to credit restaurant: ${err.message}`);
+            failures.push(`restaurant:${err.message}`);
         }
     }
 
-    // 2. Credit delivery partner wallet with their earning
-    if (deliveryPartnerId && riderEarning > 0) {
+    if (
+        transaction.deliveryPartnerId &&
+        !settlement.isRiderSettled &&
+        Number(transaction.amounts?.riderShare || 0) > 0
+    ) {
         try {
             await creditWallet({
                 entityType: 'deliveryBoy',
-                entityId: deliveryPartnerId,
-                amount: riderEarning,
-                description: `Order ${orderId} - delivery earning`,
+                entityId: String(transaction.deliveryPartnerId),
+                amount: Number(transaction.amounts.riderShare),
+                description: `Order ${displayOrderId} - delivery earning`,
                 category: 'delivery_earning',
-                orderId: orderMongoId,
-                metadata: { orderId, paymentMethod }
+                orderId: String(orderMongoId),
+                metadata: {
+                    orderId: displayOrderId,
+                    source: 'delivery_completed',
+                    paymentMethod: transaction.payment?.method || transaction.paymentMethod || 'cash'
+                }
             });
 
-            // Increment delivery count
-            const { FoodDeliveryWallet } = await import('../../modules/food/delivery/models/deliveryWallet.model.js');
-            const mongoose = await import('mongoose');
+            const { FoodDeliveryWallet } = await import(
+                '../../modules/food/delivery/models/deliveryWallet.model.js'
+            );
             await FoodDeliveryWallet.updateOne(
-                { deliveryPartnerId: new mongoose.default.Types.ObjectId(deliveryPartnerId) },
+                { deliveryPartnerId: transaction.deliveryPartnerId },
                 { $inc: { totalDeliveries: 1 } }
             );
 
-            logger.info(`[PaymentProcessor] Delivery partner ${deliveryPartnerId} credited ${riderEarning} for order ${orderId}`);
+            await FoodTransaction.updateOne(
+                {
+                    _id: transaction._id,
+                    'settlement.isRiderSettled': { $ne: true }
+                },
+                {
+                    $set: {
+                        'settlement.isRiderSettled': true,
+                        'settlement.riderSettledAt': new Date()
+                    },
+                    $push: {
+                        history: {
+                            kind: 'rider_wallet_credited',
+                            amount: Number(transaction.amounts.riderShare),
+                            at: new Date(),
+                            note: 'Rider earning credited by payment worker',
+                            recordedBy: { role: 'SYSTEM' }
+                        }
+                    }
+                }
+            );
 
-            // Automatically check and credit any completed earning addons
             try {
-                await checkEarningAddonCompletions(deliveryPartnerId, false, true);
+                await checkEarningAddonCompletions(String(transaction.deliveryPartnerId), false, true);
             } catch (addonErr) {
-                logger.error(`[PaymentProcessor] Error checking earning addons for ${deliveryPartnerId}: ${addonErr.message}`);
+                logger.error(
+                    `[PaymentProcessor] Earning addon completion failed for ${transaction.deliveryPartnerId}: ${addonErr.message}`
+                );
             }
-
         } catch (err) {
-            logger.error(`[PaymentProcessor] Failed to credit delivery partner: ${err.message}`);
+            failures.push(`rider:${err.message}`);
         }
     }
 
-    // 3. Credit admin/platform wallet with platform profit
-    if (platformProfit > 0) {
+    if (
+        !settlement.isPlatformSettled &&
+        Number(transaction.amounts?.platformNetProfit || 0) > 0
+    ) {
         try {
             await creditWallet({
                 entityType: 'admin',
                 entityId: 'platform',
-                amount: platformProfit,
-                description: `Order ${orderId} - platform profit`,
+                amount: Number(transaction.amounts.platformNetProfit),
+                description: `Order ${displayOrderId} - platform profit`,
                 category: 'platform_fee',
-                orderId: orderMongoId,
-                metadata: { orderId, paymentMethod, riderEarning }
+                orderId: String(orderMongoId),
+                metadata: {
+                    orderId: displayOrderId,
+                    source: 'delivery_completed',
+                    riderShare: Number(transaction.amounts?.riderShare || 0)
+                }
             });
-            logger.info(`[PaymentProcessor] Platform credited ${platformProfit} for order ${orderId}`);
+
+            await FoodTransaction.updateOne(
+                {
+                    _id: transaction._id,
+                    'settlement.isPlatformSettled': { $ne: true }
+                },
+                {
+                    $set: {
+                        'settlement.isPlatformSettled': true,
+                        'settlement.platformSettledAt': new Date()
+                    },
+                    $push: {
+                        history: {
+                            kind: 'platform_wallet_credited',
+                            amount: Number(transaction.amounts.platformNetProfit),
+                            at: new Date(),
+                            note: 'Platform profit credited by payment worker',
+                            recordedBy: { role: 'SYSTEM' }
+                        }
+                    }
+                }
+            );
         } catch (err) {
-            logger.error(`[PaymentProcessor] Failed to credit platform: ${err.message}`);
+            failures.push(`platform:${err.message}`);
         }
+    }
+
+    await syncOrderFinanceDocuments({
+        orderId: orderMongoId,
+        source: 'payment_queue_delivery_completed'
+    });
+
+    if (failures.length > 0) {
+        throw new Error(`delivery_completed partial failures: ${failures.join(', ')}`);
     }
 }
 
-/**
- * Handle order cancellation — trigger refund if payment was made.
- */
 async function handleOrderCancelled(data) {
-    const { orderMongoId, paymentId, paymentMethod, paymentStatus, userId, amount, reason } = data;
-
-    if (!paymentId || paymentStatus !== 'success') {
-        logger.info(`[PaymentProcessor] No refund needed for order ${orderMongoId} (status: ${paymentStatus})`);
-        return;
+    const orderMongoId = data?.orderMongoId;
+    if (!orderMongoId) {
+        throw new Error('orderMongoId is required for order_cancelled');
     }
 
-    try {
-        await initiateRefund({
-            paymentId,
-            orderId: orderMongoId,
-            userId,
-            amount,
-            reason: reason || 'Order cancelled',
-            refundTo: paymentMethod === 'wallet' ? 'wallet' : 'wallet' // Default to wallet refund
-        });
-        logger.info(`[PaymentProcessor] Refund initiated for order ${orderMongoId}`);
-    } catch (err) {
-        logger.error(`[PaymentProcessor] Refund failed for order ${orderMongoId}: ${err.message}`);
-    }
+    await syncOrderFinanceDocuments({
+        orderId: orderMongoId,
+        source: 'payment_queue_order_cancelled',
+        refundReason: data?.reason || 'Order cancelled'
+    });
 }
 
-/**
- * Handle payment verified — create a Payment record in the new system.
- */
 async function handlePaymentVerified(data) {
-    const { orderMongoId, orderId, userId, paymentMethod, paymentStatus, amount, gatewayPaymentId } = data;
-
-    try {
-        const payment = await createPayment({
-            orderId: orderMongoId,
-            userId,
-            amount,
-            method: paymentMethod,
-            gateway: paymentMethod === 'razorpay' ? 'razorpay' : 'none',
-            gatewayOrderId: data.razorpayOrderId || '',
-            metadata: { orderId, source: 'payment_verified_event' }
-        });
-
-        if (paymentStatus === 'paid' && gatewayPaymentId) {
-            await markPaymentSuccess(payment._id, { gatewayPaymentId });
-        }
-
-        logger.info(`[PaymentProcessor] Payment record created for order ${orderId}: ${payment._id}`);
-    } catch (err) {
-        logger.error(`[PaymentProcessor] Failed to create payment record: ${err.message}`);
+    const orderMongoId = data?.orderMongoId;
+    if (!orderMongoId) {
+        throw new Error('orderMongoId is required for payment_verified');
     }
+
+    await syncOrderFinanceDocuments({
+        orderId: orderMongoId,
+        source: 'payment_queue_payment_verified'
+    });
 }

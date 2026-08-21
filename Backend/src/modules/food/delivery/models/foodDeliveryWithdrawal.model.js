@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 const foodDeliveryWithdrawalSchema = new mongoose.Schema({
     deliveryPartnerId: {
@@ -35,7 +36,7 @@ const foodDeliveryWithdrawalSchema = new mongoose.Schema({
     transactionId: String, // Final bank transaction reference from admin
     processedAt: Date
 }, { 
-    collection: 'food_delivery_withdrawals', 
+    collection: PAYMENT_COLLECTIONS.PAYMENT_DELIVERY_WITHDRAWALS,
     timestamps: true 
 });
 

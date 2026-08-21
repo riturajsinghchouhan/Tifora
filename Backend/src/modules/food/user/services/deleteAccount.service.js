@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { FoodUser } from '../../../../core/users/user.model.js';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { AccountDeletion } from '../../admin/models/accountDeletion.model.js';
 
@@ -22,7 +23,7 @@ export async function deleteUserAccount(userId) {
         let walletBalance = 0;
         try {
             const walletDoc = await mongoose.connection.db
-                .collection('food_user_wallets')
+                .collection(PAYMENT_COLLECTIONS.PAYMENT_USER_WALLETS)
                 .findOne({ userId: new mongoose.Types.ObjectId(userId) });
             walletBalance = walletDoc?.balance || 0;
         } catch (_) {}
@@ -86,7 +87,7 @@ export async function deleteUserAccount(userId) {
 
         // --- 4. Anonymize transactions ---
         try {
-            await mongoose.connection.db.collection('food_transactions').updateMany(
+            await mongoose.connection.db.collection(PAYMENT_COLLECTIONS.PAYMENT_FOOD_TRANSACTIONS).updateMany(
                 { userId: new mongoose.Types.ObjectId(userId) },
                 { $set: { userId: null, userName: 'Deleted User' } },
                 { session }
@@ -95,7 +96,7 @@ export async function deleteUserAccount(userId) {
 
         // --- 5. Delete user-specific collections ---
         const collectionsToClean = [
-            'food_user_wallets',
+            PAYMENT_COLLECTIONS.PAYMENT_USER_WALLETS,
             'food_support_tickets',
             'food_safety_emergency_reports',
             'food_dining_requests',

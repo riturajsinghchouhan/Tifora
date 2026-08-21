@@ -3,6 +3,7 @@ import { logger } from '../../../../../utils/logger.js';
 import { FoodOrder, FoodSettings } from '../models/order.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import crypto from 'crypto';
+import { attachFinancialSnapshotToOrder } from './order.helpers.js';
 
 /**
  * Pushes an order to Petpooja POS
@@ -31,6 +32,7 @@ export async function pushOrderToPetpooja(orderMongoId) {
         // Fetch Order with Restaurant
         const order = await FoodOrder.findById(orderMongoId).populate('restaurantId').populate('userId');
         if (!order) throw new Error('Order not found');
+        const financeOrder = await attachFinancialSnapshotToOrder(order);
 
         const restaurant = order.restaurantId;
         if (!restaurant || !restaurant.petpoojaSettings || !restaurant.petpoojaSettings.enabled) {
@@ -53,9 +55,9 @@ export async function pushOrderToPetpooja(orderMongoId) {
                     preorder_time: order.scheduledAt ? order.scheduledAt.toISOString().split('T')[1].substring(0, 5) : '',
                     // 1: Delivery, 2: PickUp, 3: DineIn
                     orderType: "1", 
-                    discount: order.pricing.discount || 0,
-                    taxes: order.pricing.tax || 0,
-                    total: order.pricing.total || 0,
+                    discount: financeOrder.pricing?.discount || 0,
+                    taxes: financeOrder.pricing?.tax || 0,
+                    total: financeOrder.pricing?.total || 0,
                     description: order.note || '',
                     customer: {
                         name: order.customerName || 'Guest',
@@ -75,9 +77,9 @@ export async function pushOrderToPetpooja(orderMongoId) {
                     })),
                     paymentInfo: {
                         // For Petpooja: usually COD, Online, etc.
-                        payment_type: order.payment.method === 'cash' ? 'COD' : 'Online',
-                        amount: order.pricing.total || 0,
-                        status: order.payment.status === 'paid' ? 'Paid' : 'Pending'
+                        payment_type: financeOrder.payment?.method === 'cash' ? 'COD' : 'Online',
+                        amount: financeOrder.pricing?.total || 0,
+                        status: financeOrder.payment?.status === 'paid' ? 'Paid' : 'Pending'
                     }
                 }
             }]

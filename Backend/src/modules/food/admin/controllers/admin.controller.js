@@ -1690,6 +1690,36 @@ export async function getSidebarBadges(req, res, next) {
     }
 }
 
+export async function resetPaymentFinanceData(req, res, next) {
+    try {
+        const data = await adminService.resetPaymentFinanceData({
+            confirmation: req.body?.confirmation
+        });
+        res.status(200).json({
+            success: true,
+            message: 'Payment and finance data reset successfully',
+            data
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function clearAllOrdersData(req, res, next) {
+    try {
+        const data = await adminService.clearAllOrdersData({
+            confirmation: req.body?.confirmation
+        });
+        res.status(200).json({
+            success: true,
+            message: 'All orders cleared successfully',
+            data
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function getExpiredFssaiNotifications(req, res, next) {
     try {
         const { listExpiredFssaiRestaurants } = await import('../../restaurant/services/fssaiExpiry.service.js');

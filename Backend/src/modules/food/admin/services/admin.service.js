@@ -1,5 +1,10 @@
 import mongoose from 'mongoose';
 import { ValidationError } from '../../../../core/auth/errors.js';
+import { Payment } from '../../../../core/payments/models/payment.model.js';
+import { Refund } from '../../../../core/payments/models/refund.model.js';
+import { Settlement } from '../../../../core/payments/models/settlement.model.js';
+import { Transaction } from '../../../../core/payments/models/transaction.model.js';
+import { ProcessedGatewayEvent } from '../../../../core/payments/models/processedGatewayEvent.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { buildRawDownloadUrlFromFileUrl } from '../../../../services/upload.service.js';
 import { normalizeMediaUrl, toMediaObject } from '../../../../utils/mediaUrl.js';
@@ -25,16 +30,21 @@ import { FoodDeliveryEmergencyHelp } from '../models/deliveryEmergencyHelp.model
 import { FoodReferralSettings } from '../models/referralSettings.model.js';
 import { FoodReferralLog } from '../models/referralLog.model.js';
 import { FoodSafetyEmergencyReport } from '../models/safetyEmergencyReport.model.js';
+import { FoodAdminWallet } from '../models/adminWallet.model.js';
 import { FoodAddon } from '../../restaurant/models/foodAddon.model.js';
 import { FoodSupportTicket } from '../../user/models/supportTicket.model.js';
 import { FoodRestaurantSupportTicket } from '../../restaurant/models/supportTicket.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { getOutletTimingsForRestaurant } from '../../restaurant/services/outletTimings.service.js';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
+import { FoodUserWallet } from '../../user/models/userWallet.model.js';
 import { FoodRestaurantWithdrawal } from '../../restaurant/models/foodRestaurantWithdrawal.model.js';
+import { FoodRestaurantWallet } from '../../restaurant/models/restaurantWallet.model.js';
 import { FoodDeliveryWithdrawal } from '../../delivery/models/foodDeliveryWithdrawal.model.js';
 import { FoodDeliveryWallet } from '../../delivery/models/deliveryWallet.model.js';
 import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashDeposit.model.js';
+import { TiffinCommissionSetting } from '../../tiffin/models/tiffinCommission.model.js';
+import { TiffinPayout } from '../../tiffin/models/tiffinPayout.model.js';
 import {
     backfillLegacyCategoryWorkflow,
     categoryAllowsFoodType,
@@ -48,6 +58,9 @@ import {
     normalizeFoodVariantsInput,
     serializeFoodVariants
 } from './foodVariant.service.js';
+
+export const RESET_PAYMENT_DATA_CONFIRMATION = 'DELETE ALL PAYMENT DATA';
+export const RESET_ORDER_DATA_CONFIRMATION = 'DELETE ALL ORDERS';
 
 const parseBooleanLike = (value, fieldName) => {
     if (typeof value === 'boolean') return value;
@@ -116,6 +129,143 @@ const validateOpeningClosingTimes = (openingTime, closingTime) => {
         throw new ValidationError('Opening time and closing time cannot be same');
     }
 };
+
+const buildResetFeeSettingsState = () => ({
+    deliveryFee: 0,
+    deliveryFeeRanges: [],
+    freeDeliveryUpTo: 0,
+    freeDeliveryThreshold: 0,
+    platformFee: 0,
+    packagingFee: 0,
+    gstRate: 0,
+    gstOnDeliveryFee: 0,
+    gstOnPlatformFee: 0,
+    gstOnPackagingFee: 0,
+    deliveryBonusAmount: 0,
+    dispatchRadiusExpansionEnabled: true,
+    dispatchRadiusTiers: [2, 4, 6, 8, 15],
+    globalRestaurantCommission: 0,
+    globalGstOnItem: 0,
+    globalGstOnCommission: 0,
+    globalPaymentGatewayFee: 0,
+    globalTcs: 0,
+    applyGlobalTaxes: false,
+    isActive: true
+});
+
+const buildResetTiffinCommissionState = () => ({
+    globalCommissionPercentage: 0,
+    gstOnCommission: 0,
+    perDeliveryRate: 0,
+    customKitchenRates: [],
+    monthlyFixedSalaryDefault: 0,
+    salaryCalculationMode: 'per_drop'
+});
+
+const getDeleteCount = (result) => Number(result?.deletedCount || 0);
+const getUpdateCount = (result) => Number(result?.modifiedCount || result?.matchedCount || 0);
+
+async function deleteFoodOrderPaymentAuditRows(filter = {}) {
+    const db = mongoose.connection?.db;
+    if (!db) return 0;
+    const result = await db.collection('food_order_payments').deleteMany(filter);
+    return getDeleteCount(result);
+}
+
+async function resetOrderLinkedFinanceData() {
+    const paymentFilter = { orderId: { $exists: true, $ne: null } };
+    const transactionFilter = { orderId: { $exists: true, $ne: null } };
+    const gatewayEventFilter = {
+        $or: [
+            { orderId: { $exists: true, $ne: null } },
+            { transactionId: { $exists: true, $ne: null } },
+            { paymentId: { $exists: true, $ne: null } }
+        ]
+    };
+
+    const linkedLedgerTransactionIds = await Transaction.find(transactionFilter).distinct('_id');
+    const settlementDeletePromise = linkedLedgerTransactionIds.length > 0
+        ? Settlement.deleteMany({ transactionIds: { $in: linkedLedgerTransactionIds } })
+        : Promise.resolve({ deletedCount: 0 });
+
+    const [
+        paymentRecordsResult,
+        refundsResult,
+        ledgerTransactionsResult,
+        settlementsResult,
+        gatewayEventsResult,
+        foodTransactionsResult,
+        orderPaymentAuditRows
+    ] = await Promise.all([
+        Payment.deleteMany(paymentFilter),
+        Refund.deleteMany(paymentFilter),
+        Transaction.deleteMany(transactionFilter),
+        settlementDeletePromise,
+        ProcessedGatewayEvent.deleteMany(gatewayEventFilter),
+        FoodTransaction.deleteMany({ orderId: { $exists: true, $ne: null } }),
+        deleteFoodOrderPaymentAuditRows({})
+    ]);
+
+    const [
+        deliveryWalletsResult,
+        restaurantWalletsResult,
+        adminWalletsResult
+    ] = await Promise.all([
+        FoodDeliveryWallet.updateMany(
+            {},
+            {
+                $set: {
+                    balance: 0,
+                    lockedAmount: 0,
+                    cashInHand: 0,
+                    totalEarnings: 0,
+                    totalBonus: 0,
+                    totalSettled: 0,
+                    totalDeliveries: 0
+                }
+            }
+        ),
+        FoodRestaurantWallet.updateMany(
+            {},
+            {
+                $set: {
+                    balance: 0,
+                    lockedAmount: 0,
+                    totalEarnings: 0,
+                    totalSettled: 0
+                }
+            }
+        ),
+        FoodAdminWallet.updateMany(
+            {},
+            {
+                $set: {
+                    balance: 0,
+                    totalRevenue: 0,
+                    totalPayouts: 0,
+                    totalRefunds: 0
+                }
+            }
+        )
+    ]);
+
+    return {
+        deleted: {
+            paymentRecords: getDeleteCount(paymentRecordsResult),
+            refunds: getDeleteCount(refundsResult),
+            ledgerTransactions: getDeleteCount(ledgerTransactionsResult),
+            settlements: getDeleteCount(settlementsResult),
+            gatewayEvents: getDeleteCount(gatewayEventsResult),
+            foodTransactions: getDeleteCount(foodTransactionsResult),
+            orderPaymentAuditRows
+        },
+        reset: {
+            deliveryWallets: getUpdateCount(deliveryWalletsResult),
+            restaurantWallets: getUpdateCount(restaurantWalletsResult),
+            adminWallets: getUpdateCount(adminWalletsResult)
+        }
+    };
+}
 
 export async function getRestaurantComplaints(query = {}) {
     const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
@@ -419,17 +569,22 @@ export async function getDashboardStats(query = {}) {
         ? new mongoose.Types.ObjectId(query.zoneId)
         : null;
 
-    const orderMatch = {
-        $or: [
-            { "payment.method": { $in: ["cash", "wallet"] } },
-            { "payment.status": { $in: ["paid", "authorized", "captured", "settled", "refunded"] } },
-        ],
-    };
+    const orderMatch = {};
     if (periodRange) {
         orderMatch.createdAt = { $gte: periodRange.start, $lte: periodRange.end };
     }
     if (zoneId) {
         orderMatch.zoneId = zoneId;
+    }
+
+    const transactionMatch = {};
+    if (periodRange) {
+        transactionMatch.createdAt = { $gte: periodRange.start, $lte: periodRange.end };
+    }
+
+    const deliveredTransactionOrderMatch = { 'order.orderStatus': 'delivered' };
+    if (zoneId) {
+        deliveredTransactionOrderMatch['order.zoneId'] = zoneId;
     }
 
     const restaurantMatch = {};
@@ -446,6 +601,7 @@ export async function getDashboardStats(query = {}) {
 
     const [
         orderTotalsAgg,
+        financeTotalsAgg,
         monthlyAgg,
         restaurantsTotal,
         restaurantsPending,
@@ -487,44 +643,42 @@ export async function getDashboardStats(query = {}) {
                         $sum: {
                             $cond: [{ $in: ['$orderStatus', DASHBOARD_PROCESSING_ORDER_STATUSES] }, 1, 0]
                         }
-                    },
-                    revenueTotal: { 
-                        $sum: { 
-                            $cond: [DELIVERED_ORDER_STATUS_EXPR, { $ifNull: ['$pricing.total', 0] }, 0] 
-                        } 
-                    },
-                    commissionTotal: { 
-                        $sum: { 
-                            $cond: [DELIVERED_ORDER_STATUS_EXPR, { $ifNull: ['$pricing.restaurantCommission', 0] }, 0] 
-                        } 
-                    },
-                    platformFeeTotal: { 
-                        $sum: { 
-                            $cond: [DELIVERED_ORDER_STATUS_EXPR, DASHBOARD_PLATFORM_FEE_EXPR, 0] 
-                        } 
-                    },
-                    deliveryFeeTotal: { 
-                        $sum: { 
-                            $cond: [DELIVERED_ORDER_STATUS_EXPR, DASHBOARD_DELIVERY_FEE_EXPR, 0] 
-                        } 
-                    },
-                    gstTotal: { 
-                        $sum: { 
-                            $cond: [DELIVERED_ORDER_STATUS_EXPR, { $ifNull: ['$pricing.tax', 0] }, 0] 
-                        } 
-                    },
-                    adminNetProfit: { 
-                        $sum: { 
-                            $cond: [DELIVERED_ORDER_STATUS_EXPR, { $ifNull: ['$platformProfit', 0] }, 0] 
-                        } 
                     }
                 }
             }
         ]),
-        FoodOrder.aggregate([
+        FoodTransaction.aggregate([
+            { $match: transactionMatch },
+            {
+                $lookup: {
+                    from: 'food_orders',
+                    localField: 'orderId',
+                    foreignField: '_id',
+                    as: 'order'
+                }
+            },
+            { $unwind: '$order' },
+            { $match: deliveredTransactionOrderMatch },
+            {
+                $group: {
+                    _id: null,
+                    revenueTotal: { $sum: { $ifNull: ['$pricing.total', 0] } },
+                    commissionTotal: { $sum: { $ifNull: ['$pricing.restaurantCommission', 0] } },
+                    platformFeeTotal: { $sum: { $ifNull: ['$pricing.platformFee', 0] } },
+                    deliveryFeeTotal: { $sum: { $ifNull: ['$pricing.deliveryFee', 0] } },
+                    gstTotal: {
+                        $sum: {
+                            $ifNull: ['$amounts.taxAmount', { $ifNull: ['$pricing.tax', 0] }]
+                        }
+                    },
+                    adminNetProfit: { $sum: { $ifNull: ['$amounts.platformNetProfit', 0] } }
+                }
+            }
+        ]),
+        FoodTransaction.aggregate([
             {
                 $match: {
-                    ...orderMatch,
+                    ...transactionMatch,
                     createdAt: {
                         $gte: new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1),
                         $lte: new Date()
@@ -532,25 +686,25 @@ export async function getDashboardStats(query = {}) {
                 }
             },
             {
+                $lookup: {
+                    from: 'food_orders',
+                    localField: 'orderId',
+                    foreignField: '_id',
+                    as: 'order'
+                }
+            },
+            { $unwind: '$order' },
+            { $match: deliveredTransactionOrderMatch },
+            {
                 $group: {
                     _id: {
                         year: { $year: '$createdAt' },
                         month: { $month: '$createdAt' }
                     },
                     orders: { $sum: 1 },
-                    revenue: { 
-                        $sum: { 
-                            $cond: [{ $eq: ['$orderStatus', 'delivered'] }, { $ifNull: ['$pricing.total', 0] }, 0] 
-                        } 
-                    },
+                    revenue: { $sum: { $ifNull: ['$pricing.total', 0] } },
                     commission: {
-                        $sum: {
-                            $cond: [
-                                { $eq: ['$orderStatus', 'delivered'] },
-                                { $ifNull: ['$platformProfit', { $ifNull: ['$pricing.platformFee', 0] }] },
-                                0
-                            ]
-                        }
+                        $sum: { $ifNull: ['$amounts.platformNetProfit', 0] }
                     }
                 }
             },
@@ -675,6 +829,7 @@ export async function getDashboardStats(query = {}) {
     const finalLiveSignals = liveSignals.slice(0, 15);
 
     const totals = orderTotalsAgg?.[0] || {};
+    const financeTotals = financeTotalsAgg?.[0] || {};
 
     const now = new Date();
     const monthlyMap = new Map(
@@ -708,13 +863,13 @@ export async function getDashboardStats(query = {}) {
                 pending: Number(totals.pending || 0)
             }
         },
-        revenue: { total: Number(totals.revenueTotal || 0) },
-        commission: { total: Number(totals.commissionTotal || 0) },
-        platformFee: { total: Number(totals.platformFeeTotal || 0) },
-        deliveryFee: { total: Number(totals.deliveryFeeTotal || 0) },
-        gst: { total: Number(totals.gstTotal || 0) },
-        totalAdminEarnings: Number(totals.adminNetProfit || 0) + Number(totals.gstTotal || 0),
-        deliveryProfit: Number(totals.adminNetProfit || 0) - Number(totals.commissionTotal || 0) - Number(totals.platformFeeTotal || 0),
+        revenue: { total: Number(financeTotals.revenueTotal || 0) },
+        commission: { total: Number(financeTotals.commissionTotal || 0) },
+        platformFee: { total: Number(financeTotals.platformFeeTotal || 0) },
+        deliveryFee: { total: Number(financeTotals.deliveryFeeTotal || 0) },
+        gst: { total: Number(financeTotals.gstTotal || 0) },
+        totalAdminEarnings: Number(financeTotals.adminNetProfit || 0) + Number(financeTotals.gstTotal || 0),
+        deliveryProfit: Number(financeTotals.adminNetProfit || 0) - Number(financeTotals.commissionTotal || 0) - Number(financeTotals.platformFeeTotal || 0),
         restaurants: {
             total: Number(restaurantsTotal || 0),
             pendingRequests: Number(restaurantsPending || 0)
@@ -800,7 +955,7 @@ export async function getTransactionReport(query = {}) {
 
     const transactions = transactionRows.map((tx) => {
         const order = tx.orderId || {};
-        const pricing = order.pricing || {};
+        const pricing = tx.pricing || {};
         const subtotal = Number(pricing.subtotal || 0) || 0;
         const packagingFee = Number(pricing.packagingFee || 0) || 0;
         const deliveryFee = Number(pricing.deliveryFee || 0) || 0;
@@ -884,7 +1039,7 @@ export async function getTransactionReport(query = {}) {
 
             // Breakdown
             const order = tx.orderId || {};
-            const pricing = order.pricing || {};
+            const pricing = tx.pricing || {};
             
             const deliveryFeeUser = Number(pricing.deliveryFee || 0);
             const deliveryCostAdmin = Number(tx.amounts?.riderShare) || Number(order.riderEarning) || 30;
@@ -1034,17 +1189,6 @@ export async function getRestaurantReport(query = {}) {
     }
 
     const orderCreatedAtFilter = parseTimeRange(query.time);
-    const orderMatch = {
-        restaurantId: { $in: restaurantIds },
-        orderStatus: 'delivered',
-        $or: [
-            { "payment.method": { $in: ["cash", "wallet"] } },
-            { "payment.status": { $in: ["paid", "authorized", "captured", "settled", "refunded"] } },
-        ],
-    };
-    if (orderCreatedAtFilter) {
-        orderMatch.createdAt = orderCreatedAtFilter;
-    }
 
     const [foodsAgg, ordersAgg] = await Promise.all([
         FoodItem.aggregate([
@@ -1061,8 +1205,23 @@ export async function getRestaurantReport(query = {}) {
                 }
             }
         ]),
-        FoodOrder.aggregate([
-            { $match: orderMatch },
+        FoodTransaction.aggregate([
+            {
+                $match: {
+                    restaurantId: { $in: restaurantIds },
+                    ...(orderCreatedAtFilter ? { createdAt: orderCreatedAtFilter } : {})
+                }
+            },
+            {
+                $lookup: {
+                    from: 'food_orders',
+                    localField: 'orderId',
+                    foreignField: '_id',
+                    as: 'order'
+                }
+            },
+            { $unwind: '$order' },
+            { $match: { 'order.orderStatus': 'delivered' } },
             {
                 $group: {
                     _id: '$restaurantId',
@@ -1070,7 +1229,7 @@ export async function getRestaurantReport(query = {}) {
                     totalOrderAmount: { $sum: { $ifNull: ['$pricing.total', 0] } },
                     totalDiscountGiven: { $sum: { $ifNull: ['$pricing.discount', 0] } },
                     totalVATTAX: { $sum: { $ifNull: ['$pricing.tax', 0] } },
-                    totalAdminCommissionFromPlatformProfit: { $sum: { $ifNull: ['$platformProfit', 0] } },
+                    totalAdminCommissionFromPlatformProfit: { $sum: { $ifNull: ['$amounts.platformNetProfit', 0] } },
                     totalAdminCommissionFromPlatformFee: { $sum: { $ifNull: ['$pricing.platformFee', 0] } }
                 }
             }
@@ -1127,23 +1286,30 @@ export async function getRestaurantReport(query = {}) {
 
 export async function getTaxReport(query = {}) {
     const { fromDate, toDate, search } = query;
-    const match = {
-        orderStatus: 'delivered' // Typically tax is reported on delivered/completed orders
-    };
-
+    const transactionMatch = {};
     if (fromDate && toDate) {
-        match.createdAt = { $gte: new Date(fromDate), $lte: new Date(toDate) };
+        transactionMatch.createdAt = { $gte: new Date(fromDate), $lte: new Date(toDate) };
     }
 
-    if (search) {
-        // Search by order ID if provided
-        match.orderId = { $regex: search, $options: 'i' };
-    }
-
-    // Aggregate tax by income source (Restaurants, Delivery, Platform)
-    // For now, we'll group by Restaurant as the primary income source
-    const taxData = await FoodOrder.aggregate([
-        { $match: match },
+    const taxData = await FoodTransaction.aggregate([
+        { $match: transactionMatch },
+        {
+            $lookup: {
+                from: 'food_orders',
+                localField: 'orderId',
+                foreignField: '_id',
+                as: 'order'
+            }
+        },
+        { $unwind: '$order' },
+        { $match: { 'order.orderStatus': 'delivered' } },
+        ...(search
+            ? [{
+                $match: {
+                    'order.orderId': { $regex: search, $options: 'i' }
+                }
+            }]
+            : []),
         {
             $group: {
                 _id: '$restaurantId',
@@ -1206,16 +1372,16 @@ export async function getTaxReportDetail(restaurantId, query = {}) {
 
     const { fromDate, toDate } = query;
     const match = {
-        restaurantId: new mongoose.Types.ObjectId(restaurantId),
-        orderStatus: 'delivered'
+        restaurantId: new mongoose.Types.ObjectId(restaurantId)
     };
 
     if (fromDate && toDate) {
         match.createdAt = { $gte: new Date(fromDate), $lte: new Date(toDate) };
     }
 
-    const orders = await FoodOrder.find(match)
-        .select('orderId pricing createdAt orderStatus')
+    const transactions = await FoodTransaction.find(match)
+        .populate('orderId', 'orderId orderStatus createdAt')
+        .select('orderId pricing createdAt')
         .sort({ createdAt: -1 })
         .lean();
 
@@ -1223,12 +1389,14 @@ export async function getTaxReportDetail(restaurantId, query = {}) {
 
     return {
         restaurantName: restaurant?.restaurantName || 'Unknown Restaurant',
-        orders: orders.map(o => ({
-            id: o._id,
-            orderId: o.orderId,
-            totalAmount: `\u20B9${(o.pricing?.total || 0).toFixed(2)}`,
-            taxAmount: `\u20B9${(o.pricing?.tax || 0).toFixed(2)}`,
-            date: o.createdAt
+        orders: transactions
+            .filter((tx) => tx.orderId?.orderStatus === 'delivered')
+            .map((tx) => ({
+                id: tx._id,
+                orderId: tx.orderId?.orderId || 'N/A',
+                totalAmount: `\u20B9${(tx.pricing?.total || 0).toFixed(2)}`,
+                taxAmount: `\u20B9${(tx.pricing?.tax || 0).toFixed(2)}`,
+                date: tx.createdAt
         }))
     };
 }
@@ -1294,10 +1462,18 @@ export async function getCustomers(query = {}) {
         ? await FoodOrder.aggregate([
             { $match: { userId: { $in: userIds }, orderStatus: { $nin: ['created', 'cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead'] } } },
             {
+                $lookup: {
+                    from: 'payment_food_transactions',
+                    localField: '_id',
+                    foreignField: 'orderId',
+                    as: 'tx'
+                }
+            },
+            {
                 $group: {
-                    _id: '$orderId',
+                    _id: '$_id',
                     userId: { $first: '$userId' },
-                    totalAmount: { $first: { $ifNull: ['$pricing.total', 0] } }
+                    totalAmount: { $first: { $ifNull: [{ $arrayElemAt: ['$tx.pricing.total', 0] }, 0] } }
                 }
             },
             {
@@ -1374,10 +1550,18 @@ export async function getCustomerById(id) {
     const orderStats = await FoodOrder.aggregate([
         { $match: { userId: customerObjectId, orderStatus: { $nin: ['created', 'cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead'] } } },
         {
+            $lookup: {
+                from: 'payment_food_transactions',
+                localField: '_id',
+                foreignField: 'orderId',
+                as: 'tx'
+            }
+        },
+        {
             $group: {
-                _id: '$orderId',
+                _id: '$_id',
                 userId: { $first: '$userId' },
-                totalAmount: { $first: { $ifNull: ['$pricing.total', 0] } }
+                totalAmount: { $first: { $ifNull: [{ $arrayElemAt: ['$tx.pricing.total', 0] }, 0] } }
             }
         },
         {
@@ -5183,11 +5367,19 @@ export async function getDeliveryWallets(query = {}) {
                 {
                     $match: {
                         'dispatch.deliveryPartnerId': partnerId,
-                        orderStatus: 'delivered',
-                        'payment.method': 'cash'
+                        orderStatus: 'delivered'
                     }
                 },
-                { $group: { _id: null, cashCollected: { $sum: { $ifNull: ['$pricing.total', 0] } } } }
+                {
+                    $lookup: {
+                        from: 'payment_food_transactions',
+                        localField: '_id',
+                        foreignField: 'orderId',
+                        as: 'tx'
+                    }
+                },
+                { $match: { 'tx.paymentMethod': 'cash' } },
+                { $group: { _id: null, cashCollected: { $sum: { $ifNull: [{ $arrayElemAt: ['$tx.pricing.total', 0] }, 0] } } } }
             ]),
             FoodDeliveryCashDeposit.aggregate([
                 {
@@ -5360,6 +5552,103 @@ export async function getSidebarBadges() {
         console.error('Error fetching sidebar badges:', error);
         return {};
     }
+}
+
+export async function resetPaymentFinanceData({ confirmation } = {}) {
+    const normalizedConfirmation = String(confirmation || '').trim();
+    if (normalizedConfirmation !== RESET_PAYMENT_DATA_CONFIRMATION) {
+        throw new ValidationError(
+            `Confirmation text mismatch. Type "${RESET_PAYMENT_DATA_CONFIRMATION}" to continue.`
+        );
+    }
+
+    const summary = await resetOrderLinkedFinanceData();
+
+    return {
+        confirmationPhrase: RESET_PAYMENT_DATA_CONFIRMATION,
+        clears: [
+            'order-linked payment records',
+            'order-linked refund records',
+            'order-linked wallet ledger transactions',
+            'order-linked settlement batches',
+            'payment gateway events linked to orders',
+            'payment_food_transactions',
+            'legacy food_order_payments audit rows',
+            'derived admin wallet balances',
+            'derived restaurant wallet balances',
+            'derived delivery wallet balances'
+        ],
+        deleted: summary.deleted,
+        reset: summary.reset,
+        untouched: [
+            'payment_fee_settings',
+            'payment_restaurant_commissions',
+            'payment_tiffin_commission_settings',
+            'payment_tiffin_payouts',
+            'payment_user_wallets',
+            'payment_delivery_withdrawals',
+            'food_restaurant_withdrawals',
+            'food_delivery_cash_deposits',
+            'food_orders collection rows',
+            'users',
+            'restaurants',
+            'delivery partners',
+            'foods',
+            'categories',
+            'commission and fee configuration'
+        ]
+    };
+}
+
+export async function clearAllOrdersData({ confirmation } = {}) {
+    const normalizedConfirmation = String(confirmation || '').trim();
+    if (normalizedConfirmation !== RESET_ORDER_DATA_CONFIRMATION) {
+        throw new ValidationError(
+            `Confirmation text mismatch. Type "${RESET_ORDER_DATA_CONFIRMATION}" to continue.`
+        );
+    }
+
+    const financeSummary = await resetOrderLinkedFinanceData();
+    const ordersResult = await FoodOrder.deleteMany({});
+
+    return {
+        confirmationPhrase: RESET_ORDER_DATA_CONFIRMATION,
+        clears: [
+            'all food_orders rows',
+            'all order-linked payment records',
+            'all order-linked refund records',
+            'all order-linked wallet ledger transactions',
+            'all order-linked settlement batches',
+            'payment gateway events linked to orders',
+            'payment_food_transactions',
+            'legacy food_order_payments audit rows',
+            'derived admin wallet balances',
+            'derived restaurant wallet balances',
+            'derived delivery wallet balances'
+        ],
+        deleted: {
+            orders: getDeleteCount(ordersResult),
+            ...financeSummary.deleted
+        },
+        reset: financeSummary.reset,
+        untouched: [
+            'payment_fee_settings',
+            'payment_restaurant_commissions',
+            'payment_tiffin_commission_settings',
+            'payment_tiffin_payouts',
+            'payment_user_wallets',
+            'payment_delivery_withdrawals',
+            'food_restaurant_withdrawals',
+            'food_delivery_cash_deposits',
+            'commission and fee configuration',
+            'users',
+            'restaurants',
+            'delivery partners',
+            'foods',
+            'categories'
+        ],
+        nextOrderState: 'New orders will use normal model defaults on creation.'
+    };
 }
 
 export async function updateRestaurantZoneRank(restaurantId, rank) {

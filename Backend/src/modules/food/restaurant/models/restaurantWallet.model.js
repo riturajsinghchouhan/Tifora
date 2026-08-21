@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { PAYMENT_COLLECTIONS } from '../../../../core/payments/paymentCollections.js';
 
 /**
  * RestaurantWallet — tracks the financial balance for each restaurant.
@@ -21,7 +22,7 @@ const restaurantWalletSchema = new mongoose.Schema(
         /** Total amount already settled/paid out */
         totalSettled: { type: Number, default: 0, min: 0 }
     },
-    { collection: 'food_restaurant_wallets', timestamps: true }
+    { collection: PAYMENT_COLLECTIONS.PAYMENT_RESTAURANT_WALLETS, timestamps: true }
 );
 
 export const FoodRestaurantWallet = mongoose.model('FoodRestaurantWallet', restaurantWalletSchema);
