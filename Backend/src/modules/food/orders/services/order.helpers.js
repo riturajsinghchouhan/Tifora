@@ -15,6 +15,36 @@ function toMoney(value) {
   return Math.round(amount * 100) / 100;
 }
 
+function toOrderSnapshot(orderDoc) {
+  if (!orderDoc) return {};
+
+  const plain =
+    orderDoc?.toObject && typeof orderDoc?.save === "function"
+      ? orderDoc.toObject()
+      : orderDoc?.toObject
+        ? orderDoc.toObject()
+        : { ...(orderDoc || {}) };
+
+  const dynamicKeys = [
+    "pricing",
+    "payment",
+    "amounts",
+    "paymentMethod",
+    "transactionId",
+    "transactionStatus",
+    "customerName",
+    "customerPhone",
+  ];
+
+  for (const key of dynamicKeys) {
+    if (orderDoc?.[key] != null && plain?.[key] == null) {
+      plain[key] = orderDoc[key];
+    }
+  }
+
+  return plain;
+}
+
 export function extractOrderPricingSnapshot(orderLike = {}, transactionLike = null) {
   const legacyPricing =
     orderLike?.pricing && typeof orderLike.pricing === "object"
@@ -98,7 +128,12 @@ export function mergeOrderPaymentSnapshot(orderLike = {}, transactionLike = null
 export async function attachFinancialSnapshotToOrder(orderDoc, transactionDoc = null) {
   if (!orderDoc) return orderDoc;
 
-  const order = orderDoc?.toObject ? orderDoc.toObject() : { ...(orderDoc || {}) };
+  const isMongooseDoc = typeof orderDoc?.save === "function";
+  const order = isMongooseDoc
+    ? orderDoc
+    : orderDoc?.toObject
+      ? orderDoc.toObject()
+      : { ...(orderDoc || {}) };
   const orderId = order?._id || orderDoc?._id || null;
   let transaction = transactionDoc || null;
 
@@ -218,7 +253,7 @@ export function generateFourDigitDeliveryOtp() {
 }
 
 export function sanitizeOrderForExternal(orderDoc) {
-  const o = orderDoc?.toObject ? orderDoc.toObject() : { ...(orderDoc || {}) };
+  const o = toOrderSnapshot(orderDoc);
   const pricing = extractOrderPricingSnapshot(o);
   if (Object.keys(pricing).length > 0) {
     o.pricing = pricing;
@@ -318,7 +353,7 @@ export function pushStatusHistory(order, { byRole, byId, from, to, note = "" }) 
 }
 
 export function normalizeOrderForClient(orderDoc) {
-  const order = orderDoc?.toObject ? orderDoc.toObject() : orderDoc || {};
+  const order = toOrderSnapshot(orderDoc);
   const mongoId = (order._id || orderDoc?._id || "").toString();
   const displayId = order.order_id || mongoId;
   const pricing = extractOrderPricingSnapshot(order);
@@ -373,9 +408,15 @@ export async function applyAggregateRating(model, entityId, newRating) {
 }
 
 export function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
-  const order = orderDoc?.toObject ? orderDoc.toObject() : orderDoc || {};
+  const order = toOrderSnapshot(orderDoc);
   const pricing = extractOrderPricingSnapshot(order);
   const payment = mergeOrderPaymentSnapshot(order);
+  const total =
+    pricing?.total ??
+    order?.amounts?.totalCustomerPaid ??
+    payment?.amountDue ??
+    order?.total ??
+    0;
   const restaurant = restaurantDoc || order?.restaurantId || null;
   const restaurantLocation = restaurant?.location || {};
   const deliveryAddress = order?.deliveryAddress || {};
@@ -400,9 +441,10 @@ export function buildDeliverySocketPayload(orderDoc, restaurantDoc = null) {
     status: orderDoc?.orderStatus || order?.orderStatus,
     items: order?.items || [],
     pricing,
-    total: pricing?.total ?? 0,
+    total,
+    orderAmount: total,
     payment,
-    paymentMethod: payment?.method,
+    paymentMethod: payment?.method || order?.paymentMethod || "",
     restaurantId:
       order?.restaurantId?._id?.toString?.() ||
       order?.restaurantId?.toString?.() ||
@@ -453,31 +495,29 @@ export function canExposeOrderToRestaurant(orderLike) {
 
 export async function notifyRestaurantNewOrder(orderDoc) {
   try {
-    if (!orderDoc || !canExposeOrderToRestaurant(orderDoc)) return;
+    if (!orderDoc) return;
+    const hydratedOrder = await attachFinancialSnapshotToOrder(orderDoc);
+    if (!canExposeOrderToRestaurant(hydratedOrder)) return;
 
     const io = getIO();
     if (io) {
-      const payload = {
-        ...orderDoc.toObject(),
-        orderMongoId: orderDoc._id?.toString?.() || undefined,
-        orderId: orderDoc.order_id || orderDoc._id?.toString?.(),
-      };
+      const payload = sanitizeOrderForExternal(hydratedOrder);
       logger.info(
-        `[RestaurantOrders] Emitting new_order to ${rooms.restaurant(orderDoc.restaurantId)} for order ${orderDoc._id?.toString?.() || ''}`,
+        `[RestaurantOrders] Emitting new_order to ${rooms.restaurant(hydratedOrder.restaurantId)} for order ${hydratedOrder._id?.toString?.() || ''}`,
       );
-      io.to(rooms.restaurant(orderDoc.restaurantId)).emit("new_order", payload);
+      io.to(rooms.restaurant(hydratedOrder.restaurantId)).emit("new_order", payload);
     }
 
     await notifyOwnersSafely(
-      [{ ownerType: "RESTAURANT", ownerId: orderDoc.restaurantId }],
+      [{ ownerType: "RESTAURANT", ownerId: hydratedOrder.restaurantId }],
       {
         title: "New order received",
-        body: `Order #${orderDoc.order_id || orderDoc._id} is waiting for review.`,
+        body: `Order #${hydratedOrder.order_id || hydratedOrder._id} is waiting for review.`,
         data: {
           type: "new_order",
-          orderId: orderDoc._id.toString(),
-          orderMongoId: orderDoc._id?.toString?.() || "",
-          link: `/restaurant/orders/${orderDoc._id?.toString?.() || ""}`,
+          orderId: hydratedOrder._id.toString(),
+          orderMongoId: hydratedOrder._id?.toString?.() || "",
+          link: `/restaurant/orders/${hydratedOrder._id?.toString?.() || ""}`,
         },
       },
     );

@@ -2,12 +2,60 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle, ArrowRight, Wallet, History, Star } from 'lucide-react';
 
+function getFirstFiniteAmount(candidates = []) {
+  for (const candidate of candidates) {
+    const amount = Number(candidate);
+    if (Number.isFinite(amount) && amount > 0) {
+      return amount;
+    }
+  }
+
+  for (const candidate of candidates) {
+    const amount = Number(candidate);
+    if (Number.isFinite(amount)) {
+      return amount;
+    }
+  }
+
+  return 0;
+}
+
+function resolveEarningAmount(order = {}) {
+  const directAmount = getFirstFiniteAmount([
+    order?.earnings,
+    order?.riderEarning,
+    order?.deliveryEarning,
+    order?.earningAmount,
+    order?.amount,
+    order?.deliveryFee,
+    order?.pricing?.deliveryFee,
+  ]);
+
+  if (directAmount > 0) {
+    return directAmount;
+  }
+
+  const orderTotal = getFirstFiniteAmount([
+    order?.orderAmount,
+    order?.total,
+    order?.pricing?.total,
+    order?.payment?.amountDue,
+    order?.amounts?.totalCustomerPaid,
+  ]);
+
+  if (orderTotal > 0) {
+    return Number((orderTotal * 0.1).toFixed(2));
+  }
+
+  return 0;
+}
+
 /**
  * OrderSummaryModal - Ported to Original White/Green Theme.
  * Post-delivery success screen.
  */
 export const OrderSummaryModal = ({ order, onDone }) => {
-  const earnings = order?.earnings || order?.riderEarning || (order?.orderAmount * 0.1) || 0;
+  const earnings = resolveEarningAmount(order);
 
   return (
     <div className="fixed inset-0 z-160 bg-green-500 overflow-y-auto">

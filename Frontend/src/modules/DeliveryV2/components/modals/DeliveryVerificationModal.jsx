@@ -178,6 +178,16 @@ const OtpModal = ({ order, onVerified, onClose }) => {
   );
 };
 
+function getFirstFiniteAmount(candidates = []) {
+  for (const candidate of candidates) {
+    const amount = Number(candidate);
+    if (Number.isFinite(amount) && amount > 0) {
+      return amount;
+    }
+  }
+  return 0;
+}
+
 const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
   const [showQrModal, setShowQrModal] = useState(false);
   const [collectQrLink, setCollectQrLink] = useState(null);
@@ -188,7 +198,16 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
   const pollingRef = useRef(null);
 
   const orderId = order.order_id || order.orderId || order._id || 'ORD';
-  const amountToCollect = order.pricing?.total || order.amountToCollect || 0;
+  
+  const amountToCollect = getFirstFiniteAmount([
+    order?.amountToCollect,
+    order?.pricing?.total,
+    order?.total,
+    order?.orderAmount,
+    order?.totalAmount,
+    order?.payment?.amountDue,
+    order?.amounts?.totalCustomerPaid
+  ]);
 
   const checkPaymentSync = useCallback(async () => {
     try {

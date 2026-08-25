@@ -12,6 +12,7 @@ import { config } from '../../../../config/env.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { addOrderJob, cancelDispatchTimeoutJob } from '../../../../queues/producers/order.producer.js';
 import {
+  attachFinancialSnapshotToOrder,
   buildDeliverySocketPayload,
   buildOrderIdentityFilter,
   haversineKm,
@@ -500,6 +501,7 @@ export async function tryAutoAssign(orderId, options = {}) {
   }
 
   try {
+    await attachFinancialSnapshotToOrder(order);
     const paymentMethod = String(order.payment?.method || 'cash').toLowerCase();
     const isCashOrder = paymentMethod === 'cash';
     const requiredAmount = isCashOrder ? Number(order?.pricing?.total || 0) : 0;
@@ -710,6 +712,7 @@ export async function processDispatchTimeout(orderId, partnerId, options = {}) {
 
 
 async function resendDeliveryNotificationForOrder(order) {
+  await attachFinancialSnapshotToOrder(order);
   const activeStatuses = ['confirmed', 'preparing', 'ready_for_pickup'];
   if (!activeStatuses.includes(order.orderStatus)) {
     throw new ValidationError(`Cannot resend notification for order in status: ${order.orderStatus}`);

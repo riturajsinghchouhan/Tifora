@@ -11,6 +11,54 @@ import {
   isSameOrder,
 } from '@food/utils/orderDispatchId';
 
+function getFirstFiniteAmount(candidates = []) {
+  for (const candidate of candidates) {
+    const amount = Number(candidate);
+    if (Number.isFinite(amount) && amount > 0) {
+      return amount;
+    }
+  }
+
+  for (const candidate of candidates) {
+    const amount = Number(candidate);
+    if (Number.isFinite(amount)) {
+      return amount;
+    }
+  }
+
+  return 0;
+}
+
+function resolveEarningAmount(orderLike = {}) {
+  const directAmount = getFirstFiniteAmount([
+    orderLike.earnings,
+    orderLike.riderEarning,
+    orderLike.deliveryEarning,
+    orderLike.earningAmount,
+    orderLike.amount,
+    orderLike.deliveryFee,
+    orderLike.pricing?.deliveryFee,
+  ]);
+
+  if (directAmount > 0) {
+    return directAmount;
+  }
+
+  const orderTotal = getFirstFiniteAmount([
+    orderLike.orderAmount,
+    orderLike.total,
+    orderLike.pricing?.total,
+    orderLike.payment?.amountDue,
+    orderLike.amounts?.totalCustomerPaid,
+  ]);
+
+  if (orderTotal > 0) {
+    return Number((orderTotal * 0.1).toFixed(2));
+  }
+
+  return 0;
+}
+
 /**
  * NewOrderModal - Ported to Original 1:1 Theme with Slider Accept.
  * Matches the Zomato/Swiggy style Green Header + White Card.
@@ -144,7 +192,8 @@ export const NewOrderModal = ({ order, queuedOrders = [], onSelectOrder, onAccep
   }, [orderKey, order, queuedOrders.length]);
 
   const bonus = order.deliveryBonusAmount || 0;
-  const earnings = order.earnings || order.riderEarning || (order.orderAmount ? order.orderAmount * 0.1 : 0);
+  const earnings = resolveEarningAmount(order);
+  const displayAmount = earnings;
   const baseEarnings = Math.max(0, earnings - bonus);
 
   const restaurantName = order.restaurantName || order.restaurant_name || (order.restaurantId?.name) || 'Restaurant';
@@ -216,7 +265,7 @@ export const NewOrderModal = ({ order, queuedOrders = [], onSelectOrder, onAccep
           <div>
             <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest mb-1">Incoming Request</p>
             <div className="flex items-end gap-2">
-              <h2 className="text-2xl sm:text-4xl font-bold tracking-tighter">₹{Number(earnings || 0).toFixed(2)}</h2>
+              <h2 className="text-2xl sm:text-4xl font-bold tracking-tighter">₹{displayAmount.toFixed(2)}</h2>
               {bonus > 0 && (
                 <p className="text-white/70 text-xs font-semibold mb-1">
                   (₹{Number(baseEarnings).toFixed(0)} + ₹{Number(bonus).toFixed(0)} Bonus)
@@ -238,11 +287,7 @@ export const NewOrderModal = ({ order, queuedOrders = [], onSelectOrder, onAccep
               {queuedOrders.map((queuedOrder, index) => {
                 const queuedId = getOrderMongoId(queuedOrder) || getOrderDisplayId(queuedOrder);
                 const isActive = isSameOrder(queuedOrder, order);
-                const earnings =
-                  queuedOrder.earnings ||
-                  queuedOrder.riderEarning ||
-                  queuedOrder.pricing?.deliveryFee ||
-                  0;
+                const queuedDisplayAmount = resolveEarningAmount(queuedOrder);
                 const label =
                   getOrderDisplayId(queuedOrder) ||
                   `Order ${index + 1}`;
@@ -262,7 +307,7 @@ export const NewOrderModal = ({ order, queuedOrders = [], onSelectOrder, onAccep
                       {label.length > 12 ? `${label.slice(0, 12)}…` : label}
                     </span>
                     <span className="block text-sm font-bold mt-0.5">
-                      ₹{Number(earnings || 0).toFixed(0)}
+                      ₹{queuedDisplayAmount.toFixed(0)}
                     </span>
                   </button>
                 );

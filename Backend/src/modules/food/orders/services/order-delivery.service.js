@@ -426,11 +426,35 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
     .select('pricing payment dispatch orderStatus')
     .lean();
   if (!existingOrder) throw new NotFoundError('Order not found');
+  const existingTransaction = await FoodTransaction.findOne({
+    orderId: existingOrder._id,
+  }).lean();
+  const financeOrder = existingTransaction
+    ? {
+        ...existingOrder,
+        payment: existingTransaction.payment || existingOrder.payment,
+        pricing: existingTransaction.pricing || existingOrder.pricing,
+        amounts: existingTransaction.amounts || existingOrder.amounts,
+        paymentMethod:
+          existingTransaction.payment?.method ||
+          existingTransaction.paymentMethod ||
+          existingOrder.paymentMethod,
+      }
+    : existingOrder;
 
-  const paymentMethod = String(existingOrder?.payment?.method || 'cash').toLowerCase();
+  const paymentMethod = String(
+    financeOrder?.payment?.method || financeOrder?.paymentMethod || 'cash',
+  ).toLowerCase();
   const isCashOrder = paymentMethod === 'cash';
-  const orderAmount = Math.max(0, Number(existingOrder?.pricing?.total || 0));
-  const offeredEntry = (existingOrder?.dispatch?.offeredTo || []).find(
+  const orderAmount = Math.max(
+    0,
+    Number(
+      financeOrder?.pricing?.total ||
+      financeOrder?.amounts?.totalCustomerPaid ||
+      0,
+    ),
+  );
+  const offeredEntry = (financeOrder?.dispatch?.offeredTo || []).find(
     (entry) => String(entry?.partnerId || '') === String(deliveryPartnerId),
   );
   const canBypassCashLimit = Boolean(offeredEntry?.allowOverLimit);
@@ -517,9 +541,22 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
     ) {
       const acceptedOrder = await FoodOrder.findOne(identity)
         .populate('restaurantId userId');
-      return acceptedOrder
-        ? sanitizeOrderForExternal(acceptedOrder)
-        : null;
+      if (!acceptedOrder) return null;
+      const reAcceptResponse = sanitizeOrderForExternal(acceptedOrder);
+      // Hydrate pricing/payment from FoodTransaction for re-accept path
+      try {
+        const reTx = await FoodTransaction.findOne({ orderId: acceptedOrder._id }).lean();
+        if (reTx) {
+          reAcceptResponse.paymentMethod = reTx.payment?.method || reTx.paymentMethod || reAcceptResponse.paymentMethod;
+          reAcceptResponse.payment = reTx.payment || reAcceptResponse.payment;
+          reAcceptResponse.pricing = reTx.pricing || reAcceptResponse.pricing;
+          reAcceptResponse.amounts = reTx.amounts || reAcceptResponse.amounts;
+          reAcceptResponse.transactionStatus = reTx.status || reAcceptResponse.transactionStatus;
+        }
+      } catch (txErr) {
+        logger.warn(`acceptOrderDelivery re-accept: failed to hydrate transaction: ${txErr?.message}`);
+      }
+      return reAcceptResponse;
     }
     if (
       existing.dispatch?.status === 'accepted' &&
@@ -532,6 +569,20 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
   }
 
   const responseOrder = sanitizeOrderForExternal(order);
+
+  // Hydrate pricing/payment from FoodTransaction (same pattern as getCurrentTripDelivery)
+  try {
+    const tx = await FoodTransaction.findOne({ orderId: order._id }).lean();
+    if (tx) {
+      responseOrder.paymentMethod = tx.payment?.method || tx.paymentMethod || responseOrder.paymentMethod;
+      responseOrder.payment = tx.payment || responseOrder.payment;
+      responseOrder.pricing = tx.pricing || responseOrder.pricing;
+      responseOrder.amounts = tx.amounts || responseOrder.amounts;
+      responseOrder.transactionStatus = tx.status || responseOrder.transactionStatus;
+    }
+  } catch (txErr) {
+    logger.warn(`acceptOrderDelivery: failed to hydrate transaction for ${order._id}: ${txErr?.message}`);
+  }
 
   void (async () => {
     try {

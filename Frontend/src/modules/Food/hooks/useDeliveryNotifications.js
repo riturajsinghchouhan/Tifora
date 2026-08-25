@@ -135,7 +135,14 @@ const supportsBrowserNotifications = () =>
 const buildDeliveryOrderNotification = (orderData = {}) => {
   const orderId = orderData.orderId || orderData.orderMongoId || orderData.id || 'New';
   const itemCount = Array.isArray(orderData.items) ? orderData.items.length : 0;
-  const total = Number(orderData.total || orderData.pricing?.total || orderData.orderTotal || 0);
+  const total = Number(
+    orderData.total ||
+    orderData.pricing?.total ||
+    orderData.payment?.amountDue ||
+    orderData.amounts?.totalCustomerPaid ||
+    orderData.orderTotal ||
+    0,
+  );
 
   return {
     title: `New order #${orderId}`,

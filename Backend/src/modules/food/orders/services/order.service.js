@@ -789,7 +789,9 @@ export async function getOrderById(
     throw new ForbiddenError("Not assigned to you");
 
   if (deliveryPartnerId || restaurantId) {
-    const sanitized = sanitizeOrderForExternal(order);
+    const sanitized = sanitizeOrderForExternal(
+      await attachFinancialSnapshotToOrder(order),
+    );
     if (restaurantId && order.pickupOtp) {
       sanitized.pickupOtp = order.pickupOtp;
     }

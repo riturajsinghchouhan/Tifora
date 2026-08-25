@@ -733,11 +733,30 @@ export const getDeliveryPartnerTripHistory = async (deliveryPartnerId, query = {
         .limit(limit)
         .lean();
 
+    // Hydrate pricing/payment from FoodTransaction (pricing lives in transactions, not orders)
+    const orderIds = (orders || []).map((o) => o?._id).filter(Boolean);
+    const txRows = orderIds.length
+        ? await FoodTransaction.find({ orderId: { $in: orderIds } }).lean()
+        : [];
+    const txByOrderId = new Map(txRows.map((t) => [String(t.orderId), t]));
+
+    const enrichedOrders = (orders || []).map((doc) => {
+        const tx = txByOrderId.get(String(doc?._id)) || null;
+        if (!tx) return doc;
+        return {
+            ...doc,
+            paymentMethod: tx.payment?.method || tx.paymentMethod || doc.paymentMethod,
+            payment: tx.payment || doc.payment,
+            pricing: tx.pricing || doc.pricing,
+            amounts: tx.amounts || doc.amounts,
+        };
+    });
+
     return {
         period,
         date: (date || new Date()).toISOString(),
         range: { start: start.toISOString(), end: end.toISOString() },
-        trips: (orders || []).map(toTripDto)
+        trips: (enrichedOrders || []).map(toTripDto)
     };
 };
 
@@ -775,7 +794,26 @@ export const getDeliveryPocketDetails = async (deliveryPartnerId, query = {}) =>
         .limit(limit)
         .lean();
 
-    const trips = (orders || []).map(toTripDto);
+    // Hydrate pricing/payment from FoodTransaction (pricing lives in transactions, not orders)
+    const pocketOrderIds = (orders || []).map((o) => o?._id).filter(Boolean);
+    const pocketTxRows = pocketOrderIds.length
+        ? await FoodTransaction.find({ orderId: { $in: pocketOrderIds } }).lean()
+        : [];
+    const pocketTxByOrderId = new Map(pocketTxRows.map((t) => [String(t.orderId), t]));
+
+    const enrichedPocketOrders = (orders || []).map((doc) => {
+        const tx = pocketTxByOrderId.get(String(doc?._id)) || null;
+        if (!tx) return doc;
+        return {
+            ...doc,
+            paymentMethod: tx.payment?.method || tx.paymentMethod || doc.paymentMethod,
+            payment: tx.payment || doc.payment,
+            pricing: tx.pricing || doc.pricing,
+            amounts: tx.amounts || doc.amounts,
+        };
+    });
+
+    const trips = (enrichedPocketOrders || []).map(toTripDto);
 
     const paymentTransactions = (orders || []).map((o) => ({
         _id: o._id,
