@@ -6,6 +6,7 @@ import { FoodEarningAddon } from '../../admin/models/earningAddon.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
 import { TiffinDelivery } from '../../tiffin/models/tiffinDelivery.model.js';
+import { FoodZone } from '../../admin/models/zone.model.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings, getDeliveryOnboardingFeeSettings } from '../../admin/services/admin.service.js';
@@ -20,6 +21,44 @@ const DEV_ONBOARDING_SIGNATURE = 'dev_onboarding_signature';
 const normalizeDeliveryPhone = (phone) => String(phone || '').replace(/\D/g, '').slice(-10);
 
 const normalizeIdentityValue = (value) => String(value || '').trim().toUpperCase();
+
+const getZoneDisplayName = (zoneDoc = {}) =>
+    String(zoneDoc?.zoneName || zoneDoc?.name || zoneDoc?.serviceLocation || '').trim();
+
+const resolveDeliveryZoneSelection = async (zoneIdValue, options = {}) => {
+    const rawZoneId = String(zoneIdValue || '').trim();
+    if (!rawZoneId) {
+        if (options.required) {
+            throw new ValidationError('Zone is required');
+        }
+        return null;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(rawZoneId)) {
+        throw new ValidationError('Invalid zone selected');
+    }
+
+    const zone = await FoodZone.findOne({
+        _id: new mongoose.Types.ObjectId(rawZoneId),
+        isActive: true
+    })
+        .select('name zoneName serviceLocation isActive')
+        .lean();
+
+    if (!zone) {
+        throw new ValidationError('Selected zone is not available');
+    }
+
+    const zoneName = getZoneDisplayName(zone);
+    if (!zoneName) {
+        throw new ValidationError('Selected zone is invalid');
+    }
+
+    return {
+        zoneId: zone._id,
+        zoneName
+    };
+};
 
 const validateDeliveryRegistrationUniqueness = async (payload = {}) => {
     const normalizedPhone = normalizeDeliveryPhone(payload.phone);
@@ -276,7 +315,7 @@ export const createDeliveryOnboardingFeeOrder = async (payload = {}) => {
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
         name, phone, email, countryCode, address, city, state, 
-        vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
+        zoneId, vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
         fcmToken, platform 
     } = payload;
     const refRaw = typeof payload?.ref === 'string' ? String(payload.ref).trim() : '';
@@ -295,6 +334,8 @@ export const registerDeliveryPartner = async (payload, files) => {
         aadharNumber,
         drivingLicenseNumber
     });
+
+    const selectedZone = await resolveDeliveryZoneSelection(zoneId, { required: true });
 
     const images = {};
 
@@ -337,6 +378,8 @@ export const registerDeliveryPartner = async (payload, files) => {
         address,
         city,
         state,
+        zoneId: selectedZone.zoneId,
+        zoneName: selectedZone.zoneName,
         vehicleType,
         vehicleName,
         vehicleNumber,
@@ -406,15 +449,23 @@ export const updateDeliveryPartnerProfile = async (userId, payload, files) => {
 
     const {
         name, countryCode, address, city, state,
-        vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
+        zoneId, vehicleType, vehicleName, vehicleNumber, drivingLicenseNumber, panNumber, aadharNumber,
         fcmToken, platform
     } = payload;
+
+    const selectedZone = zoneId !== undefined
+        ? await resolveDeliveryZoneSelection(zoneId, { required: true })
+        : null;
 
     if (name) partner.name = name;
     if (countryCode !== undefined) partner.countryCode = countryCode;
     if (address !== undefined) partner.address = address;
     if (city !== undefined) partner.city = city;
     if (state !== undefined) partner.state = state;
+    if (selectedZone) {
+        partner.zoneId = selectedZone.zoneId;
+        partner.zoneName = selectedZone.zoneName;
+    }
     if (vehicleType !== undefined) partner.vehicleType = vehicleType;
     if (vehicleName !== undefined) partner.vehicleName = vehicleName;
     if (vehicleNumber !== undefined) partner.vehicleNumber = vehicleNumber;
@@ -479,6 +530,12 @@ export const updateDeliveryPartnerDetails = async (userId, payload) => {
     const partner = await FoodDeliveryPartner.findById(userId);
     if (!partner) {
         throw new ValidationError('Delivery partner not found');
+    }
+
+    if (payload?.zoneId !== undefined) {
+        const selectedZone = await resolveDeliveryZoneSelection(payload.zoneId, { required: true });
+        partner.zoneId = selectedZone.zoneId;
+        partner.zoneName = selectedZone.zoneName;
     }
 
     const vehicle = payload?.vehicle;

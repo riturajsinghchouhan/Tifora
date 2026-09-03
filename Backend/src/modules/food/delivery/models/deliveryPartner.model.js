@@ -33,6 +33,17 @@ const deliveryPartnerSchema = new mongoose.Schema(
         state: {
             type: String
         },
+        zoneId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'FoodZone',
+            default: null,
+            index: true
+        },
+        zoneName: {
+            type: String,
+            trim: true,
+            default: ''
+        },
         vehicleType: {
             type: String
         },

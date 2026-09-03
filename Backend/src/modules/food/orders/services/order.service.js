@@ -2129,10 +2129,18 @@ export async function assignDeliveryPartnerAdmin(
   }
 
   const partner = await FoodDeliveryPartner.findById(deliveryPartnerId)
-    .select("status availabilityStatus")
+    .select("status availabilityStatus zoneId")
     .lean();
   if (!partner || partner.status !== "approved" || partner.availabilityStatus !== "online")
     throw new ValidationError("Delivery partner is not available or offline");
+
+  if (
+    partner?.zoneId &&
+    order?.zoneId &&
+    String(partner.zoneId) !== String(order.zoneId)
+  ) {
+    throw new ValidationError("Delivery partner belongs to a different zone for this order");
+  }
 
   const busyPartner = await FoodOrder.findOne({
     'dispatch.deliveryPartnerId': new mongoose.Types.ObjectId(deliveryPartnerId),

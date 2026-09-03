@@ -53,6 +53,13 @@ function isOtpMatch(expectedOtp, enteredOtp) {
   return false;
 }
 
+function isPartnerEligibleForOrderZone(partnerZoneId, orderZoneId) {
+  const normalizedPartnerZoneId = String(partnerZoneId || '').trim();
+  const normalizedOrderZoneId = String(orderZoneId || '').trim();
+  if (!normalizedPartnerZoneId || !normalizedOrderZoneId) return true;
+  return normalizedPartnerZoneId === normalizedOrderZoneId;
+}
+
 export async function getPartnerCashCapacity(deliveryPartnerId) {
   const partnerObjectId = new mongoose.Types.ObjectId(deliveryPartnerId);
   const limitDoc = await FoodDeliveryCashLimit.findOne({ isActive: true })
@@ -319,6 +326,12 @@ export async function getCurrentTripDelivery(deliveryPartnerId) {
 
 export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
   const { page, limit, skip } = buildPaginationOptions(query);
+  const partner = await FoodDeliveryPartner.findById(deliveryPartnerId)
+    .select('zoneId')
+    .lean();
+  if (!partner) {
+    throw new NotFoundError('Delivery partner not found');
+  }
   const partnerCapacity = await getPartnerCashCapacity(deliveryPartnerId);
   const cashLimit = {
     blocked: false,
@@ -341,12 +354,18 @@ export async function listOrdersAvailableDelivery(deliveryPartnerId, query) {
     },
   };
 
+  const unassignedOrderFilter = {
+    'dispatch.status': 'unassigned',
+    orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup'] },
+  };
+
+  if (partner.zoneId) {
+    unassignedOrderFilter.zoneId = partner.zoneId;
+  }
+
   const filter = {
     $or: [
-      {
-        'dispatch.status': 'unassigned',
-        orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup'] },
-      },
+      unassignedOrderFilter,
       activeOwnOrderFilter,
     ],
   };
@@ -421,11 +440,19 @@ export async function acceptOrderDelivery(orderId, deliveryPartnerId) {
   if (!identity) throw new ValidationError('Order id required');
 
   const partnerId = new mongoose.Types.ObjectId(deliveryPartnerId);
+  const partner = await FoodDeliveryPartner.findById(deliveryPartnerId)
+    .select('zoneId')
+    .lean();
+  if (!partner) throw new NotFoundError('Delivery partner not found');
 
   const existingOrder = await FoodOrder.findOne(identity)
-    .select('pricing payment dispatch orderStatus')
+    .select('pricing payment dispatch orderStatus zoneId')
     .lean();
   if (!existingOrder) throw new NotFoundError('Order not found');
+
+  if (!isPartnerEligibleForOrderZone(partner.zoneId, existingOrder.zoneId)) {
+    throw new ValidationError('This order belongs to a different zone.');
+  }
   const existingTransaction = await FoodTransaction.findOne({
     orderId: existingOrder._id,
   }).lean();

@@ -4017,6 +4017,7 @@ export async function getDeliveryJoinRequests(query) {
         const z = zone.trim();
         andParts.push({
             $or: [
+                { zoneName: { $regex: z, $options: 'i' } },
                 { city: { $regex: z, $options: 'i' } },
                 { state: { $regex: z, $options: 'i' } },
                 { address: { $regex: z, $options: 'i' } }
@@ -4032,6 +4033,7 @@ export async function getDeliveryJoinRequests(query) {
     const limitNum = Math.max(1, Math.min(1000, Number(limit) || 100));
 
     const list = await FoodDeliveryPartner.find(filter)
+        .populate('zoneId', 'name zoneName serviceLocation')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
@@ -4043,7 +4045,7 @@ export async function getDeliveryJoinRequests(query) {
         name: doc.name || '',
         email: doc.email || '',
         phone: doc.phone || '',
-        zone: doc.city || doc.state || doc.address || '',
+        zone: doc.zoneId?.zoneName || doc.zoneId?.name || doc.zoneId?.serviceLocation || doc.zoneName || doc.city || doc.state || doc.address || '',
         jobType: doc.jobType || '',
         vehicleType: doc.vehicleType || '',
         status: doc.status === 'rejected' ? 'denied' : doc.status,
@@ -4163,7 +4165,20 @@ export async function updateDeliverySupportTicket(id, body = {}) {
 // ----- Delivery partners (approved list) -----
 export async function getAvailableDeliveryPartners(query) {
     const filter = { status: 'approved', availabilityStatus: 'online' };
-    const list = await FoodDeliveryPartner.find(filter).lean();
+    if (query?.orderId && mongoose.Types.ObjectId.isValid(query.orderId)) {
+        const order = await FoodOrder.findById(query.orderId).select('zoneId').lean();
+        if (order?.zoneId) {
+            filter.$or = [
+                { zoneId: order.zoneId },
+                { zoneId: { $exists: false } },
+                { zoneId: null }
+            ];
+        }
+    }
+
+    const list = await FoodDeliveryPartner.find(filter)
+        .populate('zoneId', 'name zoneName serviceLocation')
+        .lean();
 
     const busyPartners = await FoodOrder.distinct('dispatch.deliveryPartnerId', {
         'dispatch.status': 'accepted',
@@ -4182,6 +4197,8 @@ export async function getAvailableDeliveryPartners(query) {
             profilePhoto: doc.profilePhoto || null,
             lastLat: doc.lastLat,
             lastLng: doc.lastLng,
+            zoneId: doc.zoneId?._id || doc.zoneId || null,
+            zone: doc.zoneId?.zoneName || doc.zoneId?.name || doc.zoneId?.serviceLocation || doc.zoneName || doc.city || doc.state || doc.address || '',
             city: doc.city,
             area: doc.address || doc.state || ''
         }))
@@ -4196,6 +4213,7 @@ export async function getDeliveryPartners(query) {
             { name: { $regex: term, $options: 'i' } },
             { phone: { $regex: term, $options: 'i' } },
             { email: { $regex: term, $options: 'i' } },
+            { zoneName: { $regex: term, $options: 'i' } },
             { city: { $regex: term, $options: 'i' } },
             { state: { $regex: term, $options: 'i' } }
         ];
@@ -4206,6 +4224,7 @@ export async function getDeliveryPartners(query) {
 
     const [list, total] = await Promise.all([
         FoodDeliveryPartner.find(filter)
+            .populate('zoneId', 'name zoneName serviceLocation')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limitNum)
@@ -4241,7 +4260,7 @@ export async function getDeliveryPartners(query) {
         email: doc.email || '',
         phone: doc.phone || '',
         deliveryId: doc._id ? `DP-${doc._id.toString().slice(-8).toUpperCase()}` : null,
-        zone: doc.city || doc.state || doc.address || '',
+        zone: doc.zoneId?.zoneName || doc.zoneId?.name || doc.zoneId?.serviceLocation || doc.zoneName || doc.city || doc.state || doc.address || '',
         vehicleType: doc.vehicleType || '',
         status: doc.status,
         totalOrders: countsMap.get(String(doc._id)) || 0,
@@ -4833,13 +4852,16 @@ export async function checkEarningAddonCompletions(deliveryPartnerId, _force = f
 }
 
 export async function getDeliveryPartnerById(id) {
-    const partner = await FoodDeliveryPartner.findById(id).lean();
+    const partner = await FoodDeliveryPartner.findById(id)
+        .populate('zoneId', 'name zoneName serviceLocation isActive')
+        .lean();
     if (!partner) return null;
     const deliveryId = partner._id ? `DP-${partner._id.toString().slice(-8).toUpperCase()}` : null;
     return {
         ...partner,
         email: partner.email || null,
         deliveryId,
+        zone: partner.zoneId?.zoneName || partner.zoneId?.name || partner.zoneId?.serviceLocation || partner.zoneName || partner.city || partner.state || partner.address || '',
         status: partner.status === 'rejected' ? 'blocked' : partner.status,
         onboardingFee: {
             required: partner.onboardingFee?.required === true,

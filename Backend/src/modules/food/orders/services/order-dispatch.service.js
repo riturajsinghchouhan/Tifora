@@ -87,6 +87,16 @@ async function filterPartnersByCashLimit(partners = [], options = {}) {
   }));
 }
 
+function isPartnerEligibleForRestaurantZone(partner, restaurantZoneId) {
+  const normalizedRestaurantZoneId = String(restaurantZoneId || '').trim();
+  if (!normalizedRestaurantZoneId) return true;
+
+  const normalizedPartnerZoneId = String(partner?.zoneId || '').trim();
+  if (!normalizedPartnerZoneId) return true;
+
+  return normalizedPartnerZoneId === normalizedRestaurantZoneId;
+}
+
 async function listNearbyOnlineDeliveryPartners(
   restaurantId,
   {
@@ -122,12 +132,13 @@ async function listNearbyOnlineDeliveryPartners(
   }
 
   const [rLng, rLat] = restaurant.location.coordinates;
+  const restaurantZoneId = restaurant?.zoneId ? String(restaurant.zoneId) : '';
   const busyIds = await getBusyDeliveryPartnerIds();
   const allOnline = await FoodDeliveryPartner.find({
     availabilityStatus: 'online',
     status: 'approved',
   })
-    .select('_id status lastLat lastLng lastLocationAt name')
+    .select('_id status lastLat lastLng lastLocationAt name zoneId')
     .lean();
 
   const radiusEligible = [];
@@ -135,6 +146,7 @@ async function listNearbyOnlineDeliveryPartners(
 
   for (const p of allOnline) {
     if (busyIds.has(String(p._id))) continue;
+    if (!isPartnerEligibleForRestaurantZone(p, restaurantZoneId)) continue;
 
     const hasCoords = p.lastLat != null && p.lastLng != null;
 
@@ -296,13 +308,14 @@ async function listResendEligibleDeliveryPartners(
   }
 
   const [rLng, rLat] = restaurant.location.coordinates;
+  const restaurantZoneId = restaurant?.zoneId ? String(restaurant.zoneId) : '';
   const [busyIds, allOnline, firebaseLocs] = await Promise.all([
     getBusyDeliveryPartnerIds(),
     FoodDeliveryPartner.find({
       availabilityStatus: 'online',
       status: 'approved',
     })
-      .select('_id status lastLat lastLng lastLocationAt name')
+      .select('_id status lastLat lastLng lastLocationAt name zoneId')
       .lean(),
     fetchFirebaseDeliveryLocations(),
   ]);
@@ -313,6 +326,7 @@ async function listResendEligibleDeliveryPartners(
     busy: busyIds.size,
     inZone: 0,
     outsideZone: 0,
+    zoneMismatch: 0,
     noLocation: 0,
     outsideRadius: 0,
     firebaseLocations: firebaseLocs.size,
@@ -320,6 +334,10 @@ async function listResendEligibleDeliveryPartners(
 
   for (const p of allOnline) {
     if (busyIds.has(String(p._id))) continue;
+    if (!isPartnerEligibleForRestaurantZone(p, restaurantZoneId)) {
+      stats.zoneMismatch += 1;
+      continue;
+    }
 
     const coords = resolvePartnerCoordinatesForResend(
       p,
@@ -379,7 +397,7 @@ async function listResendEligibleDeliveryPartners(
 
   stats.eligible = eligible.length;
   logger.info(
-    `[Dispatch] Resend rider search restaurant=${rId} online=${stats.online} busy=${stats.busy} eligible=${stats.eligible} inZone=${stats.inZone} noLocation=${stats.noLocation} outsideZone=${stats.outsideZone} outsideRadius=${stats.outsideRadius} firebaseLocations=${stats.firebaseLocations} zoneFilter=${Boolean(zonePolygon)}`,
+    `[Dispatch] Resend rider search restaurant=${rId} online=${stats.online} busy=${stats.busy} eligible=${stats.eligible} inZone=${stats.inZone} zoneMismatch=${stats.zoneMismatch} noLocation=${stats.noLocation} outsideZone=${stats.outsideZone} outsideRadius=${stats.outsideRadius} firebaseLocations=${stats.firebaseLocations} zoneFilter=${Boolean(zonePolygon)}`,
   );
 
   if (eligible.length === 0) {

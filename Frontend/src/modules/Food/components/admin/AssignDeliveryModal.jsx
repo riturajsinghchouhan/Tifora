@@ -12,12 +12,12 @@ export default function AssignDeliveryModal({ orderId, isOpen, onClose, onAssign
     if (isOpen) {
       fetchPartners();
     }
-  }, [isOpen]);
+  }, [isOpen, orderId]);
 
   const fetchPartners = async () => {
     try {
       setLoading(true);
-      const res = await adminAPI.getAvailableDeliveryPartners();
+      const res = await adminAPI.getAvailableDeliveryPartners({ orderId });
       if (res?.data?.success) {
         setPartners(res.data.data.availablePartners || []);
       }
@@ -70,7 +70,7 @@ export default function AssignDeliveryModal({ orderId, isOpen, onClose, onAssign
               <Navigation className="w-12 h-12 text-gray-300 mb-4" />
               <p className="text-gray-800 font-semibold mb-1">No Partners Available</p>
               <p className="text-sm text-gray-500 max-w-xs">
-                There are currently no online delivery partners available to take this order.
+                There are currently no online delivery partners available for this order's zone.
               </p>
             </div>
           ) : (
@@ -90,6 +90,9 @@ export default function AssignDeliveryModal({ orderId, isOpen, onClose, onAssign
                     <div>
                       <h3 className="font-semibold text-gray-800">{partner.name}</h3>
                       <p className="text-xs text-gray-500">{partner.phone}</p>
+                      {partner.zone ? (
+                        <p className="text-[11px] text-gray-500">Zone: {partner.zone}</p>
+                      ) : null}
                       <span className="inline-block mt-1 px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-bold rounded uppercase tracking-wider">
                         Online & Free
                       </span>
