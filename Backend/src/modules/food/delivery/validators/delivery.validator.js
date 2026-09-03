@@ -37,12 +37,44 @@ const deliveryRegisterSchema = z.object({
         .regex(aadharRegex, 'Invalid Aadhar format')
         .optional()
         .or(z.literal('')),
+    onboardingFeeAmount: z.coerce.number().min(0).optional(),
+    onboardingRazorpayOrderId: z.string().optional().or(z.literal('')),
+    onboardingRazorpayPaymentId: z.string().optional().or(z.literal('')),
+    onboardingRazorpaySignature: z.string().optional().or(z.literal('')),
     fcmToken: z.string().optional().nullable(),
     platform: z.enum(['web', 'mobile']).optional().default('web')
 });
 
 export const validateDeliveryRegisterDto = (body) => {
     const result = deliveryRegisterSchema.safeParse(body);
+    if (!result.success) {
+        throw new ValidationError(result.error.errors[0].message);
+    }
+    return result.data;
+};
+
+const deliveryOnboardingFeeOrderSchema = z.object({
+    name: z.string().min(1, 'Name is required'),
+    phone: phoneSchema,
+    email: z.string().email().optional().or(z.literal('')),
+    vehicleNumber: z.string().optional().or(z.literal('')),
+    drivingLicenseNumber: z.string().optional().or(z.literal('')),
+    panNumber: z.string().optional().or(z.literal('')),
+    aadharNumber: z.string().optional().or(z.literal(''))
+});
+
+export const validateDeliveryOnboardingFeeOrderDto = (body) => {
+    const normalized = {
+        name: body?.name ? String(body.name).trim() : '',
+        phone: body?.phone ? String(body.phone).replace(/\D/g, '').slice(-10) : '',
+        email: body?.email ? String(body.email).trim().toLowerCase() : '',
+        vehicleNumber: body?.vehicleNumber ? String(body.vehicleNumber).trim().toUpperCase() : '',
+        drivingLicenseNumber: body?.drivingLicenseNumber ? String(body.drivingLicenseNumber).trim().toUpperCase() : '',
+        panNumber: body?.panNumber ? String(body.panNumber).trim().toUpperCase() : '',
+        aadharNumber: body?.aadharNumber ? String(body.aadharNumber).replace(/\D/g, '').slice(0, 12) : ''
+    };
+
+    const result = deliveryOnboardingFeeOrderSchema.safeParse(normalized);
     if (!result.success) {
         throw new ValidationError(result.error.errors[0].message);
     }

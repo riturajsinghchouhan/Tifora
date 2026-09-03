@@ -3,7 +3,7 @@ import { upload } from '../../../../middleware/upload.js';
 import { authMiddleware } from '../../../../core/auth/auth.middleware.js';
 import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import * as orderController from '../../orders/controllers/order.controller.js';
-import { registerDeliveryPartnerController, updateDeliveryPartnerProfileController, updateDeliveryPartnerBankDetailsController, listSupportTicketsController, createSupportTicketController, getSupportTicketByIdController, updateDeliveryPartnerDetailsController, updateDeliveryPartnerProfilePhotoBase64Controller, updateAvailabilityController, getWalletController, createWithdrawalRequestController, createCashDepositOrderController, verifyCashDepositPaymentController, getEarningsController, getTripHistoryController, getPocketDetailsController, getEmergencyHelpController, getCashLimitController, getDeliveryReferralStatsController, getActiveEarningAddonsController } from '../controllers/delivery.controller.js';
+import { registerDeliveryPartnerController, updateDeliveryPartnerProfileController, updateDeliveryPartnerBankDetailsController, listSupportTicketsController, createSupportTicketController, getSupportTicketByIdController, updateDeliveryPartnerDetailsController, updateDeliveryPartnerProfilePhotoBase64Controller, updateAvailabilityController, getWalletController, createWithdrawalRequestController, createCashDepositOrderController, verifyCashDepositPaymentController, getEarningsController, getTripHistoryController, getPocketDetailsController, getEmergencyHelpController, getCashLimitController, getDeliveryReferralStatsController, getActiveEarningAddonsController, getDeliveryOnboardingFeeConfigController, createDeliveryOnboardingFeeOrderController } from '../controllers/delivery.controller.js';
 import { deleteDeliveryAccountController } from '../controllers/deleteAccount.controller.js';
 
 const router = express.Router();
@@ -20,6 +20,9 @@ const uploadFields = upload.fields([
     { name: 'rcPhoto', maxCount: 1 },
     { name: 'upiQrCode', maxCount: 1 }
 ]);
+
+router.get('/onboarding-fee', getDeliveryOnboardingFeeConfigController);
+router.post('/onboarding-fee/order', createDeliveryOnboardingFeeOrderController);
 
 router.post('/register', uploadFields, registerDeliveryPartnerController);
 

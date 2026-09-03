@@ -130,7 +130,25 @@ const deliveryPartnerSchema = new mongoose.Schema(
             max: 5,
             set: normalizeRatingValue
         },
-        totalRatings: { type: Number, default: 0, min: 0 }
+        totalRatings: { type: Number, default: 0, min: 0 },
+        onboardingFee: {
+            required: { type: Boolean, default: false },
+            amount: { type: Number, default: 0, min: 0 },
+            status: {
+                type: String,
+                enum: ['not_required', 'pending', 'paid'],
+                default: 'not_required'
+            },
+            paidAt: { type: Date, default: null },
+            paymentMethod: { type: String, default: '' },
+            paymentRecordId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'FoodDeliveryOnboardingPayment',
+                default: null
+            },
+            razorpayOrderId: { type: String, default: '' },
+            razorpayPaymentId: { type: String, default: '' }
+        }
     },
     {
         collection: 'food_delivery_partners',

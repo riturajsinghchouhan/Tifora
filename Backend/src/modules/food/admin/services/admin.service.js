@@ -43,6 +43,7 @@ import { FoodRestaurantWallet } from '../../restaurant/models/restaurantWallet.m
 import { FoodDeliveryWithdrawal } from '../../delivery/models/foodDeliveryWithdrawal.model.js';
 import { FoodDeliveryWallet } from '../../delivery/models/deliveryWallet.model.js';
 import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashDeposit.model.js';
+import { FoodDeliveryOnboardingPayment } from '../../delivery/models/deliveryOnboardingPayment.model.js';
 import { TiffinCommissionSetting } from '../../tiffin/models/tiffinCommission.model.js';
 import { TiffinPayout } from '../../tiffin/models/tiffinPayout.model.js';
 import {
@@ -142,6 +143,8 @@ const buildResetFeeSettingsState = () => ({
     gstOnPlatformFee: 0,
     gstOnPackagingFee: 0,
     deliveryBonusAmount: 0,
+    deliveryOnboardingFeeEnabled: false,
+    deliveryOnboardingFeeAmount: 0,
     dispatchRadiusExpansionEnabled: true,
     dispatchRadiusTiers: [2, 4, 6, 8, 15],
     globalRestaurantCommission: 0,
@@ -2109,6 +2112,22 @@ export async function getFeeSettings() {
     return { feeSettings: doc || null };
 }
 
+export async function getDeliveryOnboardingFeeSettings() {
+    const doc = await FoodFeeSettings.findOne({ isActive: true })
+        .sort({ createdAt: -1 })
+        .select('deliveryOnboardingFeeEnabled deliveryOnboardingFeeAmount')
+        .lean();
+
+    const amount = Math.max(0, Number(doc?.deliveryOnboardingFeeAmount) || 0);
+    const enabled = doc?.deliveryOnboardingFeeEnabled === true && amount > 0;
+
+    return {
+        enabled,
+        amount: enabled ? amount : 0,
+        paymentRequired: enabled
+    };
+}
+
 export async function upsertFeeSettings(body) {
     // Single active doc pattern: keep only one active record.
     const existing = await FoodFeeSettings.findOne({ isActive: true }).sort({ createdAt: -1 });
@@ -2148,6 +2167,11 @@ export async function upsertFeeSettings(body) {
         if (body.deliveryBonusAmount === null) $unset.deliveryBonusAmount = 1;
         else if (body.deliveryBonusAmount !== undefined) $set.deliveryBonusAmount = body.deliveryBonusAmount;
 
+        if (body.deliveryOnboardingFeeEnabled !== undefined) $set.deliveryOnboardingFeeEnabled = body.deliveryOnboardingFeeEnabled;
+
+        if (body.deliveryOnboardingFeeAmount === null) $unset.deliveryOnboardingFeeAmount = 1;
+        else if (body.deliveryOnboardingFeeAmount !== undefined) $set.deliveryOnboardingFeeAmount = body.deliveryOnboardingFeeAmount;
+
         if (body.dispatchRadiusExpansionEnabled !== undefined) $set.dispatchRadiusExpansionEnabled = body.dispatchRadiusExpansionEnabled;
 
         if (body.dispatchRadiusTiers === null) $unset.dispatchRadiusTiers = 1;
@@ -2178,6 +2202,8 @@ export async function upsertFeeSettings(body) {
     if (body.gstOnPlatformFee !== undefined && body.gstOnPlatformFee !== null) payload.gstOnPlatformFee = body.gstOnPlatformFee;
     if (body.gstOnPackagingFee !== undefined && body.gstOnPackagingFee !== null) payload.gstOnPackagingFee = body.gstOnPackagingFee;
     if (body.deliveryBonusAmount !== undefined && body.deliveryBonusAmount !== null) payload.deliveryBonusAmount = body.deliveryBonusAmount;
+    if (body.deliveryOnboardingFeeEnabled !== undefined) payload.deliveryOnboardingFeeEnabled = body.deliveryOnboardingFeeEnabled;
+    if (body.deliveryOnboardingFeeAmount !== undefined && body.deliveryOnboardingFeeAmount !== null) payload.deliveryOnboardingFeeAmount = body.deliveryOnboardingFeeAmount;
     if (body.dispatchRadiusExpansionEnabled !== undefined) payload.dispatchRadiusExpansionEnabled = body.dispatchRadiusExpansionEnabled;
     if (body.dispatchRadiusTiers !== undefined && body.dispatchRadiusTiers !== null) payload.dispatchRadiusTiers = body.dispatchRadiusTiers;
 
@@ -4022,6 +4048,11 @@ export async function getDeliveryJoinRequests(query) {
         vehicleType: doc.vehicleType || '',
         status: doc.status === 'rejected' ? 'denied' : doc.status,
         rejectionReason: doc.rejectionReason || undefined,
+        onboardingFeeRequired: doc.onboardingFee?.required === true,
+        onboardingFeeStatus: doc.onboardingFee?.status || 'not_required',
+        onboardingFeeAmount: Number(doc.onboardingFee?.amount) || 0,
+        onboardingFeePaidAt: doc.onboardingFee?.paidAt || null,
+        onboardingFeePaymentMethod: doc.onboardingFee?.paymentMethod || '',
         profilePhoto: doc.profilePhoto || null,
         profileImage: toMediaObject(doc.profilePhoto)
     }));
@@ -4810,6 +4841,15 @@ export async function getDeliveryPartnerById(id) {
         email: partner.email || null,
         deliveryId,
         status: partner.status === 'rejected' ? 'blocked' : partner.status,
+        onboardingFee: {
+            required: partner.onboardingFee?.required === true,
+            amount: Number(partner.onboardingFee?.amount) || 0,
+            status: partner.onboardingFee?.status || 'not_required',
+            paidAt: partner.onboardingFee?.paidAt || null,
+            paymentMethod: partner.onboardingFee?.paymentMethod || '',
+            razorpayOrderId: partner.onboardingFee?.razorpayOrderId || '',
+            razorpayPaymentId: partner.onboardingFee?.razorpayPaymentId || ''
+        },
         profileImage: toMediaObject(partner.profilePhoto),
         documents: {
             aadhar: (partner.aadharPhoto || partner.aadharFrontPhoto || partner.aadharBackPhoto || partner.aadharNumber)
@@ -4926,6 +4966,11 @@ export async function getDeliverymanReviews(query = {}) {
 export async function approveDeliveryPartner(id) {
     const partner = await FoodDeliveryPartner.findById(id);
     if (!partner) return null;
+
+    if (partner.onboardingFee?.required === true && partner.onboardingFee?.status !== 'paid') {
+        throw new ValidationError('Onboarding fee payment is pending for this delivery partner.');
+    }
+
     partner.status = 'approved';
     partner.approvedAt = new Date();
     partner.rejectedAt = undefined;
@@ -4997,6 +5042,13 @@ export async function approveDeliveryPartner(id) {
         // Never fail approval due to referral errors.
         // eslint-disable-next-line no-console
         console.warn('Referral crediting failed (delivery approval):', e?.message || e);
+    }
+
+    if (partner.onboardingFee?.paymentRecordId) {
+        await FoodDeliveryOnboardingPayment.updateOne(
+            { _id: partner.onboardingFee.paymentRecordId },
+            { $set: { partnerId: partner._id, status: 'paid', paidAt: partner.onboardingFee.paidAt || new Date() } }
+        );
     }
     return partner.toObject();
 }

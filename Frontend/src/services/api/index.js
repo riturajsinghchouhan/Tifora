@@ -1506,6 +1506,10 @@ export const deliveryAPI = {
     }
     return deliveryClient.post("/food/delivery/register", formData);
   },
+  getOnboardingFeeConfig: () =>
+    deliveryClient.get("/food/delivery/onboarding-fee"),
+  createOnboardingFeeOrder: (body = {}) =>
+    deliveryClient.post("/food/delivery/onboarding-fee/order", body ?? {}),
   /** PATCH /food/delivery/profile - complete profile after OTP (Bearer token required). */
   completeProfile: (formData) => {
     if (!formData || !(formData instanceof FormData)) {

@@ -71,6 +71,7 @@ const DeliveryBoyWallet = lazy(() => import("@food/pages/admin/DeliveryBoyWallet
 const DeliveryEmergencyHelp = lazy(() => import("@food/pages/admin/DeliveryEmergencyHelp"));
 const DeliverySupportTickets = lazy(() => import("@food/pages/admin/DeliverySupportTickets"));
 const JoinRequest = lazy(() => import("@food/pages/admin/delivery-partners/JoinRequest"));
+const OnboardingManagement = lazy(() => import("@food/pages/admin/delivery-partners/OnboardingManagement"));
 const AddDeliveryman = lazy(() => import("@food/pages/admin/delivery-partners/AddDeliveryman"));
 const DeliverymanList = lazy(() => import("@food/pages/admin/delivery-partners/DeliverymanList"));
 const DeliverymanReviews = lazy(() => import("@food/pages/admin/delivery-partners/DeliverymanReviews"));
@@ -247,6 +248,7 @@ export default function AdminRouter() {
             <Route path="subscribed-mail-list" element={<SubscribedMailList />} />
 
             <Route path="delivery-boy-commission" element={<DeliveryBoyCommission />} />
+            <Route path="delivery-onboarding-management" element={<OnboardingManagement />} />
             <Route path="delivery-cash-limit" element={<DeliveryCashLimit />} />
             <Route path="cash-limit-settlement" element={<CashLimitSettlement />} />
             <Route path="delivery-withdrawal" element={<DeliveryWithdrawal />} />

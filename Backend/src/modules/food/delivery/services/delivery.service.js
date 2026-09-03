@@ -8,11 +8,151 @@ import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
 import { TiffinDelivery } from '../../tiffin/models/tiffinDelivery.model.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
-import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
+import { getDeliveryCashLimitSettings, getDeliveryOnboardingFeeSettings } from '../../admin/services/admin.service.js';
+import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
+import { FoodDeliveryOnboardingPayment } from '../models/deliveryOnboardingPayment.model.js';
 
 const TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead'];
 const ACTIVE_TIFFIN_DELIVERY_STATUSES = ['pending', 'assigned', 'out_for_delivery'];
 const OFFLINE_BLOCKED_ERROR = 'Cannot go offline while you still have an assigned order';
+const DEV_ONBOARDING_SIGNATURE = 'dev_onboarding_signature';
+
+const normalizeDeliveryPhone = (phone) => String(phone || '').replace(/\D/g, '').slice(-10);
+
+const normalizeIdentityValue = (value) => String(value || '').trim().toUpperCase();
+
+const validateDeliveryRegistrationUniqueness = async (payload = {}) => {
+    const normalizedPhone = normalizeDeliveryPhone(payload.phone);
+    if (!normalizedPhone) {
+        throw new ValidationError('Phone is required');
+    }
+
+    const existingPhonePartner = await FoodDeliveryPartner.findOne({ phone: normalizedPhone }).lean();
+    if (existingPhonePartner && existingPhonePartner.status !== 'rejected') {
+        throw new ValidationError('Delivery partner with this phone already exists');
+    }
+
+    const vehicleNumber = normalizeIdentityValue(payload.vehicleNumber);
+    if (vehicleNumber) {
+        const existingVehiclePartner = await FoodDeliveryPartner.findOne({ vehicleNumber }).lean();
+        if (
+            existingVehiclePartner &&
+            !(
+                existingVehiclePartner.status === 'rejected' &&
+                normalizeDeliveryPhone(existingVehiclePartner.phone) === normalizedPhone
+            )
+        ) {
+            throw new ValidationError('This vehicle number is already registered. Please use a different vehicle number.');
+        }
+    }
+
+    return {
+        normalizedPhone,
+        rejectedPhonePartnerId:
+            existingPhonePartner?.status === 'rejected' ? String(existingPhonePartner._id) : null
+    };
+};
+
+const buildOnboardingFeeSnapshot = (settings = {}) => {
+    const amount = Math.max(0, Number(settings?.amount) || 0);
+    const required = settings?.paymentRequired === true && amount > 0;
+
+    return {
+        required,
+        amount: required ? amount : 0,
+        status: required ? 'pending' : 'not_required',
+        paidAt: null,
+        paymentMethod: '',
+        paymentRecordId: null,
+        razorpayOrderId: '',
+        razorpayPaymentId: ''
+    };
+};
+
+const verifyDeliveryOnboardingPaymentForRegistration = async (payload = {}, partnerIdentity = {}) => {
+    const onboardingSettings = await getDeliveryOnboardingFeeSettings();
+    const snapshot = buildOnboardingFeeSnapshot(onboardingSettings);
+
+    if (!snapshot.required) {
+        return snapshot;
+    }
+
+    const orderId = String(payload?.onboardingRazorpayOrderId || '').trim();
+    const paymentId = String(payload?.onboardingRazorpayPaymentId || '').trim();
+    const signature = String(payload?.onboardingRazorpaySignature || '').trim();
+    const amount = Number(payload?.onboardingFeeAmount);
+
+    if (!orderId || !paymentId || !signature) {
+        throw new ValidationError('Delivery onboarding fee payment is required before signup completion.');
+    }
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+        throw new ValidationError('Invalid onboarding fee amount.');
+    }
+
+    if (Math.round(amount * 100) !== Math.round(snapshot.amount * 100)) {
+        throw new ValidationError(`Onboarding fee amount mismatch. Expected ₹${snapshot.amount}.`);
+    }
+
+    const paymentRecord = await FoodDeliveryOnboardingPayment.findOne({
+        $or: [
+            { razorpayOrderId: orderId },
+            { razorpayPaymentId: paymentId }
+        ]
+    });
+
+    if (!paymentRecord) {
+        throw new ValidationError('Onboarding payment record not found. Please try the payment again.');
+    }
+
+    const normalizedPhone = normalizeDeliveryPhone(partnerIdentity.phone);
+    if (paymentRecord.phone && normalizeDeliveryPhone(paymentRecord.phone) !== normalizedPhone) {
+        throw new ValidationError('This onboarding payment belongs to a different phone number.');
+    }
+
+    if (
+        paymentRecord.partnerId &&
+        String(paymentRecord.partnerId) !== String(partnerIdentity.partnerId || '')
+    ) {
+        throw new ValidationError('This onboarding payment has already been used.');
+    }
+
+    const isValidSignature = isRazorpayConfigured()
+        ? verifyPaymentSignature(orderId, paymentId, signature)
+        : signature === DEV_ONBOARDING_SIGNATURE;
+
+    if (!isValidSignature) {
+        throw new ValidationError('Onboarding payment verification failed.');
+    }
+
+    paymentRecord.applicantName = String(partnerIdentity.name || paymentRecord.applicantName || '').trim();
+    paymentRecord.email = String(partnerIdentity.email || paymentRecord.email || '').trim();
+    paymentRecord.amount = snapshot.amount;
+    paymentRecord.status = 'paid';
+    paymentRecord.gateway = isRazorpayConfigured() ? 'razorpay' : 'dev';
+    paymentRecord.razorpayOrderId = orderId;
+    paymentRecord.razorpayPaymentId = paymentId;
+    paymentRecord.razorpaySignature = signature;
+    paymentRecord.paidAt = new Date();
+    paymentRecord.feeSnapshot = { enabled: true, amount: snapshot.amount };
+    paymentRecord.metadata = {
+        vehicleNumber: normalizeIdentityValue(partnerIdentity.vehicleNumber),
+        panNumber: normalizeIdentityValue(partnerIdentity.panNumber),
+        aadharNumber: String(partnerIdentity.aadharNumber || '').replace(/\D/g, '').slice(0, 12),
+        drivingLicenseNumber: normalizeIdentityValue(partnerIdentity.drivingLicenseNumber)
+    };
+    await paymentRecord.save();
+
+    return {
+        ...snapshot,
+        status: 'paid',
+        paidAt: paymentRecord.paidAt,
+        paymentMethod: paymentRecord.gateway,
+        paymentRecordId: paymentRecord._id,
+        razorpayOrderId: paymentRecord.razorpayOrderId,
+        razorpayPaymentId: paymentRecord.razorpayPaymentId
+    };
+};
 
 const hasActiveAssignedDeliveries = async (deliveryPartnerId) => {
     if (!deliveryPartnerId || !mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
@@ -36,6 +176,103 @@ const hasActiveAssignedDeliveries = async (deliveryPartnerId) => {
     return Boolean(hasActiveFoodOrder || hasActiveTiffinDelivery);
 };
 
+export const getDeliveryOnboardingFeeConfig = async () => {
+    const settings = await getDeliveryOnboardingFeeSettings();
+    return {
+        ...settings,
+        description: settings.paymentRequired
+            ? `One-time onboarding fee of ₹${settings.amount} is required for new delivery partners.`
+            : 'No onboarding fee is currently required.'
+    };
+};
+
+export const createDeliveryOnboardingFeeOrder = async (payload = {}) => {
+    const settings = await getDeliveryOnboardingFeeSettings();
+    if (!settings.paymentRequired) {
+        return {
+            paymentRequired: false,
+            amount: 0
+        };
+    }
+
+    await validateDeliveryRegistrationUniqueness(payload);
+
+    const amount = Math.max(0, Number(settings.amount) || 0);
+    const amountPaise = Math.round(amount * 100);
+    const phone = normalizeDeliveryPhone(payload.phone);
+    const receipt = `delivery_onboarding_${phone}_${Date.now()}`;
+
+    if (!isRazorpayConfigured()) {
+        const orderId = `order_dev_onboarding_${Date.now()}`;
+        const paymentId = `pay_dev_onboarding_${Date.now()}`;
+
+        await FoodDeliveryOnboardingPayment.create({
+            applicantName: String(payload.name || '').trim(),
+            phone,
+            email: String(payload.email || '').trim(),
+            amount,
+            status: 'created',
+            gateway: 'dev',
+            razorpayOrderId: orderId,
+            feeSnapshot: {
+                enabled: true,
+                amount
+            },
+            metadata: {
+                vehicleNumber: normalizeIdentityValue(payload.vehicleNumber),
+                panNumber: normalizeIdentityValue(payload.panNumber),
+                aadharNumber: String(payload.aadharNumber || '').replace(/\D/g, '').slice(0, 12),
+                drivingLicenseNumber: normalizeIdentityValue(payload.drivingLicenseNumber)
+            }
+        });
+
+        return {
+            paymentRequired: true,
+            amount,
+            paymentMode: 'dev',
+            devPayment: {
+                orderId,
+                paymentId,
+                signature: DEV_ONBOARDING_SIGNATURE
+            }
+        };
+    }
+
+    const order = await createRazorpayOrder(amountPaise, 'INR', receipt);
+
+    await FoodDeliveryOnboardingPayment.create({
+        applicantName: String(payload.name || '').trim(),
+        phone,
+        email: String(payload.email || '').trim(),
+        amount,
+        status: 'created',
+        gateway: 'razorpay',
+        razorpayOrderId: String(order.id),
+        feeSnapshot: {
+            enabled: true,
+            amount
+        },
+        metadata: {
+            vehicleNumber: normalizeIdentityValue(payload.vehicleNumber),
+            panNumber: normalizeIdentityValue(payload.panNumber),
+            aadharNumber: String(payload.aadharNumber || '').replace(/\D/g, '').slice(0, 12),
+            drivingLicenseNumber: normalizeIdentityValue(payload.drivingLicenseNumber)
+        }
+    });
+
+    return {
+        paymentRequired: true,
+        amount,
+        paymentMode: 'razorpay',
+        razorpay: {
+            key: getRazorpayKeyId(),
+            orderId: String(order.id),
+            amount: Number(order.amount) || amountPaise,
+            currency: order.currency || 'INR'
+        }
+    };
+};
+
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
         name, phone, email, countryCode, address, city, state, 
@@ -44,14 +281,20 @@ export const registerDeliveryPartner = async (payload, files) => {
     } = payload;
     const refRaw = typeof payload?.ref === 'string' ? String(payload.ref).trim() : '';
 
-    const existing = await FoodDeliveryPartner.findOne({ phone });
-    if (existing) {
-        if (existing.status !== 'rejected') {
-            throw new ValidationError('Delivery partner with this phone already exists');
-        }
-        // If rejected, delete the old record so they can start fresh with same phone
-        await FoodDeliveryPartner.deleteMany({ phone });
+    const { normalizedPhone, rejectedPhonePartnerId } = await validateDeliveryRegistrationUniqueness(payload);
+    if (rejectedPhonePartnerId) {
+        await FoodDeliveryPartner.deleteMany({ phone: normalizedPhone });
     }
+
+    const onboardingFee = await verifyDeliveryOnboardingPaymentForRegistration(payload, {
+        phone: normalizedPhone,
+        name,
+        email,
+        vehicleNumber,
+        panNumber,
+        aadharNumber,
+        drivingLicenseNumber
+    });
 
     const images = {};
 
@@ -88,7 +331,7 @@ export const registerDeliveryPartner = async (payload, files) => {
 
     const partner = await FoodDeliveryPartner.create({
         name,
-        phone,
+        phone: normalizedPhone,
         email: email && String(email).trim() ? String(email).trim() : undefined,
         countryCode,
         address,
@@ -101,6 +344,7 @@ export const registerDeliveryPartner = async (payload, files) => {
         panNumber,
         aadharNumber,
         status: 'pending',
+        onboardingFee,
         ...images
     });
 
@@ -127,6 +371,13 @@ export const registerDeliveryPartner = async (payload, files) => {
     }
 
     await partner.save();
+
+    if (partner.onboardingFee?.paymentRecordId) {
+        await FoodDeliveryOnboardingPayment.updateOne(
+            { _id: partner.onboardingFee.paymentRecordId },
+            { $set: { partnerId: partner._id, status: 'paid', paidAt: partner.onboardingFee.paidAt || new Date() } }
+        );
+    }
 
     try {
         const { notifyAdminsSafely } = await import('../../../../core/notifications/firebase.service.js');

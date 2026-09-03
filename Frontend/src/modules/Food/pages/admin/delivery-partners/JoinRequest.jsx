@@ -159,7 +159,14 @@ export default function JoinRequest() {
     return result
   }, [requests, filters])
 
+  const isOnboardingFeePending = (request) =>
+    request?.onboardingFeeRequired === true && request?.onboardingFeeStatus !== "paid"
+
   const handleApprove = (request) => {
+    if (isOnboardingFeePending(request)) {
+      toast.error("Onboarding fee is still unpaid for this delivery partner.")
+      return
+    }
     setSelectedRequest(request)
     setIsApproveOpen(true)
   }
@@ -416,13 +423,19 @@ export default function JoinRequest() {
                         <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
                       </div>
                     </th>
+                    <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <span>Onboarding Fee</span>
+                        <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
+                      </div>
+                    </th>
                     <th className="px-6 py-4 text-center text-[10px] font-bold text-slate-700 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
                   {filteredRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-20 text-center">
+                      <td colSpan={8} className="px-6 py-20 text-center">
                         <p className="text-sm text-slate-500">
                           {error ? "Error loading requests" : "No requests found"}
                         </p>
@@ -491,6 +504,24 @@ export default function JoinRequest() {
                             )}
                           </div>
                         </td>
+                        <td className="px-6 py-4">
+                          {request.onboardingFeeRequired ? (
+                            <div className="flex flex-col gap-1">
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium inline-block w-fit ${
+                                request.onboardingFeeStatus === "paid"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}>
+                                {request.onboardingFeeStatus === "paid" ? "Paid" : "Unpaid"}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                ₹{Number(request.onboardingFeeAmount || 0).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">Not required</span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button
@@ -504,9 +535,9 @@ export default function JoinRequest() {
                               <>
                                 <button
                                   onClick={() => handleApprove(request)}
-                                  disabled={processing}
+                                  disabled={processing || isOnboardingFeePending(request)}
                                   className="p-1.5 rounded bg-green-50 text-green-600 hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                  title="Approve"
+                                  title={isOnboardingFeePending(request) ? "Onboarding fee unpaid" : "Approve"}
                                 >
                                   <Check className="w-4 h-4" />
                                 </button>
@@ -670,6 +701,27 @@ export default function JoinRequest() {
                       }`}>
                         {viewDetails.status === 'blocked' ? 'Rejected' : (viewDetails.status?.charAt(0).toUpperCase() + viewDetails.status?.slice(1) || "N/A")}
                       </span>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase flex items-center gap-1">
+                        <CreditCard className="w-3 h-3" /> Onboarding Fee
+                      </label>
+                      {viewDetails.onboardingFee?.required ? (
+                        <div className="mt-1">
+                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                            viewDetails.onboardingFee?.status === "paid"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}>
+                            {viewDetails.onboardingFee?.status === "paid" ? "Paid" : "Unpaid"}
+                          </span>
+                          <p className="text-sm text-slate-900 mt-1">
+                            ₹{Number(viewDetails.onboardingFee?.amount || 0).toLocaleString("en-IN")}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500 mt-1">Not required</p>
+                      )}
                     </div>
                     {viewDetails.rejectionReason && (
                       <div className="col-span-2">

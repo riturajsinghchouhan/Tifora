@@ -4,6 +4,7 @@ import { ArrowLeft, Upload, X, Check, Camera, Image as ImageIcon } from "lucide-
 import { deliveryAPI } from "@food/api"
 import { toast } from "sonner"
 import { isFlutterBridgeAvailable, openCamera } from "@food/utils/imageUploadUtils"
+import { initRazorpayPayment } from "@food/utils/razorpay"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
@@ -231,6 +232,12 @@ export default function SignupStep2() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploading, setUploading] = useState({})
   const [isSuccess, setIsSuccess] = useState(false)
+  const [onboardingFeeConfig, setOnboardingFeeConfig] = useState({
+    paymentRequired: false,
+    amount: 0,
+    description: "",
+  })
+  const [loadingFeeConfig, setLoadingFeeConfig] = useState(true)
 
   // Hydrate files from IndexedDB on load
   useEffect(() => {
@@ -272,6 +279,32 @@ export default function SignupStep2() {
       }))
     }
     loadFiles()
+  }, [])
+
+  useEffect(() => {
+    const loadOnboardingFeeConfig = async () => {
+      try {
+        setLoadingFeeConfig(true)
+        const response = await deliveryAPI.getOnboardingFeeConfig()
+        const data = response?.data?.data || {}
+        setOnboardingFeeConfig({
+          paymentRequired: data.paymentRequired === true,
+          amount: Number(data.amount) || 0,
+          description: data.description || "",
+        })
+      } catch (error) {
+        debugError("Failed to load onboarding fee config:", error)
+        setOnboardingFeeConfig({
+          paymentRequired: false,
+          amount: 0,
+          description: "",
+        })
+      } finally {
+        setLoadingFeeConfig(false)
+      }
+    }
+
+    loadOnboardingFeeConfig()
   }, [])
 
   // Save uploaded docs metadata to session storage whenever they change
@@ -474,6 +507,67 @@ export default function SignupStep2() {
     setIsSubmitting(true)
 
     try {
+      const shouldCollectOnboardingFee =
+        isCompleteProfile &&
+        onboardingFeeConfig.paymentRequired === true &&
+        Number(onboardingFeeConfig.amount) > 0
+
+      if (shouldCollectOnboardingFee) {
+        const orderResponse = await deliveryAPI.createOnboardingFeeOrder({
+          name: details.name || "",
+          phone: String(details.phone || "").replace(/\D/g, "").slice(0, 15),
+          email: details.email || "",
+          vehicleNumber: details.vehicleNumber || "",
+          drivingLicenseNumber: details.drivingLicenseNumber || "",
+          panNumber: details.panNumber || "",
+          aadharNumber: details.aadharNumber || "",
+        })
+
+        const orderData = orderResponse?.data?.data || {}
+
+        if (orderData.paymentRequired) {
+          if (orderData.paymentMode === "dev" && orderData.devPayment) {
+            formData.append("onboardingFeeAmount", String(Number(orderData.amount) || 0))
+            formData.append("onboardingRazorpayOrderId", orderData.devPayment.orderId || "")
+            formData.append("onboardingRazorpayPaymentId", orderData.devPayment.paymentId || "")
+            formData.append("onboardingRazorpaySignature", orderData.devPayment.signature || "")
+          } else {
+            const razorpay = orderData.razorpay
+            if (!razorpay?.key || !razorpay?.orderId) {
+              throw new Error("Failed to initialize onboarding payment")
+            }
+
+            const paymentResponse = await new Promise((resolve, reject) => {
+              initRazorpayPayment({
+                key: razorpay.key,
+                amount: razorpay.amount,
+                currency: razorpay.currency || "INR",
+                order_id: razorpay.orderId,
+                name: "Delivery Partner Onboarding",
+                description: `Onboarding Fee - ₹${Number(orderData.amount || 0).toLocaleString("en-IN")}`,
+                prefill: {
+                  name: details.name || "",
+                  email: details.email || "",
+                  contact: String(details.phone || "").replace(/\D/g, "").slice(-10),
+                },
+                notes: {
+                  module: "delivery_onboarding",
+                  phone: String(details.phone || "").replace(/\D/g, "").slice(-10),
+                },
+                handler: resolve,
+                onError: reject,
+                onClose: () => reject(new Error("Payment cancelled by user")),
+              }).catch(reject)
+            })
+
+            formData.append("onboardingFeeAmount", String(Number(orderData.amount) || 0))
+            formData.append("onboardingRazorpayOrderId", paymentResponse.razorpay_order_id || "")
+            formData.append("onboardingRazorpayPaymentId", paymentResponse.razorpay_payment_id || "")
+            formData.append("onboardingRazorpaySignature", paymentResponse.razorpay_signature || "")
+          }
+        }
+      }
+
       // New number (OTP ke baad pehli baar): DB me abhi partner nahi hai,
       // is case me register hi call karna hai (no auth token needed).
       const response = isCompleteProfile
@@ -637,6 +731,22 @@ export default function SignupStep2() {
           <p className="text-sm text-gray-600">Please upload clear photos of your documents</p>
         </div>
 
+        {loadingFeeConfig ? (
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white px-4 py-3 flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#00B761]"></div>
+            <p className="text-sm text-slate-600">Checking onboarding fee settings...</p>
+          </div>
+        ) : onboardingFeeConfig.paymentRequired ? (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+            <p className="text-sm font-bold text-emerald-800">
+              One-time onboarding fee: ₹{Number(onboardingFeeConfig.amount || 0).toLocaleString("en-IN")}
+            </p>
+            <p className="text-sm text-emerald-700 mt-1">
+              {onboardingFeeConfig.description || "You will need to pay this amount before your join request is submitted."}
+            </p>
+          </div>
+        ) : null}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <DocumentUpload docType="profilePhoto" label="Profile Photo" required={true} />
           <DocumentUpload docType="aadharFrontPhoto" label="Aadhar Card (Front)" required={true} />
@@ -651,13 +761,19 @@ export default function SignupStep2() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || loadingFeeConfig}
             className={`w-full py-4 rounded-lg font-bold text-white text-base transition-colors mt-6 ${isSubmitting
               ? "bg-gray-400 cursor-not-allowed"
               : "bg-[#00B761] hover:bg-[#00A055]"
               }`}
           >
-            {isSubmitting ? "Submitting..." : "Complete Signup"}
+            {isSubmitting
+              ? onboardingFeeConfig.paymentRequired
+                ? "Processing payment..."
+                : "Submitting..."
+              : onboardingFeeConfig.paymentRequired
+                ? "Pay & Complete Signup"
+                : "Complete Signup"}
           </button>
         </form>
       </div>
