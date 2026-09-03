@@ -74,6 +74,11 @@ function isCancelledDeliveryStatus(statusLike) {
   return normalized.includes('cancel') || normalized === 'dead';
 }
 
+function isOfflineBlockedError(error) {
+  const message = String(error?.response?.data?.error || error?.message || '').toLowerCase();
+  return message.includes('cannot go offline while you still have an assigned order');
+}
+
 /** Minimal bottom-sheet popup (Restored from legacy FeedNavbar) */
 function BottomPopup({ isOpen, onClose, title, children }) {
   if (!isOpen) return null;
@@ -1281,8 +1286,15 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                         { timeout: 10000, enableHighAccuracy: true }
                       );
                   } else {
-                      toggleOnline(); // Store action
-                      deliveryAPI.updateOnlineStatus(false).catch(() => {});
+                      deliveryAPI.updateOnlineStatus(false)
+                        .then(() => {
+                          toggleOnline();
+                        })
+                        .catch((error) => {
+                          if (!isOfflineBlockedError(error)) {
+                            toast.error("Failed to update status. Please try again.");
+                          }
+                        });
                   }
                 }}
                 className={`delivery-online-toggle relative w-[92px] h-8 rounded-full p-1 transition-all duration-500 flex items-center ${isOnline ? 'is-online bg-green-500 shadow-lg shadow-green-500/20' : 'is-offline bg-green-400 shadow-lg shadow-green-400/20'}`}

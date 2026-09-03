@@ -5,9 +5,36 @@ import { DeliveryBonusTransaction } from '../../admin/models/deliveryBonusTransa
 import { FoodEarningAddon } from '../../admin/models/earningAddon.model.js';
 import { FoodOrder } from '../../orders/models/order.model.js';
 import { FoodTransaction } from '../../orders/models/foodTransaction.model.js';
+import { TiffinDelivery } from '../../tiffin/models/tiffinDelivery.model.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings } from '../../admin/services/admin.service.js';
+
+const TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead'];
+const ACTIVE_TIFFIN_DELIVERY_STATUSES = ['pending', 'assigned', 'out_for_delivery'];
+const OFFLINE_BLOCKED_ERROR = 'Cannot go offline while you still have an assigned order';
+
+const hasActiveAssignedDeliveries = async (deliveryPartnerId) => {
+    if (!deliveryPartnerId || !mongoose.Types.ObjectId.isValid(deliveryPartnerId)) {
+        return false;
+    }
+
+    const partnerObjectId = new mongoose.Types.ObjectId(deliveryPartnerId);
+
+    const [hasActiveFoodOrder, hasActiveTiffinDelivery] = await Promise.all([
+        FoodOrder.exists({
+            'dispatch.deliveryPartnerId': partnerObjectId,
+            'dispatch.status': { $in: ['assigned', 'accepted'] },
+            orderStatus: { $nin: TERMINAL_ORDER_STATUSES }
+        }),
+        TiffinDelivery.exists({
+            assignedTo: partnerObjectId,
+            status: { $in: ACTIVE_TIFFIN_DELIVERY_STATUSES }
+        })
+    ]);
+
+    return Boolean(hasActiveFoodOrder || hasActiveTiffinDelivery);
+};
 
 export const registerDeliveryPartner = async (payload, files) => {
     const { 
@@ -344,6 +371,10 @@ export const updateDeliveryAvailability = async (userId, payload) => {
     let validStatus = 'offline';
     if (status === 'online' || status === true) validStatus = 'online';
     else if (status === 'offline' || status === false) validStatus = 'offline';
+
+    if (validStatus === 'offline' && await hasActiveAssignedDeliveries(userId)) {
+        throw new ValidationError(OFFLINE_BLOCKED_ERROR);
+    }
     
     partner.availabilityStatus = validStatus;
 

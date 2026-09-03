@@ -14,6 +14,12 @@ const debugError = (...args) => {}
 
 const LS_KEY = "app:isOnline";
 const TOAST_ID_KEY = "feedNavbar-onlineStatus";
+const OFFLINE_BLOCKED_ERROR = "cannot go offline while you still have an assigned order";
+
+function isOfflineBlockedError(error) {
+  const message = String(error?.response?.data?.error || error?.message || "").toLowerCase();
+  return message.includes(OFFLINE_BLOCKED_ERROR);
+}
 
 /** Minimal bottom-sheet popup (self-contained) */
 function BottomPopup({
@@ -168,12 +174,8 @@ export default function FeedNavbar({ className = "" }) {
         }
     }
     
-    // Update state immediately for better UX
-    setIsOnline(next);
-    showSingleToast(next);
-
-    // Update backend with location if available
     try {
+      // Update backend with location if available
       // Try to get current location from localStorage or geolocation
       let latitude = null;
       let longitude = null;
@@ -248,11 +250,14 @@ export default function FeedNavbar({ className = "" }) {
         await deliveryAPI.updateOnlineStatus(next);
         debugLog('? Online status updated in backend (location not available):', next);
       }
+
+      setIsOnline(next);
+      showSingleToast(next);
     } catch (error) {
       debugError('? Error updating online status in backend:', error);
-      // Revert state if backend update fails
-      setIsOnline(!next);
-      toast.error('Failed to update status. Please try again.');
+      if (!isOfflineBlockedError(error)) {
+        toast.error('Failed to update status. Please try again.');
+      }
     }
   };
 
