@@ -76,7 +76,6 @@ const Logout = lazy(() => import("@food/pages/user/profile/Logout"))
 const ReferEarn = lazy(() => import("@food/pages/user/profile/ReferEarn"))
 
 // Auth
-const SignIn = lazy(() => import("@food/pages/user/auth/SignIn"))
 const OTP = lazy(() => import("@food/pages/user/auth/OTP"))
 const AuthCallback = lazy(() => import("@food/pages/user/auth/AuthCallback"))
 
@@ -107,6 +106,27 @@ export default function UserRouter() {
     <Suspense fallback={<Loader />}>
       <Routes>
         <Route element={<UserLayout />}>
+          {/* Public Legal Policies (stay public) */}
+          <Route path="profile/terms" element={<Terms />} />
+          <Route path="profile/privacy" element={<Privacy />} />
+          <Route path="profile/refund" element={<Refund />} />
+          <Route path="profile/shipping" element={<Shipping />} />
+          <Route path="profile/cancellation" element={<Cancellation />} />
+
+          {/* Auth - User login is centralized at /user/auth/login */}
+          <Route path="auth/login" element={<Navigate to="/user/auth/login" replace />} />
+          <Route path="auth/sign-in" element={<Navigate to="/user/auth/login" replace />} />
+          <Route path="auth/otp" element={<OTP />} />
+          <Route path="auth/callback" element={<AuthCallback />} />
+        </Route>
+
+        <Route
+          element={
+            <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
+              <UserLayout />
+            </ProtectedRoute>
+          }
+        >
           {/* Home & Discovery */}
           <Route path="" element={<Home />} />
           <Route path="hotel" element={<HotelComingSoon />} />
@@ -123,14 +143,7 @@ export default function UserRouter() {
           <Route path="dining/modification-policy" element={<TableModificationPolicy />} />
           <Route path="dining/cancellation-policy" element={<TableCancellationPolicy />} />
           <Route path="dining/edit-user" element={<TableEditUserPage />} />
-          <Route
-            path="bookings"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <MyBookings />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="bookings" element={<MyBookings />} />
           <Route path="under-250" element={<Under250 />} />
           <Route path="dietbox" element={<Under250 />} />
           <Route path="diet-box" element={<Under250 />} />
@@ -144,56 +157,21 @@ export default function UserRouter() {
           {/* Tiffin Service Routes */}
           <Route path="tiffin" element={<TiffinHome />} />
           <Route path="tiffin/plan/:id" element={<TiffinPlanDetails />} />
-          <Route path="tiffin/checkout" element={<ProtectedRoute requiredRole="user" loginPath="/user/auth/login"><TiffinCheckout /></ProtectedRoute>} />
-          <Route path="tiffin/my-subscriptions" element={<ProtectedRoute requiredRole="user" loginPath="/user/auth/login"><MySubscriptions /></ProtectedRoute>} />
+          <Route path="tiffin/checkout" element={<TiffinCheckout />} />
+          <Route path="tiffin/my-subscriptions" element={<MySubscriptions />} />
 
-          {/* Cart - Now Public */}
+          {/* Cart */}
           <Route path="cart" element={<Cart />} />
           <Route path="cart/checkout" element={<Checkout />} />
           <Route path="cart/select-address" element={<SelectAddress />} />
           <Route path="address-selector" element={<AddressSelectorPage />} />
 
-          {/* Orders - Protected (require user auth) */}
-          <Route
-            path="orders"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Orders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="orders/:orderId"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <OrderTracking />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="orders/:orderId/invoice"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <OrderInvoice />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="orders/:orderId/details"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <UserOrderDetails />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="tiffin-tracking/:deliveryId"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <TiffinUserTrackingMap />
-              </ProtectedRoute>
-            }
-          />
+          {/* Orders */}
+          <Route path="orders" element={<Orders />} />
+          <Route path="orders/:orderId" element={<OrderTracking />} />
+          <Route path="orders/:orderId/invoice" element={<OrderInvoice />} />
+          <Route path="orders/:orderId/details" element={<UserOrderDetails />} />
+          <Route path="tiffin-tracking/:deliveryId" element={<TiffinUserTrackingMap />} />
 
           {/* Offers */}
           <Route path="offers" element={<Offers />} />
@@ -201,190 +179,40 @@ export default function UserRouter() {
           {/* Gourmet */}
           <Route path="gourmet" element={<Gourmet />} />
 
-
           {/* Collections */}
           <Route path="collections" element={<Collections />} />
           <Route path="collections/:id" element={<CollectionDetail />} />
 
-
-
-          {/* Profile - Protected (require user auth) */}
-          <Route
-            path="profile"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/edit"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <EditProfile />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/payments"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Payments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/payments/new"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <AddPayment />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/payments/:id/edit"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <EditPayment />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/favorites"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Favorites />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/support"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Support />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/coupons"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Coupons />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/tiffin"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <MySubscriptions />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/tiffin-subscriptions"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <MySubscriptions />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/about"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <About />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="profile/report-safety-emergency"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <ReportSafetyEmergency />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/accessibility"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Accessibility />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/logout"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Logout />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/refer-earn"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <ReferEarn />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="profile/dining-bookings"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <MyBookings />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Public Legal Policies (stay public) */}
-          <Route path="profile/terms" element={<Terms />} />
-          <Route path="profile/privacy" element={<Privacy />} />
-          <Route path="profile/refund" element={<Refund />} />
-          <Route path="profile/shipping" element={<Shipping />} />
-          <Route path="profile/cancellation" element={<Cancellation />} />
-
-          {/* Auth - User login is centralized at /user/auth/login */}
-          <Route path="auth/login" element={<Navigate to="/user/auth/login" replace />} />
-          <Route path="auth/sign-in" element={<Navigate to="/user/auth/login" replace />} />
-          <Route path="auth/otp" element={<OTP />} />
-          <Route path="auth/callback" element={<AuthCallback />} />
+          {/* Profile */}
+          <Route path="profile" element={<Profile />} />
+          <Route path="profile/edit" element={<EditProfile />} />
+          <Route path="profile/payments" element={<Payments />} />
+          <Route path="profile/payments/new" element={<AddPayment />} />
+          <Route path="profile/payments/:id/edit" element={<EditPayment />} />
+          <Route path="profile/favorites" element={<Favorites />} />
+          <Route path="profile/support" element={<Support />} />
+          <Route path="profile/coupons" element={<Coupons />} />
+          <Route path="profile/tiffin" element={<MySubscriptions />} />
+          <Route path="profile/tiffin-subscriptions" element={<MySubscriptions />} />
+          <Route path="profile/about" element={<About />} />
+          <Route path="profile/report-safety-emergency" element={<ReportSafetyEmergency />} />
+          <Route path="profile/accessibility" element={<Accessibility />} />
+          <Route path="profile/logout" element={<Logout />} />
+          <Route path="profile/refer-earn" element={<ReferEarn />} />
+          <Route path="profile/dining-bookings" element={<MyBookings />} />
 
           {/* Help */}
           <Route path="help" element={<Help />} />
           <Route path="help/orders/:orderId" element={<OrderHelp />} />
 
-          {/* Notifications - Protected (user auth) */}
-          <Route
-            path="notifications"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Notifications />
-              </ProtectedRoute>
-            }
-          />
+          {/* Notifications */}
+          <Route path="notifications" element={<Notifications />} />
 
-          {/* Wallet - Protected (user auth) */}
-          <Route
-            path="wallet"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <Wallet />
-              </ProtectedRoute>
-            }
-          />
+          {/* Wallet */}
+          <Route path="wallet" element={<Wallet />} />
 
-          {/* Complaints - Protected (user auth) */}
-          <Route
-            path="complaints/submit/:orderId"
-            element={
-              <ProtectedRoute requiredRole="user" loginPath="/user/auth/login">
-                <SubmitComplaint />
-              </ProtectedRoute>
-            }
-          />
+          {/* Complaints */}
+          <Route path="complaints/submit/:orderId" element={<SubmitComplaint />} />
         </Route>
       </Routes>
     </Suspense>

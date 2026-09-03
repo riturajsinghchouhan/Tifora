@@ -10,6 +10,7 @@ import { logger } from './src/utils/logger.js';
 import { initializeFirebaseRealtime } from './src/config/firebase.js';
 import { loadEnvFromDb } from './src/config/envLoader.js';
 import { initRedisEmitter, initSocket } from './src/config/socket.js';
+import { initTiffinScheduler } from './src/modules/food/tiffin/scripts/tiffinScheduler.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10000;
 let server = null;
@@ -50,6 +51,7 @@ const startServer = async () => {
         // 1.5 Load Environment Variables from Database overrides
         await loadEnvFromDb();
         initializeFirebaseRealtime();
+        initTiffinScheduler();
 
         // 2. Create HTTP server from Express app
         const httpServer = http.createServer(app);

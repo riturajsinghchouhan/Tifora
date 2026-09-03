@@ -3,11 +3,35 @@ import mongoose from 'mongoose';
 import { config } from './env.js';
 import { logger } from '../utils/logger.js';
 
-dns.setServers(['8.8.8.8', '1.1.1.1']);
 mongoose.set('autoCreate', false);
+
+const configureDnsServers = () => {
+    const rawDnsServers = process.env.MONGODB_DNS_SERVERS;
+
+    if (!rawDnsServers) {
+        return;
+    }
+
+    const servers = rawDnsServers
+        .split(',')
+        .map((server) => server.trim())
+        .filter(Boolean);
+
+    if (servers.length === 0) {
+        return;
+    }
+
+    try {
+        dns.setServers(servers);
+        logger.info(`MongoDB DNS override enabled with ${servers.length} server(s) from MONGODB_DNS_SERVERS`);
+    } catch (error) {
+        logger.warn(`Failed to apply MONGODB_DNS_SERVERS override: ${error.message}`);
+    }
+};
 
 export const connectDB = async () => {
     try {
+        configureDnsServers();
         const conn = await mongoose.connect(config.mongodbUri, {
             maxPoolSize: 100,
             minPoolSize: 5,
