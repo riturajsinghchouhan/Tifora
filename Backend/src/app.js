@@ -128,8 +128,4 @@ app.use('/api/v1/uploads', express.static(uploadDir));
 
 // Error Handling
 app.use(errorHandler);
-
-import { initTiffinScheduler } from './modules/food/tiffin/scripts/tiffinScheduler.js';
-initTiffinScheduler();
-
 export default app;
