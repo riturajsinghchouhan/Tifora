@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import outOfZoneBg from "@food/assets/out-of-zone-bg.png";
 import { motion, AnimatePresence } from "framer-motion";
-import Footer from "@food/components/user/Footer";
+import MobilePromoFooter from "@food/components/user/MobilePromoFooter";
 import AddToCartButton from "@food/components/user/AddToCartButton";
 import StickyCartCard from "@food/components/user/StickyCartCard";
 import OrderTrackingCard from "@food/components/user/OrderTrackingCard";
@@ -3340,6 +3340,7 @@ export default function Home() {
       <StickyCartCard />
       {/* Live order strip: only on homepage (not in UserLayout) */}
       <OrderTrackingCard hasBottomNav />
+      <MobilePromoFooter />
       </div> {/* Closes the unified relative z-10 w-full mb-2 container from top */}
     </div>
   );

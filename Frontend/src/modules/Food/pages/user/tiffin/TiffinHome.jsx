@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import api from '@food/api';
+import MobilePromoFooter from '@food/components/user/MobilePromoFooter';
 
 import TiffinHeroBanner from './components/TiffinHeroBanner';
 import TiffinFeatureCards from './components/TiffinFeatureCards';
@@ -131,6 +132,7 @@ export default function TiffinHome() {
           )}
         </div>
       </div>
+      <MobilePromoFooter />
     </div>
   );
 }

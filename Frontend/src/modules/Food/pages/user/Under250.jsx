@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import AnimatedPage from "@food/components/user/AnimatedPage"
 import MenuScanAnimation from "@food/components/user/MenuScanAnimation"
+import MobilePromoFooter from "@food/components/user/MobilePromoFooter"
 import { Card, CardContent } from "@food/components/ui/card"
 import { Button } from "@food/components/ui/button"
 import { useLocationSelector } from "@food/components/user/UserLayout"
@@ -2002,6 +2003,7 @@ export default function Under250() {
 
       {/* Add to Cart Animation */}
       <ScrollAwareAddToCartAnimation />
+      <MobilePromoFooter />
     </div>
   )
 }

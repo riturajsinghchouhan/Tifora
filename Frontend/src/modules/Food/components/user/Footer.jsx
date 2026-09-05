@@ -1,50 +1,52 @@
 import { Link } from "react-router-dom"
 import { Facebook, Twitter, Instagram, Mail, Phone, MapPin, Heart } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { getCachedSettings, loadBusinessSettings } from "@food/utils/businessSettings"
 import { useCompanyName } from "@food/hooks/useCompanyName"
-
 
 export default function Footer() {
   const companyName = useCompanyName()
   const currentYear = new Date().getFullYear()
   const [logoUrl, setLogoUrl] = useState(null)
 
-  // Load business settings logo
   useEffect(() => {
+    let isMounted = true
+
     const loadLogo = async () => {
       try {
         const cached = getCachedSettings()
-        if (cached?.logo?.url) {
-          setLogoUrl(cached.logo.url)
-        } else {
-          const settings = await loadBusinessSettings()
-          if (settings?.logo?.url) {
-            setLogoUrl(settings.logo.url)
-          }
+        const cachedLogo = cached?.logo?.url || null
+        if (cachedLogo) {
+          if (isMounted) setLogoUrl(cachedLogo)
+          return
+        }
+
+        const settings = await loadBusinessSettings()
+        if (isMounted) {
+          setLogoUrl(settings?.logo?.url || null)
         }
       } catch (error) {
-        // Silently fail, use default logo
+        if (isMounted) setLogoUrl(null)
       }
     }
+
     loadLogo()
 
-    // Listen for business settings updates
     const handleSettingsUpdate = () => {
       const cached = getCachedSettings()
-      if (cached?.logo?.url) {
-        setLogoUrl(cached.logo.url)
-      }
+      setLogoUrl(cached?.logo?.url || null)
     }
-    window.addEventListener('businessSettingsUpdated', handleSettingsUpdate)
+
+    window.addEventListener("businessSettingsUpdated", handleSettingsUpdate)
 
     return () => {
-      window.removeEventListener('businessSettingsUpdated', handleSettingsUpdate)
+      isMounted = false
+      window.removeEventListener("businessSettingsUpdated", handleSettingsUpdate)
     }
   }, [])
 
   const footerLinks = {
-    company: [
+    discover: [
       { name: "About Us", href: "/user/help" },
       { name: "Careers", href: "/user/help" },
       { name: "Blog", href: "/user/help" },
@@ -56,101 +58,84 @@ export default function Footer() {
       { name: "Privacy Policy", href: "/profile/privacy" },
       { name: "Terms of Service", href: "/profile/terms" },
     ],
-    user: [
+    account: [
       { name: "My Account", href: "/user/profile" },
       { name: "My Orders", href: "/user/orders" },
       { name: "Favorites", href: "/user/profile/favorites" },
       { name: "Offers", href: "/user/offers" },
     ],
-    restaurants: [
+    partners: [
       { name: "Partner With Us", href: "/user/help" },
       { name: "Restaurant Login", href: "/restaurant" },
-      { name: "Delivery", href: "/delivery" },
+      { name: "Delivery Login", href: "/delivery" },
     ],
   }
 
   return (
-    <footer className="hidden md:block bg-zinc-900 text-white mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-8">
-          {/* Brand Section */}
-          <div className="lg:col-span-2 space-y-4">
-            <div
-              style={{
-                animation: 'fadeInUp 0.5s ease-out'
-              }}
-            >
-              <div className="flex items-center gap-2 mb-4">
+    <footer className="mt-12 border-t border-white/10 bg-[#0c0c10] text-white">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <div className="grid gap-10 md:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr_1fr]">
+          <div className="space-y-5">
+            <div className="flex items-center gap-3">
+              {logoUrl ? (
                 <img
-                  src={logoUrl }
-                  alt="Company Logo"
-                  className="h-10 w-10 rounded-full object-cover"
+                  src={logoUrl}
+                  alt={companyName}
+                  className="h-11 w-11 rounded-2xl object-cover ring-1 ring-white/10"
                   crossOrigin="anonymous"
-                  onError={(e) => { e.target.style.display = 'none'; }}
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none"
+                  }}
                 />
-                <span className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  {companyName}
-                </span>
-              </div>
-              <p className="text-slate-300 text-sm leading-relaxed max-w-md">
-                Delivering delicious food to your doorstep. Order from your favorite restaurants
-                and enjoy fresh, hot meals in minutes.
-              </p>
-            </div>
-
-            {/* Contact Info */}
-            <div
-              className="space-y-2"
-            >
-              <div className="flex items-center gap-2 text-slate-300 text-sm">
-                <Phone className="h-4 w-4" />
-                <span>+1 (555) 123-4567</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-300 text-sm">
-                <Mail className="h-4 w-4" />
-                <span>support@{companyName.toLowerCase().replace(/\s+/g, '')}.com</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-300 text-sm">
-                <MapPin className="h-4 w-4" />
-                <span>New York, NY</span>
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#ff7a18] to-[#ff3d77] text-base font-black text-white">
+                  {String(companyName || "F").slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-[#ff9f43]">Food by {companyName}</p>
+                <h2 className="text-2xl font-black tracking-tight">Fast, fresh, and local.</h2>
               </div>
             </div>
 
-            {/* Social Media */}
-            <div
-              className="flex items-center gap-4 pt-2"
-            >
-              <a
-                href="#"
-                className="transition-transform duration-200 hover:scale-110"
-              >
-                <Facebook className="h-5 w-5" />
+            <p className="max-w-xl text-sm leading-6 text-white/70">
+              Order from nearby favorites, explore tiffin plans, and discover budget-friendly meals in one place.
+            </p>
+
+            <div className="grid gap-3 text-sm text-white/75 sm:grid-cols-2">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-[#ff9f43]" />
+                <span>+91 00000 00000</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-[#ff9f43]" />
+                <span>support@{String(companyName || "tifora").toLowerCase().replace(/\s+/g, "")}.com</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-[#ff9f43]" />
+                <span>Available in your city</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <a href="#" className="rounded-full border border-white/10 bg-white/5 p-3 text-white/70 transition hover:border-white/20 hover:text-white">
+                <Facebook className="h-4 w-4" />
               </a>
-              <a
-                href="#"
-                className="transition-transform duration-200 hover:scale-110"
-              >
-                <Twitter className="h-5 w-5" />
+              <a href="#" className="rounded-full border border-white/10 bg-white/5 p-3 text-white/70 transition hover:border-white/20 hover:text-white">
+                <Twitter className="h-4 w-4" />
               </a>
-              <a
-                href="#"
-                className="transition-transform duration-200 hover:scale-110"
-              >
-                <Instagram className="h-5 w-5" />
+              <a href="#" className="rounded-full border border-white/10 bg-white/5 p-3 text-white/70 transition hover:border-white/20 hover:text-white">
+                <Instagram className="h-4 w-4" />
               </a>
             </div>
           </div>
 
-          {/* Company Links */}
-          <div
-          >
-            <h3 className="font-bold text-lg mb-4 text-yellow-400">Company</h3>
-            <ul className="space-y-2">
-              {footerLinks.company.map((link, index) => (
-                <li key={index}>
-                  <Link
-                    to={link.href}
-                  >
+          <div>
+            <h3 className="mb-4 text-xs font-black uppercase tracking-[0.22em] text-[#ff9f43]">Discover</h3>
+            <ul className="space-y-3 text-sm text-white/70">
+              {footerLinks.discover.map((link) => (
+                <li key={link.name}>
+                  <Link to={link.href} className="transition hover:text-white">
                     {link.name}
                   </Link>
                 </li>
@@ -158,16 +143,12 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Support Links */}
-          <div
-          >
-            <h3 className="font-bold text-lg mb-4 text-yellow-400">Support</h3>
-            <ul className="space-y-2">
-              {footerLinks.support.map((link, index) => (
-                <li key={index}>
-                  <Link
-                    to={link.href}
-                  >
+          <div>
+            <h3 className="mb-4 text-xs font-black uppercase tracking-[0.22em] text-[#ff9f43]">Support</h3>
+            <ul className="space-y-3 text-sm text-white/70">
+              {footerLinks.support.map((link) => (
+                <li key={link.name}>
+                  <Link to={link.href} className="transition hover:text-white">
                     {link.name}
                   </Link>
                 </li>
@@ -175,16 +156,23 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* User Links */}
-          <div
-          >
-            <h3 className="font-bold text-lg mb-4 text-yellow-400">For You</h3>
-            <ul className="space-y-2">
-              {footerLinks.user.map((link, index) => (
-                <li key={index}>
-                  <Link
-                    to={link.href}
-                  >
+          <div>
+            <h3 className="mb-4 text-xs font-black uppercase tracking-[0.22em] text-[#ff9f43]">For You</h3>
+            <ul className="space-y-3 text-sm text-white/70">
+              {footerLinks.account.map((link) => (
+                <li key={link.name}>
+                  <Link to={link.href} className="transition hover:text-white">
+                    {link.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+
+            <h3 className="mb-4 mt-8 text-xs font-black uppercase tracking-[0.22em] text-[#ff9f43]">Partners</h3>
+            <ul className="space-y-3 text-sm text-white/70">
+              {footerLinks.partners.map((link) => (
+                <li key={link.name}>
+                  <Link to={link.href} className="transition hover:text-white">
                     {link.name}
                   </Link>
                 </li>
@@ -193,38 +181,17 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div
-          className="border-t border-slate-600 pt-8 mt-8"
-        >
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-slate-400 text-sm text-center md:text-left">
-              � {currentYear} {companyName}. All rights reserved.
-            </p>
-            <div className="flex items-center gap-1 text-slate-400 text-sm">
+        <div className="mt-10 border-t border-white/10 pt-6">
+          <div className="flex flex-col gap-3 text-sm text-white/60 sm:flex-row sm:items-center sm:justify-between">
+            <p>© {currentYear} {companyName}. All rights reserved.</p>
+            <div className="flex items-center gap-2">
               <span>Made with</span>
-              <span
-              >
-                <Heart className="h-4 w-4 fill-red-500 text-red-500" />
-              </span>
+              <Heart className="h-4 w-4 fill-red-500 text-red-500" />
               <span>for food lovers</span>
             </div>
           </div>
         </div>
       </div>
-      <style>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </footer>
   )
 }
-

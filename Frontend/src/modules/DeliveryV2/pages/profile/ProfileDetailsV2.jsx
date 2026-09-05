@@ -9,7 +9,7 @@ import {
 import BottomPopup from "@delivery/components/BottomPopup"
 import { toast } from "sonner"
 import { openCamera, isFlutterBridgeAvailable } from "@food/utils/imageUploadUtils"
-import { deliveryAPI } from "@food/api"
+import { deliveryAPI, zoneAPI } from "@food/api"
 import { motion, AnimatePresence } from "framer-motion"
 import useDeliveryBackNavigation from "../../hooks/useDeliveryBackNavigation"
 
@@ -30,6 +30,11 @@ export const ProfileDetailsV2 = () => {
   const [vehicleType, setVehicleType] = useState("")
   const [showVehiclePopup, setShowVehiclePopup] = useState(false)
   const [vehicleInput, setVehicleInput] = useState({ number: "", brand: "", type: "" })
+  const [zones, setZones] = useState([])
+  const [zonesLoading, setZonesLoading] = useState(false)
+  const [zoneSelection, setZoneSelection] = useState("")
+  const [showZonePopup, setShowZonePopup] = useState(false)
+  const [isUpdatingZone, setIsUpdatingZone] = useState(false)
   const [selectedDocument, setSelectedDocument] = useState(null)
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [showBankDetailsPopup, setShowBankDetailsPopup] = useState(false)
@@ -58,12 +63,14 @@ export const ProfileDetailsV2 = () => {
   const [activePicker, setActivePicker] = useState(null) // { target: 'profilePhoto' | 'upiQrCode', ref: any, title: string }
   const drivingLicenseInputRef = useRef(null)
   const upiQrCameraInputRef = useRef(null)
+  const getZoneLabel = (zone) =>
+    String(zone?.zoneName || zone?.name || zone?.serviceLocation || "").trim()
 
   // Fetch profile data
   const popupStatePushed = useRef(false);
 
   useEffect(() => {
-    const isAnyModalOpen = !!(showVehiclePopup || showBankDetailsPopup || showDocumentModal || showDeletePopup || activePicker);
+    const isAnyModalOpen = !!(showVehiclePopup || showZonePopup || showBankDetailsPopup || showDocumentModal || showDeletePopup || activePicker);
     
     if (isAnyModalOpen && !popupStatePushed.current) {
       window.history.pushState({ popupOpen: true }, '');
@@ -74,13 +81,14 @@ export const ProfileDetailsV2 = () => {
         window.history.back();
       }
     }
-  }, [showVehiclePopup, showBankDetailsPopup, showDocumentModal, showDeletePopup, activePicker]);
+  }, [showVehiclePopup, showZonePopup, showBankDetailsPopup, showDocumentModal, showDeletePopup, activePicker]);
 
   useEffect(() => {
     const handlePopState = (e) => {
       if (popupStatePushed.current) {
         popupStatePushed.current = false;
         setShowVehiclePopup(false);
+        setShowZonePopup(false);
         setShowBankDetailsPopup(false);
         setShowDocumentModal(false);
         setShowDeletePopup(false);
@@ -140,6 +148,8 @@ export const ProfileDetailsV2 = () => {
             upiId: profileData?.documents?.bankDetails?.upiId || "",
             upiQrCode: profileData?.documents?.bankDetails?.upiQrCode || null
           })
+          const currentZoneId = profileData?.zoneId?._id || profileData?.zoneId?.id || profileData?.zoneId || ""
+          setZoneSelection(String(currentZoneId || ""))
         } else {
           throw new Error("Profile fetch failed")
         }
@@ -160,6 +170,23 @@ export const ProfileDetailsV2 = () => {
 
     fetchProfile()
   }, [navigate])
+
+  useEffect(() => {
+    const fetchZones = async () => {
+      try {
+        setZonesLoading(true)
+        const response = await zoneAPI.getPublicZones()
+        setZones(response?.data?.data?.zones || [])
+      } catch (error) {
+        debugError("Error fetching zones:", error)
+        setZones([])
+      } finally {
+        setZonesLoading(false)
+      }
+    }
+
+    fetchZones()
+  }, [])
 
   const isAdminApproved = ["approved", "active"].includes(String(profile?.status || "").toLowerCase())
 
@@ -233,6 +260,11 @@ export const ProfileDetailsV2 = () => {
   const riderLevel = getRiderLevel()
 
   const profileImageUrl = profile?.profileImage?.url || profile?.documents?.photo || null
+  const profileZoneId = String(profile?.zoneId?._id || profile?.zoneId?.id || profile?.zoneId || "")
+  const zoneLabel =
+    profile?.zoneName ||
+    getZoneLabel(zones.find((zone) => String(zone?._id || zone?.id || "") === profileZoneId)) ||
+    "No zone selected"
 
   const refreshProfile = async () => {
     const response = await deliveryAPI.getProfile()
@@ -248,6 +280,33 @@ export const ProfileDetailsV2 = () => {
         upiId: pd?.documents?.bankDetails?.upiId || "",
         upiQrCode: pd?.documents?.bankDetails?.upiQrCode || null
       })
+      const refreshedZoneId = pd?.zoneId?._id || pd?.zoneId?.id || pd?.zoneId || ""
+      setZoneSelection(String(refreshedZoneId || ""))
+    }
+  }
+
+  const submitZoneSelection = async () => {
+    if (!zoneSelection) {
+      toast.error("Please select a zone")
+      return
+    }
+
+    if (profileZoneId && String(zoneSelection) === profileZoneId) {
+      toast.success("Zone already selected")
+      setShowZonePopup(false)
+      return
+    }
+
+    try {
+      setIsUpdatingZone(true)
+      await deliveryAPI.updateProfileDetails({ zoneId: zoneSelection })
+      toast.success("Zone updated")
+      setShowZonePopup(false)
+      await refreshProfile()
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Zone update failed")
+    } finally {
+      setIsUpdatingZone(false)
     }
   }
 
@@ -543,9 +602,28 @@ export const ProfileDetailsV2 = () => {
         {/* ─── VEHICLE SECTION ─── */}
         <section>
           <div className="flex items-center justify-between mb-3 px-1">
-             <h3 className="text-xs font-black text-gray-950 uppercase tracking-widest flex items-center gap-2">
-                {(() => {
-                  const type = String(profile?.vehicle?.type || "").toLowerCase();
+            <h3 className="text-xs font-black text-gray-950 uppercase tracking-widest flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-gray-400" /> Service Zone
+            </h3>
+          </div>
+          <InfoCard
+            icon={MapPin}
+            label="Assigned Zone"
+            value={zoneLabel}
+            color="orange"
+            badge={!zoneSelection ? <span className="text-[9px] bg-red-50 text-red-500 px-1.5 rounded uppercase font-bold">Set Zone</span> : null}
+            onEdit={() => {
+              setZoneSelection(profileZoneId)
+              setShowZonePopup(true)
+            }}
+          />
+        </section>
+
+        <section>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h3 className="text-xs font-black text-gray-950 uppercase tracking-widest flex items-center gap-2">
+               {(() => {
+                 const type = String(profile?.vehicle?.type || "").toLowerCase();
                   if (type.includes("car")) return <Car className="w-4 h-4 text-gray-400" />;
                   if (type.includes("bike") || type.includes("scooter") || type.includes("motorcycle")) return <Bike className="w-4 h-4 text-gray-400" />;
                   if (type.includes("bicycle")) return <Bike className="w-4 h-4 text-gray-400" />;
@@ -573,6 +651,59 @@ export const ProfileDetailsV2 = () => {
         </section>
 
         {/* ─── BANK & PAYMENTS SECTION (ENHANCED) ─── */}
+        <BottomPopup
+          isOpen={showZonePopup}
+          onClose={() => setShowZonePopup(false)}
+          title="Select Delivery Zone"
+          maxHeight="80vh"
+          showHandle={false}
+        >
+          <div className="space-y-5 pb-10">
+            <div className="bg-orange-50 border border-orange-100 rounded-3xl p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center text-orange-500 border border-orange-100">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-1">Current Zone</p>
+                  <p className="text-sm font-bold text-gray-900">{zoneLabel}</p>
+                  <p className="text-xs text-gray-500 mt-1">Choose the zone where you usually deliver orders.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50/60 p-4 rounded-2xl border border-gray-100">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Delivery Zone</label>
+              <select
+                value={zoneSelection}
+                onChange={(e) => setZoneSelection(e.target.value)}
+                disabled={zonesLoading}
+                className="w-full bg-white text-sm font-bold text-gray-950 outline-none border border-gray-200 rounded-xl px-4 py-3 disabled:opacity-60"
+              >
+                <option value="">{zonesLoading ? "Loading zones..." : "Select a zone"}</option>
+                {zones.map((zone) => {
+                  const zoneId = String(zone?._id || zone?.id || "")
+                  const zoneLabelText = getZoneLabel(zone) || zoneId
+                  return (
+                    <option key={zoneId} value={zoneId}>
+                      {zoneLabelText}
+                    </option>
+                  )
+                })}
+              </select>
+              <p className="text-[11px] text-gray-500 mt-2">This zone will be used to assign you delivery work.</p>
+            </div>
+
+            <button
+              onClick={submitZoneSelection}
+              disabled={isUpdatingZone || zonesLoading}
+              className="w-full bg-black text-white py-5 rounded-[1.5rem] font-black uppercase tracking-[0.2em] shadow-xl hover:bg-gray-900 transition-all active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {isUpdatingZone ? <><Loader2 className="w-5 h-5 animate-spin" /> saving...</> : "Save Zone"}
+            </button>
+          </div>
+        </BottomPopup>
+
         <section>
            <div className="flex items-center justify-between mb-4 px-1">
               <h3 className="text-xs font-black text-gray-950 uppercase tracking-widest flex items-center gap-2">
