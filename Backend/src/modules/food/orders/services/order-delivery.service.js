@@ -15,7 +15,8 @@ import { logger } from '../../../../utils/logger.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { getFirebaseDB } from '../../../../config/firebase.js';
 import {
-  fetchRazorpayPaymentLink,
+  fetchRazorpayQrCode,
+  fetchRazorpayQrCodePayments,
   isRazorpayConfigured,
 } from '../helpers/razorpay.helper.js';
 import { fetchPolyline } from '../utils/googleMaps.js';
@@ -247,47 +248,128 @@ function emitOrderUpdate(order, deliveryPartnerId, options = {}) {
 }
 
 async function syncRazorpayQrPayment(orderDoc) {
-  // Phase 2: FoodTransaction is source of truth; avoid relying on FoodOrder.payment.
   const tx = await FoodTransaction.findOne({ orderId: orderDoc?._id }).lean();
   const payment = tx?.payment || null;
   if (!payment) return null;
-  if (payment.method !== 'razorpay_qr') return payment;
-  if (payment.status === 'paid') return payment;
+  if (!isRazorpayConfigured()) return payment;
 
-  const paymentLinkId = payment?.qr?.paymentLinkId;
-  if (!paymentLinkId || !isRazorpayConfigured()) return payment;
+  const qrId = String(payment?.qr?.qrId || payment?.qr?.paymentLinkId || '').trim();
+  if (!qrId) return payment;
 
-  let link;
+  const paymentStatus = String(payment?.status || '').toLowerCase();
+  if (['paid', 'refunded'].includes(paymentStatus)) return payment;
+
+  const expectedAmountMajor = Number(
+    payment?.amountDue ?? tx?.pricing?.total ?? tx?.amounts?.totalCustomerPaid ?? 0,
+  ) || 0;
+  const expectedAmountPaise = Math.max(0, Math.round(expectedAmountMajor * 100));
+
+  let qrInfo = null;
   try {
-    link = await fetchRazorpayPaymentLink(paymentLinkId);
+    qrInfo = await fetchRazorpayQrCode(qrId);
   } catch (error) {
-    logger.warn(
-      `Razorpay payment-link fetch failed for ${paymentLinkId}: ${
-        error?.message || error
-      }`,
-    );
-    return payment;
+    logger.warn(`Razorpay QR fetch failed for ${qrId}: ${error?.message || error}`);
   }
 
-  const linkStatus = String(link?.status || '').toLowerCase();
-  if (!linkStatus) return payment;
+  let qrPayments = [];
+  try {
+    qrPayments = normalizeQrPaymentList(await fetchRazorpayQrCodePayments(qrId));
+  } catch (error) {
+    logger.warn(`Razorpay QR payments fetch failed for ${qrId}: ${error?.message || error}`);
+  }
 
-  await FoodTransaction.updateOne(
-    { orderId: orderDoc?._id },
-    {
-      $set: {
-        'payment.qr.status': linkStatus,
-        'payment.status': ['paid', 'captured', 'authorized'].includes(linkStatus)
-          ? 'paid'
-          : ['expired', 'cancelled', 'canceled', 'failed'].includes(linkStatus)
-            ? 'failed'
-            : (payment.status || 'pending_qr'),
-      },
-    },
+  const capturedPayments = qrPayments.filter((entry) =>
+    String(entry?.status || '').toLowerCase() === 'captured',
   );
+  const capturedAmountPaise = capturedPayments.reduce(
+    (sum, entry) => sum + Math.max(0, Number(entry?.amount || 0)),
+    0,
+  );
+  const qrStatus = normalizeQrStatus(qrInfo?.status || payment?.qr?.status);
+  const expiresAt = qrInfo?.close_by
+    ? new Date(Number(qrInfo.close_by) * 1000)
+    : payment?.qr?.expiresAt || null;
+
+  if (expectedAmountPaise > 0 && capturedAmountPaise >= expectedAmountPaise) {
+    const latestPayment = capturedPayments[capturedPayments.length - 1] || {};
+    await FoodTransaction.updateOne(
+      { orderId: orderDoc?._id },
+      {
+        $set: {
+          status: 'captured',
+          paymentMethod: 'razorpay_qr',
+          'payment.method': 'razorpay_qr',
+          'payment.status': 'paid',
+          'payment.amountDue': expectedAmountMajor,
+          'payment.razorpay.orderId':
+            String(latestPayment?.order_id || qrId || payment?.razorpay?.orderId || ''),
+          'payment.razorpay.paymentId':
+            String(latestPayment?.id || latestPayment?.payment_id || payment?.razorpay?.paymentId || ''),
+          'payment.razorpay.signature':
+            String(latestPayment?.signature || payment?.razorpay?.signature || ''),
+          'payment.qr.qrId': qrId,
+          'payment.qr.paymentLinkId': qrId,
+          'payment.qr.imageUrl': String(qrInfo?.image_url || payment?.qr?.imageUrl || ''),
+          'payment.qr.status': 'paid',
+          'payment.qr.amount': expectedAmountMajor,
+          'payment.qr.expiresAt': expiresAt,
+          'gateway.provider': 'razorpay',
+          'gateway.razorpayPaymentId':
+            String(latestPayment?.id || latestPayment?.payment_id || payment?.gateway?.razorpayPaymentId || ''),
+          'gateway.qrUrl': String(qrInfo?.image_url || payment?.qr?.imageUrl || ''),
+          'gateway.qrExpiresAt': expiresAt,
+        },
+      },
+    );
+
+    const updatedTx = await FoodTransaction.findOne({ orderId: orderDoc?._id }).lean();
+    return updatedTx?.payment || payment;
+  }
+
+  if (qrStatus && ['expired', 'closed', 'cancelled', 'canceled', 'failed'].includes(qrStatus)) {
+    await FoodTransaction.updateOne(
+      { orderId: orderDoc?._id },
+      {
+        $set: {
+          'payment.qr.status': qrStatus,
+          'payment.status': 'failed',
+          'gateway.qrExpiresAt': expiresAt,
+        },
+      },
+    );
+    const updatedTx = await FoodTransaction.findOne({ orderId: orderDoc?._id }).lean();
+    return updatedTx?.payment || payment;
+  }
+
+  if (qrStatus) {
+    await FoodTransaction.updateOne(
+      { orderId: orderDoc?._id },
+      {
+        $set: {
+          'payment.qr.status': qrStatus,
+          'gateway.qrExpiresAt': expiresAt,
+        },
+      },
+    );
+  }
 
   const updatedTx = await FoodTransaction.findOne({ orderId: orderDoc?._id }).lean();
   return updatedTx?.payment || payment;
+}
+
+function normalizeQrStatus(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeQrPaymentList(payload) {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.payments)) return payload.payments;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.entity)) return payload.entity;
+  if (Array.isArray(payload?.collection)) return payload.collection;
+  return [];
 }
 
 export async function getCurrentTripDelivery(deliveryPartnerId) {
@@ -1201,7 +1283,7 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
     throw new ForbiddenError('Not your order');
   }
 
-  const { otp, ratings, paymentMethod: selectedPaymentMethod } = body;
+  const { otp, ratings } = body;
 
   // 1. Handover OTP Verification
   if (
@@ -1236,25 +1318,17 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
   
   // 2. Financial Context Resolution
   const tx = await FoodTransaction.findOne({ orderId: order._id }).lean();
-  const prevPayStatus = String(tx?.payment?.status || order?.payment?.status || 'cod_pending');
-  const payMethod = String(tx?.payment?.method || order?.payment?.method || order?.paymentMethod || 'cash');
+  const syncedPayment = await syncRazorpayQrPayment(order);
+  const currentPayment = syncedPayment || tx?.payment || order?.payment || {};
+  const prevPayStatus = String(currentPayment?.status || order?.payment?.status || 'cod_pending');
+  const finalPayMethod = String(currentPayment?.method || order?.payment?.method || order?.paymentMethod || 'cash').toLowerCase();
+  const finalPayStatus = String(currentPayment?.status || '').toLowerCase();
+  const amountDue = Number(
+    currentPayment?.amountDue ?? tx?.pricing?.total ?? tx?.amounts?.totalCustomerPaid ?? order?.pricing?.total ?? 0,
+  ) || 0;
 
-  /**
-   * Final Payment Method Logic:
-   * - If rider chose 'qr', we force 'razorpay_qr'.
-   * - If rider chose 'cash', we force 'cash'. 
-   * - Otherwise, we keep the original method.
-   */
-  let finalPayMethod = payMethod;
-  if (selectedPaymentMethod === 'qr') finalPayMethod = 'razorpay_qr';
-  else if (selectedPaymentMethod === 'cash') finalPayMethod = 'cash';
-
-  // 3. QR Payment Verification (Blocking)
-  if (finalPayMethod === 'razorpay_qr') {
-    const syncedPayment = await syncRazorpayQrPayment(order);
-    if (String(syncedPayment?.status || '').toLowerCase() !== 'paid') {
-      throw new ValidationError('Please wait for the customer to complete the QR payment. Payment not verified yet.');
-    }
+  if (amountDue > 0 && !['paid', 'captured', 'authorized'].includes(finalPayStatus)) {
+    throw new ValidationError('Please complete and verify the payment before marking the order delivered.');
   }
 
   // 4. Update Order State
@@ -1284,7 +1358,7 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
   await order.save();
 
   // 5. Update Financial Ledger (FoodTransaction)
-  // This triggers the sync back to FoodOrder.payment.method which updates the Rider's Cash Limit (if cash) or Pocket (always).
+  // This records the final verified payment snapshot for finance/reconciliation.
   const ledgerKind =
     finalPayMethod === 'cash' 
       ? 'cod_marked_paid_on_delivery' 

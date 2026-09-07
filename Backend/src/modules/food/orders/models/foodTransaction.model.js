@@ -52,6 +52,7 @@ const foodTransactionSchema = new mongoose.Schema({
             paymentLinkId: { type: String, default: '' },
             shortUrl: { type: String, default: '' },
             status: { type: String, default: '' },
+            amount: { type: Number, default: 0 },
             expiresAt: { type: Date, default: null }
         },
         refund: {

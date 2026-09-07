@@ -1726,6 +1726,11 @@ export const deliveryAPI = {
       `/food/delivery/orders/${String(orderId)}/collect/qr`,
       body ?? {}
     ),
+  getPaymentQr: (orderId, body = {}) =>
+    deliveryClient.post(
+      `/food/delivery/orders/${String(orderId)}/payment-qr`,
+      body ?? {}
+    ),
   /** GET /food/delivery/orders/:orderId/payment-status - check COD/QR payment status */
   getPaymentStatus: (orderId) =>
     deliveryClient.get(`/food/delivery/orders/${String(orderId)}/payment-status`),

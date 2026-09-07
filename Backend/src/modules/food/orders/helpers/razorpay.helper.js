@@ -51,6 +51,26 @@ export function createPaymentLink({ amountPaise, currency = 'INR', description, 
     });
 }
 
+export function createRazorpayQrCode(payload = {}) {
+    const instance = getRazorpayInstance();
+    if (!instance) return Promise.reject(new Error('Razorpay not configured'));
+    return instance.qrCode.create(payload);
+}
+
+export async function fetchRazorpayQrCode(qrCodeId) {
+    const instance = getRazorpayInstance();
+    if (!instance) throw new Error('Razorpay not configured');
+    if (!qrCodeId) throw new Error('qrCodeId is required');
+    return instance.qrCode.fetch(String(qrCodeId));
+}
+
+export async function fetchRazorpayQrCodePayments(qrCodeId) {
+    const instance = getRazorpayInstance();
+    if (!instance) throw new Error('Razorpay not configured');
+    if (!qrCodeId) throw new Error('qrCodeId is required');
+    return instance.qrCode.fetchAllPayments(String(qrCodeId));
+}
+
 export function verifyPaymentSignature(orderId, paymentId, signature) {
     if (!KEY_SECRET) return false;
     const body = `${orderId}|${paymentId}`;

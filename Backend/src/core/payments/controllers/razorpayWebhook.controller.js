@@ -97,32 +97,73 @@ export const handleRazorpayWebhook = async (req, res) => {
     try {
         if (event === 'payment.captured') {
             const paymentObj = payload?.payment?.entity || {};
-            const rzOrderId = paymentObj.order_id;
-            const rzPaymentId = paymentObj.id;
+            const rzOrderId = String(paymentObj.order_id || '').trim();
+            const rzPaymentId = String(paymentObj.id || '').trim();
+            const qrCodeId = String(paymentObj.qr_code_id || '').trim();
+            const noteOrderId = String(paymentObj.notes?.order_id || paymentObj.notes?.order_mongo_id || '').trim();
+            const capturedAmountPaise = Number(paymentObj.amount || 0);
 
             const session = await mongoose.startSession();
             try {
                 await session.withTransaction(async () => {
+                    const orConditions = [];
+                    if (rzOrderId) {
+                        orConditions.push({ 'payment.razorpay.orderId': rzOrderId });
+                        orConditions.push({ 'gateway.razorpayOrderId': rzOrderId });
+                    }
+                    if (qrCodeId) {
+                        orConditions.push({ 'payment.qr.qrId': qrCodeId });
+                        orConditions.push({ 'payment.qr.paymentLinkId': qrCodeId });
+                        orConditions.push({ 'gateway.qrId': qrCodeId });
+                    }
+                    if (noteOrderId && mongoose.Types.ObjectId.isValid(noteOrderId)) {
+                        orConditions.push({ orderId: new mongoose.Types.ObjectId(noteOrderId) });
+                    }
+
+                    if (orConditions.length === 0) return;
+
                     const existingTransaction = await FoodTransaction.findOne({
-                        $or: [
-                            { 'payment.razorpay.orderId': rzOrderId },
-                            { 'gateway.razorpayOrderId': rzOrderId }
-                        ]
+                        $or: orConditions
                     }).session(session);
                     if (!existingTransaction?.orderId) return;
 
                     const order = await FoodOrder.findById(existingTransaction.orderId).session(session);
-
                     if (!order) return;
+
+                    const expectedAmountMajor = Number(
+                        existingTransaction?.payment?.amountDue ??
+                        existingTransaction?.pricing?.total ??
+                        existingTransaction?.amounts?.totalCustomerPaid ??
+                        order?.pricing?.total ?? 0
+                    ) || 0;
+                    const expectedAmountPaise = Math.round(expectedAmountMajor * 100);
+
+                    if (capturedAmountPaise < expectedAmountPaise && expectedAmountPaise > 0) {
+                        logger.warn(`Webhook [payment.captured]: Captured amount (${capturedAmountPaise} paise) is less than expected (${expectedAmountPaise} paise) for Order ${order._id}`);
+                        return;
+                    }
 
                     const transaction = await foodTransactionService.applyPaymentCapture({
                         orderId: order._id,
-                        razorpayOrderId: rzOrderId,
+                        razorpayOrderId: rzOrderId || qrCodeId || existingTransaction.payment?.razorpay?.orderId || '',
                         razorpayPaymentId: rzPaymentId,
                         note: 'Payment status synced via webhook payment.captured',
                         recordedByRole: 'SYSTEM',
                         session
                     });
+
+                    await FoodTransaction.updateOne(
+                        { _id: existingTransaction._id },
+                        {
+                            $set: {
+                                'payment.qr.status': 'paid',
+                                'payment.status': 'paid',
+                                'payment.method': 'razorpay_qr',
+                                'paymentMethod': 'razorpay_qr',
+                            }
+                        },
+                        { session }
+                    );
 
                     await syncOrderFinanceDocuments({
                         orderId: order._id,
@@ -143,7 +184,7 @@ export const handleRazorpayWebhook = async (req, res) => {
             if (orderId) {
                 logger.info(`Webhook [payment.captured]: Synced order ${String(orderId)} (Status=paid)`);
             } else {
-                logger.warn(`Webhook [payment.captured]: Order not found or already paid for RZ-Order: ${rzOrderId}`);
+                logger.warn(`Webhook [payment.captured]: Order not found or already paid for RZ-Order: ${rzOrderId || qrCodeId}`);
             }
         }
 

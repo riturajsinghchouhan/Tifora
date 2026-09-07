@@ -188,11 +188,60 @@ function getFirstFiniteAmount(candidates = []) {
   return 0;
 }
 
+const SETTLED_PAYMENT_STATUSES = new Set(['paid', 'captured', 'authorized', 'success']);
+const COLLECTION_PAYMENT_METHODS = new Set(['cash', 'cod', 'cash_on_delivery', 'razorpay_qr']);
+
+function normalizePaymentToken(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function getPaymentStatus(order) {
+  return normalizePaymentToken(
+    order?.payment?.status ??
+      order?.transaction?.payment?.status ??
+      order?.transaction?.paymentStatus ??
+      order?.paymentStatus ??
+      order?.paymentCollectionStatus
+  );
+}
+
+function getPaymentMethod(order) {
+  return normalizePaymentToken(
+    order?.paymentMethod ??
+      order?.payment?.method ??
+      order?.transaction?.payment?.method ??
+      order?.transaction?.paymentMethod ??
+      'cod'
+  );
+}
+
+function isPaymentSettled(order) {
+  if (SETTLED_PAYMENT_STATUSES.has(getPaymentStatus(order))) {
+    return true;
+  }
+
+  const collectionStatus = normalizePaymentToken(
+    order?.paymentCollectionStatus ??
+      order?.payment?.collectionStatus ??
+      order?.transaction?.paymentCollectionStatus
+  );
+
+  return ['collected', 'paid', 'verified', 'success', 'completed', 'true'].includes(collectionStatus);
+}
+
+function requiresCollectionFlow(order) {
+  if (isPaymentSettled(order)) {
+    return false;
+  }
+
+  return COLLECTION_PAYMENT_METHODS.has(getPaymentMethod(order));
+}
+
 const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
   const [showQrModal, setShowQrModal] = useState(false);
   const [collectQrLink, setCollectQrLink] = useState(null);
   const [isGeneratingQr, setIsGeneratingQr] = useState(false);
-  const isInitialPaid = ['paid', 'captured', 'authorized'].includes(String(order.payment?.status || "").toLowerCase());
+  const isInitialPaid = isPaymentSettled(order);
   const [paymentStatus, setPaymentStatus] = useState(isInitialPaid ? 'paid' : 'idle');
   const [isSyncing, setIsSyncing] = useState(false);
   const pollingRef = useRef(null);
@@ -213,12 +262,22 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
     try {
       const res = await deliveryAPI.getPaymentStatus(orderId);
       const data = res?.data?.data || res?.data || {};
-      const status = String(data?.payment?.status || "").toLowerCase();
-      if (['paid', 'captured', 'authorized'].includes(status)) {
+      const status = String(data?.payment?.status || data?.qr?.status || "").toLowerCase();
+      const isPaidServer = data?.isPaid || ['paid', 'captured', 'authorized'].includes(status);
+      
+      if (isPaidServer) {
         setPaymentStatus('paid');
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        // toast.success("Payment Received Successfully!");
         setShowQrModal(false);
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      } else if (['expired', 'closed', 'cancelled', 'canceled', 'failed'].includes(status)) {
+        setPaymentStatus('failed');
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
       }
     } catch (e) {}
   }, [orderId]);
@@ -230,11 +289,22 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
   };
 
   useEffect(() => {
-    if (paymentStatus === 'pending' || (amountToCollect > 0 && paymentStatus !== 'paid')) {
-      pollingRef.current = setInterval(checkPaymentSync, 5000);
+    if (showQrModal || paymentStatus === 'pending') {
+      checkPaymentSync();
+      pollingRef.current = setInterval(checkPaymentSync, 3000);
+    } else {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
     }
-    return () => clearInterval(pollingRef.current);
-  }, [paymentStatus, amountToCollect, checkPaymentSync]);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [showQrModal, paymentStatus, checkPaymentSync]);
 
   const generateQr = async () => {
     setIsGeneratingQr(true);
@@ -243,29 +313,33 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
         name: order.userName || 'Customer',
         phone: order.userPhone || ''
       });
-      const link = res?.data?.data?.shortUrl || res?.data?.shortUrl || null;
-      if (link) {
-        setCollectQrLink(link);
+      const data = res?.data?.data || res?.data || {};
+      const imageUrl =
+        data?.qr?.imageUrl ||
+        data?.qr?.image_url ||
+        data?.imageUrl ||
+        data?.image_url ||
+        null;
+      
+      if (imageUrl) {
+        setCollectQrImageUrl(imageUrl);
         setPaymentStatus('pending');
         setShowQrModal(true);
       } else {
-        toast.error("Could not generate QR code");
+        toast.error("Could not generate Razorpay QR code");
       }
     } catch (e) {
-      toast.error("QR Generation failed");
+      toast.error(e?.response?.data?.message || e?.message || "QR Generation failed");
     } finally {
       setIsGeneratingQr(false);
     }
   };
 
-  const isPaid = paymentStatus === 'paid';
+  const isPaid = paymentStatus === 'paid' || isInitialPaid;
   const [isCashPayment, setIsCashPayment] = useState(false);
 
-  // Toggle handlers
   const handleCashSelection = () => {
     setIsCashPayment(true);
-    // If we were waiting for QR, we can stop the active pending UI but keep polling in background if needed
-    // However, the user said "if delivery boy clicks cash, slider enable".
   };
 
   const handleQrSelection = () => {
@@ -301,7 +375,7 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
              <div className="flex justify-between items-center mb-6">
                <div>
                  <p className="text-amber-700 text-[10px] font-bold uppercase tracking-widest mb-1">
-                    {isPaid ? "Amount Paid Online" : "Cash to Collect"}
+                    {isPaid ? "Amount Paid Online" : "Amount to Collect"}
                  </p>
                  <p className="text-amber-950 text-3xl sm:text-4xl font-bold">₹{amountToCollect.toFixed(2)}</p>
                </div>
@@ -338,18 +412,15 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
               )}
           </div>
 
-          {/* If the driver collects physical cash, they can directly slide this, bypassing QR. Unless cash is selected or it's paid, lock slider. */}
-            <ActionSlider 
+          <ActionSlider 
             key="action-payment"
             label={isCashPayment ? "Slide to Confirm Cash" : "Slide to Complete Order"} 
             successLabel="Delivered! ✓"
             disabled={!isPaid && !isCashPayment}
             onConfirm={async () => {
                 try {
-                    // Pass the payment method to completion if needed
                     await onComplete(otpString, isCashPayment ? 'cash' : 'qr');
                 } catch (e) {
-                    // Slider handles reset
                     throw e;
                 }
             }}
@@ -371,14 +442,24 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
               onClick={e => e.stopPropagation()}
             >
               <h3 className="text-gray-950 font-bold text-xl mb-2">Scan to Pay</h3>
-              <p className="text-gray-500 text-sm mb-8 font-medium">Order Total: ₹{amountToCollect.toFixed(2)}</p>
+              <p className="text-gray-500 text-sm mb-6 font-medium">Order Total: ₹{amountToCollect.toFixed(2)}</p>
               
-              <div className="flex flex-col items-center gap-6 bg-gray-50 rounded-3xl border-2 border-gray-100 p-6 mb-8 w-full">
-                 <img 
-                   src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(collectQrLink)}`} 
-                   alt="Razorpay QR"
-                   className="w-44 h-44 sm:w-56 sm:h-56 mix-blend-multiply"
-                 />
+              <div className="flex flex-col items-center gap-6 bg-gray-50 rounded-3xl border-2 border-gray-100 p-6 mb-6 w-full">
+                 <div className="w-56 h-56 sm:w-64 sm:h-64 overflow-hidden rounded-3xl bg-white border-2 border-gray-100 relative flex items-center justify-center shadow-inner">
+                   {collectQrImageUrl ? (
+                     <img 
+                       src={collectQrImageUrl} 
+                       alt="Razorpay UPI QR"
+                       className="w-full h-full object-contain pointer-events-none select-none"
+                       style={{
+                         transform: 'scale(3.35) translateY(-4.5%)',
+                         transformOrigin: 'center center'
+                       }}
+                     />
+                   ) : (
+                     <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                   )}
+                 </div>
                  <button 
                     onClick={handleManualCheck}
                     disabled={isSyncing}
@@ -391,7 +472,7 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
 
               <button 
                 onClick={() => setShowQrModal(false)}
-                className="w-full py-4 bg-gray-100 text-gray-500 rounded-2xl font-bold text-xs uppercase tracking-widest"
+                className="w-full py-4 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded-2xl font-bold text-xs uppercase tracking-widest transition-colors"
               >
                 Close QR
               </button>
@@ -405,19 +486,12 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
 
 export const DeliveryVerificationModal = ({ order, onComplete, onClose }) => {
   const alreadyVerified = !!order?.deliveryVerification?.dropOtp?.verified;
-  const paymentMethod = (
-    order?.paymentMethod ||
-    order?.payment?.method ||
-    order?.transaction?.payment?.method ||
-    order?.transaction?.paymentMethod ||
-    'cod'
-  ).toLowerCase();
-  const isCod = ['cash', 'cod', 'cash_on_delivery', 'razorpay_qr'].includes(paymentMethod);
+  const needsCollectionFlow = requiresCollectionFlow(order);
 
   // Determine initial step: skip OTP if already verified
   const [step, setStep] = useState(() => {
     if (alreadyVerified) {
-      return isCod ? 'payment' : 'complete';
+      return needsCollectionFlow ? 'payment' : 'complete';
     }
     return 'otp';
   });
@@ -425,13 +499,13 @@ export const DeliveryVerificationModal = ({ order, onComplete, onClose }) => {
 
   const handleOtpVerified = (otpValue) => {
     setVerifiedOtp(otpValue);
-    // After OTP is verified: COD → show payment panel, Online → show complete button
-    setStep(isCod ? 'payment' : 'complete');
+    // After OTP is verified: COD / QR collection → payment panel, settled online → complete button
+    setStep(needsCollectionFlow ? 'payment' : 'complete');
   };
 
-  // If OTP was already verified on mount and it's a non-COD order, auto-complete
+  // If OTP was already verified on mount and the order does not need collection, auto-complete
   useEffect(() => {
-    if (step === 'complete' && !isCod) {
+    if (step === 'complete' && !needsCollectionFlow) {
       onComplete(verifiedOtp);
     }
   }, []); // only on mount
