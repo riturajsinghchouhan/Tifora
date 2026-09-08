@@ -57,120 +57,12 @@ const THEME_ACCENTS = [
   },
 ];
 
-const DEFAULT_FALLBACK_PLANS = [
-  {
-    _id: "plan-mock-1",
-    name: "Deluxe Homestyle Thali",
-    kitchenName: "Maa Ki Rasoi",
-    cuisine: "North Indian • Homestyle",
-    image:
-      "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=700&auto=format&fit=crop&q=80",
-    avatar:
-      "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=120&auto=format&fit=crop&q=80",
-    rating: 4.8,
-    durationDays: 30,
-    mealType: "Morning",
-    deliveryTime: "Lunch (12:30 PM)",
-    distance: "1.2 km",
-    price: 2999,
-    itemsDescription: "4 Butter Rotis • Dal Tadka • Paneer Sabzi • Rice",
-    isVegetarian: true,
-  },
-  {
-    _id: "plan-mock-2",
-    name: "Royal Punjabi 2-Meal Plan",
-    kitchenName: "Amritsari Tiffin",
-    cuisine: "Punjabi • Deluxe",
-    image:
-      "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=700&auto=format&fit=crop&q=80",
-    avatar:
-      "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=120&auto=format&fit=crop&q=80",
-    rating: 4.9,
-    durationDays: 30,
-    mealType: "Both",
-    deliveryTime: "Lunch + Dinner",
-    distance: "2.1 km",
-    price: 4999,
-    itemsDescription: "Paneer Sabzi • Dal Makhani • 4 Rotis • Jeera Rice",
-    isVegetarian: true,
-  },
-  {
-    _id: "plan-mock-3",
-    name: "Student 15-Day Saver Box",
-    kitchenName: "Shree Ganesh Kitchen",
-    cuisine: "Home Cooked • Pocket Friendly",
-    image:
-      "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=700&auto=format&fit=crop&q=80",
-    avatar:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80",
-    rating: 4.6,
-    durationDays: 15,
-    mealType: "Morning",
-    deliveryTime: "Lunch (1:00 PM)",
-    distance: "0.8 km",
-    price: 1599,
-    itemsDescription: "4 Soft Rotis • Desi Dal • Dry Sabzi • Steamed Rice",
-    isVegetarian: true,
-  },
-  {
-    _id: "plan-mock-4",
-    name: "Healthy Fit Diet Tiffin",
-    kitchenName: "NutriMeal Cloud",
-    cuisine: "High Protein • Low Oil",
-    image:
-      "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=700&auto=format&fit=crop&q=80",
-    avatar:
-      "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=120&auto=format&fit=crop&q=80",
-    rating: 4.7,
-    durationDays: 30,
-    mealType: "Morning",
-    deliveryTime: "Diet Lunch Box",
-    distance: "1.5 km",
-    price: 3699,
-    itemsDescription: "3 Multigrain Rotis • Sprouts Salad • Protein Dal",
-    isVegetarian: true,
-  },
-  {
-    _id: "plan-mock-5",
-    name: "Maharaja Royal Thali Feast",
-    kitchenName: "Annapurna Rasoi",
-    cuisine: "Traditional • Pure Veg",
-    image:
-      "https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?w=700&auto=format&fit=crop&q=80",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80",
-    rating: 4.9,
-    durationDays: 7,
-    mealType: "Both",
-    deliveryTime: "Lunch + Dinner",
-    distance: "1.9 km",
-    price: 1399,
-    itemsDescription: "4 Rotis • Dal • Seasonal Sabzi • Gulab Jamun",
-    isVegetarian: true,
-  },
-  {
-    _id: "plan-mock-6",
-    name: "Coastal South Special Meal",
-    kitchenName: "Dakshin Tiffin House",
-    cuisine: "South Indian • Traditional",
-    image:
-      "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=700&auto=format&fit=crop&q=80",
-    avatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-    rating: 4.8,
-    durationDays: 30,
-    mealType: "Both",
-    deliveryTime: "Lunch + Dinner",
-    distance: "2.3 km",
-    price: 3899,
-    itemsDescription: "Steamed Rice • Sambar • Rasam • Poriyal • Curd",
-    isVegetarian: true,
-  },
-];
+
 
 export default function HomeTiffinPlansMarquee() {
   const navigate = useNavigate();
   const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState({});
 
   useEffect(() => {
@@ -187,15 +79,15 @@ export default function HomeTiffinPlansMarquee() {
               ? res.data.data.filter((p) => p.isActive !== false)
               : [];
 
-          if (livePlans.length > 0) {
-            setPlans(livePlans);
-          } else {
-            setPlans(DEFAULT_FALLBACK_PLANS);
-          }
+          setPlans(livePlans);
         }
       } catch (err) {
         if (isMounted) {
-          setPlans(DEFAULT_FALLBACK_PLANS);
+          setPlans([]);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
       }
     };
@@ -212,14 +104,16 @@ export default function HomeTiffinPlansMarquee() {
   };
 
   const handlePlanClick = (plan) => {
-    if (plan?._id && !String(plan._id).startsWith("plan-mock")) {
+    if (plan?._id) {
       navigate(`/food/user/tiffin/plan/${plan._id}`, { state: { plan } });
     } else {
       navigate("/food/user/tiffin");
     }
   };
 
-  const displayPlans = plans.length > 0 ? plans : DEFAULT_FALLBACK_PLANS;
+  if (loading || plans.length === 0) {
+    return null;
+  }
 
   return (
     <div id="restaurant-tiffin-plans-section" className="w-full mt-4 mb-3">
@@ -251,7 +145,7 @@ export default function HomeTiffinPlansMarquee() {
       {/* Manual Swipe/Scroll Horizontal Carousel (Static, No Auto-Sliding) */}
       <div className="relative w-full">
         <div className="flex overflow-x-auto scrollbar-hide gap-3.5 sm:gap-4 pb-2 pt-0.5 items-stretch snap-x snap-mandatory px-0">
-          {displayPlans.map((plan, index) => {
+          {plans.map((plan, index) => {
             const planKey = `${plan._id || index}`;
             const isFav = !!favorites[plan._id];
             const theme = THEME_ACCENTS[index % THEME_ACCENTS.length];
@@ -266,13 +160,13 @@ export default function HomeTiffinPlansMarquee() {
               plan.image ||
               plan.coverImage ||
               plan.restaurantId?.coverImage ||
-              DEFAULT_FALLBACK_PLANS[index % DEFAULT_FALLBACK_PLANS.length].image;
+              "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=700&auto=format&fit=crop&q=80";
 
             const avatarImage =
               plan.avatar ||
               plan.restaurantId?.logo?.url ||
               plan.restaurantId?.logo ||
-              DEFAULT_FALLBACK_PLANS[index % DEFAULT_FALLBACK_PLANS.length].avatar;
+              "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=120&auto=format&fit=crop&q=80";
 
             const rating = plan.rating || (4.6 + ((index * 7) % 4) * 0.1).toFixed(1);
             const cuisine = plan.cuisine || "Homestyle • Nutritious";
