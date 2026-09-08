@@ -26,7 +26,7 @@ export default function HomeHeroPromo({
       {hasBanners && bannerImage && (
         <div className="w-full lg:col-span-8">
           <div
-            className="relative w-full h-[160px] sm:h-[190px] md:h-[230px] lg:h-[250px] rounded-[22px] overflow-hidden shadow-[0_6px_20px_rgba(0,0,0,0.16)] cursor-pointer group bg-[#121212]"
+            className="relative w-full aspect-[2.5/1] sm:aspect-[2.8/1] lg:aspect-auto lg:h-[250px] rounded-[22px] overflow-hidden shadow-[0_6px_20px_rgba(0,0,0,0.16)] cursor-pointer group bg-[#121212]"
             onClick={() => {
               if (currentBanner && handlePromoBannerClick) {
                 handlePromoBannerClick(currentBanner);
@@ -44,11 +44,11 @@ export default function HomeHeroPromo({
                 transition={{ duration: 0.5, ease: "easeOut" }}
                 className="absolute inset-0 w-full h-full"
               >
-                {/* Clean Banner Image without text overlay or dark gradients */}
+                {/* Clean Banner Image formatted to fit 100% without cropping text or buttons */}
                 <img
                   src={bannerImage}
                   alt={currentBanner?.title || "Promotional Banner"}
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700"
+                  className="w-full h-full object-fill group-hover:scale-105 transition-transform duration-700"
                 />
               </motion.div>
             </AnimatePresence>
