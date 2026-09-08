@@ -184,7 +184,7 @@ export default function HeroBanner({
               <img
                 src={image}
                 alt={`Hero Banner ${index + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-fill"
                 loading={index === currentIndex ? "eager" : "lazy"}
                 fetchPriority={index === currentIndex ? "high" : "low"}
                 draggable={false}
