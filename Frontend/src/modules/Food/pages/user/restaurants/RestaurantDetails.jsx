@@ -2411,8 +2411,19 @@ function RestaurantDetailsContent() {
             }
           }}
         />
-        {/* Gradient Overlays for optimal contrast & smooth transition */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/50" />
+        {/* Premium Shimmer/Shine Light Effect */}
+        <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+          <motion.div
+            animate={{ x: ["-200%", "200%"] }}
+            transition={{
+              duration: 3.5,
+              repeat: Infinity,
+              repeatDelay: 3,
+              ease: "easeInOut",
+            }}
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-[-20deg] w-[150%] h-full"
+          />
+        </div>
 
         {/* Floating Navigation Header (Top) */}
         <div className="absolute top-0 inset-x-0 z-20 px-4 sm:px-6 md:px-8 lg:px-10 xl:px-12 pt-3 md:pt-4">
