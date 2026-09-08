@@ -8,42 +8,6 @@ import TiffinHeroBanner from './components/TiffinHeroBanner';
 import TiffinFeatureCards from './components/TiffinFeatureCards';
 import TiffinSubscriptionCard from './components/TiffinSubscriptionCard';
 
-const DEMO_TIFFIN_PLANS = [
-  {
-    _id: 'plan-1',
-    name: "Renuka's 30-Day Monthly Ghar Ka Khana Delight",
-    restaurantName: "Renuka's Kitchen",
-    mealType: 'Both',
-    durationDays: 30,
-    price: 4500,
-    isVegetarian: true,
-    itemsDescription: 'Our most popular full month meal subscription. Pure ghar jaisa swaad with rotating daily fresh vegetables.',
-    image: 'https://images.unsplash.com/photo-1613292443284-8d10ef9383fe?w=600&h=450&fit=crop&q=80',
-  },
-  {
-    _id: 'plan-2',
-    name: "Renuka's 15-Day Ghar Ka Khana Plan",
-    restaurantName: "Renuka's Kitchen",
-    mealType: 'Both',
-    durationDays: 15,
-    price: 2499,
-    isVegetarian: true,
-    itemsDescription: 'Perfect for short-term healthy eating. Fresh dal, sabzi, phulkas and jeera rice delivered twice daily.',
-    image: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=600&h=450&fit=crop&q=80',
-  },
-  {
-    _id: 'plan-3',
-    name: 'Royal Student & Executive Weekly Meal Box',
-    restaurantName: 'Campus Rasoi Kitchen',
-    mealType: 'Morning',
-    durationDays: 7,
-    price: 999,
-    isVegetarian: true,
-    itemsDescription: 'Budget-friendly weekly meal with wholesome 4 chapatis, seasonal veg curry, dal tadka & salad.',
-    image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&h=450&fit=crop&q=80',
-  },
-];
-
 export default function TiffinHome() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,12 +21,12 @@ export default function TiffinHome() {
         if (res?.data?.success && Array.isArray(res.data.data) && res.data.data.length > 0) {
           setPlans(res.data.data);
         } else {
-          setPlans(DEMO_TIFFIN_PLANS);
+          setPlans([]);
         }
       } catch (err) {
         console.error('Error fetching tiffin plans', err);
         if (!isCancelled) {
-          setPlans(DEMO_TIFFIN_PLANS);
+          setPlans([]);
         }
       } finally {
         if (!isCancelled) {
@@ -118,6 +82,12 @@ export default function TiffinHome() {
                   className="w-full h-48 rounded-[24px] bg-gray-100 dark:bg-zinc-900 animate-pulse"
                 />
               ))}
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 dark:bg-zinc-900/40 rounded-2xl border border-gray-100 dark:border-zinc-800">
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                No active tiffin plans available right now. Check back soon!
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
