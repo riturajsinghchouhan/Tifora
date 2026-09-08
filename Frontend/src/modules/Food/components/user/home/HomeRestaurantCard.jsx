@@ -44,19 +44,20 @@ function HomeRestaurantCard({
 }) {
   const [currentMenuIndex, setCurrentMenuIndex] = useState(0);
 
+  const hasPlans = Array.isArray(restaurant?.plans) && restaurant.plans.length > 0;
+
   const plansData = useMemo(() => {
-    if (restaurant?.plans?.length > 0) {
+    if (hasPlans) {
       return restaurant.plans.map(p => ({
         menu: p.itemsDescription || "Contact for items",
         price: p.price || "--"
       }));
     }
-    return [
-      { menu: "No active plans available", price: "--" }
-    ];
-  }, [restaurant?.plans, restaurant?.monthlyPrice]);
+    return [];
+  }, [hasPlans, restaurant?.plans]);
 
   useEffect(() => {
+    if (plansData.length <= 1) return;
     const interval = setInterval(() => {
       setCurrentMenuIndex((prev) => (prev + 1) % plansData.length);
     }, 2500);
@@ -197,43 +198,47 @@ function HomeRestaurantCard({
                    )}
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Starting at</p>
-                    <div className="overflow-hidden relative h-[28px] w-[120px]">
+                {hasPlans && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Starting at</p>
+                        <div className="overflow-hidden relative h-[28px] w-[120px]">
+                           <div 
+                              className="absolute w-full transition-transform duration-500 ease-in-out" 
+                              style={{ transform: `translateY(-${currentMenuIndex * 28}px)` }}
+                           >
+                              {plansData.map((plan, idx) => (
+                                 <p key={idx} className="h-[28px] text-base lg:text-lg font-black text-gray-900 dark:text-white flex items-center">
+                                   ₹{plan.price}<span className="text-xs font-medium text-gray-500 ml-1">/month</span>
+                                 </p>
+                              ))}
+                           </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-center justify-end gap-1 text-xs text-gray-500">
+                          <Clock className="h-3.5 w-3.5 text-gray-400" />
+                          <span className="font-medium">{restaurant.deliveryTime || "Daily"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="-mt-1 overflow-hidden relative h-[34px]">
                        <div 
                           className="absolute w-full transition-transform duration-500 ease-in-out" 
-                          style={{ transform: `translateY(-${currentMenuIndex * 28}px)` }}
+                          style={{ transform: `translateY(-${currentMenuIndex * 34}px)` }}
                        >
-                          {plansData.map((plan, idx) => (
-                             <p key={idx} className="h-[28px] text-base lg:text-lg font-black text-gray-900 dark:text-white flex items-center">
-                               ₹{plan.price}<span className="text-xs font-medium text-gray-500 ml-1">/month</span>
-                             </p>
-                          ))}
+                         {plansData.map((plan, idx) => (
+                           <p key={idx} className="h-[34px] text-xs text-gray-500 dark:text-gray-400 italic line-clamp-1 flex items-center">
+                             <span className="font-semibold text-gray-800 dark:text-gray-300 mr-1 shrink-0">Menu:</span> 
+                             <span className="truncate">{plan.menu}</span>
+                           </p>
+                         ))}
                        </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="flex items-center justify-end gap-1 text-xs text-gray-500">
-                      <Clock className="h-3.5 w-3.5 text-gray-400" />
-                      <span className="font-medium">{restaurant.deliveryTime || "Daily"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="-mt-1 overflow-hidden relative h-[34px]">
-                   <div 
-                      className="absolute w-full transition-transform duration-500 ease-in-out" 
-                      style={{ transform: `translateY(-${currentMenuIndex * 34}px)` }}
-                   >
-                     {plansData.map((plan, idx) => (
-                       <p key={idx} className="h-[34px] text-xs text-gray-500 dark:text-gray-400 italic line-clamp-1 flex items-center">
-                         <span className="font-semibold text-gray-800 dark:text-gray-300 mr-1 shrink-0">Menu:</span> 
-                         <span className="truncate">{plan.menu}</span>
-                       </p>
-                     ))}
-                   </div>
-                </div>
+                  </>
+                )}
               </CardContent>
             </div>
 
