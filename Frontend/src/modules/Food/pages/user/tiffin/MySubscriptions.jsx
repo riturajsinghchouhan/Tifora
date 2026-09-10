@@ -1008,7 +1008,7 @@ export default function MySubscriptions() {
                                                     </div>
 
                                                     <h2 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white tracking-tight">
-                                                        {currentSub.planId?.name || "Renuka's 7-Day Starter Homestyle Tiffin"}
+                                                        {currentSub.planId?.name || "Homestyle Daily Tiffin Plan"}
                                                     </h2>
                                                 </div>
 

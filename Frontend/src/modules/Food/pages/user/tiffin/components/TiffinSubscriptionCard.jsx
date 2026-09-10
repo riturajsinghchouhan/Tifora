@@ -74,10 +74,10 @@ export default function TiffinSubscriptionCard({ plan, index = 0 }) {
   const theme = CARD_THEMES[index % CARD_THEMES.length]
 
   const primaryImage = plan?.image || TIFFIN_IMAGES[index % TIFFIN_IMAGES.length]
-  const kitchenName = plan?.restaurantId?.restaurantName || plan?.restaurantId?.name || plan?.restaurantName || "Renuka's Kitchen"
+  const kitchenName = plan?.restaurantId?.restaurantName || plan?.restaurantId?.name || plan?.restaurantName || "Featured Kitchen"
   const duration = plan?.durationDays || (index === 1 ? 15 : 30)
   const price = plan?.price || (index === 1 ? 2499 : 4500)
-  const title = plan?.name || (index === 1 ? "Renuka's 15-Day Ghar Ka Khana Plan" : "Renuka's 30-Day Monthly Ghar Ka Khana Delight")
+  const title = plan?.name || "Homestyle Ghar Ka Khana Daily Tiffin Plan"
 
   const handleCardClick = () => {
     navigate(`/food/user/tiffin/plan/${plan?._id || "plan-" + index}`, { state: { plan } })

@@ -540,7 +540,7 @@ export default function AdminTiffinManagement() {
                                         />
                                         <div className="min-w-0 flex-1">
                                             <h4 className="text-xs font-bold text-gray-900 truncate">{p.name}</h4>
-                                            <p className="text-[10px] text-gray-500 truncate">{p.restaurantId?.restaurantName || p.restaurantId?.name || "Renuka's kitchen"}</p>
+                                            <p className="text-[10px] text-gray-500 truncate">{p.restaurantId?.restaurantName || p.restaurantId?.name || "Featured Kitchen"}</p>
                                             <div className="flex items-center justify-between mt-1">
                                                 <span className="text-xs font-black text-gray-900">₹{p.price} <span className="text-[10px] font-normal text-gray-400">/{p.durationDays}d</span></span>
                                                 <span className="text-[10px] font-bold text-[#be123c] bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
@@ -618,7 +618,7 @@ export default function AdminTiffinManagement() {
                                                     </span>
                                                 </div>
                                                 <h3 className="text-sm font-bold text-gray-900 mt-1 truncate">{plan.name}</h3>
-                                                <p className="text-[11px] text-gray-500 truncate">{plan.restaurantId?.restaurantName || plan.restaurantId?.name || "Renuka's kitchen"}</p>
+                                                <p className="text-[11px] text-gray-500 truncate">{plan.restaurantId?.restaurantName || plan.restaurantId?.name || "Featured Kitchen"}</p>
                                             </div>
                                         </div>
 
@@ -721,7 +721,7 @@ export default function AdminTiffinManagement() {
                                                 <span className="block text-[10px] font-normal text-gray-400">{sub.userId?.phone}</span>
                                             </td>
                                             <td className="p-3.5 font-medium text-gray-800">
-                                                {sub.restaurantId?.restaurantName || sub.restaurantId?.name || "Renuka's kitchen"}
+                                                {sub.restaurantId?.restaurantName || sub.restaurantId?.name || "Featured Kitchen"}
                                             </td>
                                             <td className="p-3.5">
                                                 <div className="font-semibold text-gray-900">{sub.planId?.name}</div>
@@ -822,7 +822,7 @@ export default function AdminTiffinManagement() {
                                                 {del.deliveryAddress?.fullAddress || del.deliveryAddress?.street || 'Indore'}
                                             </td>
                                             <td className="p-3.5 font-medium text-gray-800">
-                                                {del.restaurantId?.restaurantName || del.restaurantId?.name || "Renuka's kitchen"}
+                                                {del.restaurantId?.restaurantName || del.restaurantId?.name || "Featured Kitchen"}
                                             </td>
                                             <td className="p-3.5">
                                                 {del.assignedTo ? (
@@ -989,6 +989,7 @@ export default function AdminTiffinManagement() {
                                     >
                                         <option value={7}>7 Days (1 Week)</option>
                                         <option value={15}>15 Days</option>
+                                        <option value={28}>28 Days (4 Weeks)</option>
                                         <option value={30}>30 Days (1 Month)</option>
                                         <option value={90}>90 Days (Quarterly)</option>
                                     </select>
@@ -1180,7 +1181,7 @@ export default function AdminTiffinManagement() {
                             <div className="bg-gray-50 p-3.5 rounded-2xl space-y-1">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase">Plan & Kitchen</span>
                                 <p className="font-bold text-gray-900">{viewSubModal.planId?.name}</p>
-                                <p className="text-gray-600">Kitchen: {viewSubModal.restaurantId?.restaurantName || viewSubModal.restaurantId?.name || "Renuka's kitchen"} • ₹{viewSubModal.amountPaid}</p>
+                                <p className="text-gray-600">Kitchen: {viewSubModal.restaurantId?.restaurantName || viewSubModal.restaurantId?.name || "Featured Kitchen"} • ₹{viewSubModal.amountPaid}</p>
                             </div>
 
                             <div className="bg-gray-50 p-3.5 rounded-2xl space-y-1">

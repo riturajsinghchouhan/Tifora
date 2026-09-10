@@ -22,7 +22,7 @@ export default function Offers() {
                         {
                             _id: 'plan-1',
                             name: 'Homestyle North Indian Tiffin',
-                            restaurantName: 'Annapurna Rasoi',
+                            restaurantName: 'Featured Kitchen',
                             mealType: 'Both',
                             durationDays: 30,
                             price: 4500,
@@ -138,7 +138,7 @@ export default function Offers() {
                                 <div className="flex-1 w-full">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <span className="text-xs font-semibold text-gray-500">{plan.restaurantId?.restaurantName || plan.restaurantId?.name || plan.restaurantName || "Renuka's Kitchen"}</span>
+                                            <span className="text-xs font-semibold text-gray-500">{plan.restaurantId?.restaurantName || plan.restaurantId?.name || plan.restaurantName || "Featured Kitchen"}</span>
                                             <h3 className="font-bold text-gray-900 text-base group-hover:text-[#be123c] transition-colors">{plan.name}</h3>
                                         </div>
                                         <div className="text-right">

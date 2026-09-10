@@ -36,7 +36,8 @@ export const getPlanById = async (req, res) => {
     }
 };
 
-import { createRazorpayOrder, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
+import { createRazorpayOrder, getRazorpayKeyId, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
+import { getUserWallet, deductWalletBalance } from '../../user/services/userWallet.service.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 
 const normalizeAddressCoords = (addr) => {
@@ -72,10 +73,10 @@ export const purchaseSubscription = async (req, res) => {
         const end = new Date(start);
         end.setDate(end.getDate() + plan.durationDays);
 
-        const amountToPay = Number(plan.price || 0);
+        const amountToPay = Number(plan.price || plan.totalPrice || 0);
         const normalizedAddress = normalizeAddressCoords(deliveryAddress);
 
-        // If Razorpay, just create order and return to frontend
+        // If Razorpay, create order and return key + order info to frontend
         if (paymentMethod === 'razorpay') {
             const amountPaise = Math.round(amountToPay * 100);
             const rzOrder = await createRazorpayOrder(amountPaise, 'INR', `tiffin_plan_${planId}`);
@@ -83,6 +84,7 @@ export const purchaseSubscription = async (req, res) => {
             return res.status(200).json({
                 success: true,
                 razorpay: {
+                    key: getRazorpayKeyId(),
                     orderId: rzOrder.id,
                     amount: amountPaise,
                     currency: 'INR'
@@ -98,7 +100,20 @@ export const purchaseSubscription = async (req, res) => {
             });
         }
 
-        // For non-razorpay (e.g. wallet/offline)
+        // Wallet Payment Handling
+        if (paymentMethod === 'wallet') {
+            const userWallet = await getUserWallet(userId);
+            if ((userWallet.balance || 0) < amountToPay) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Insufficient wallet balance. Balance: ₹${userWallet.balance || 0}, Required: ₹${amountToPay}`
+                });
+            }
+            await deductWalletBalance(userId, amountToPay, `Tiffin Subscription Payment for ${plan.name}`);
+        }
+
+        // For non-razorpay (wallet / cash / offline)
+        const isCash = paymentMethod === 'cash';
         const newSubscription = new TiffinSubscription({
             userId,
             restaurantId: plan.restaurantId,
@@ -106,8 +121,8 @@ export const purchaseSubscription = async (req, res) => {
             startDate: start,
             endDate: end,
             deliveryAddress: normalizedAddress,
-            paymentId: paymentId || `OFFLINE_${Date.now()}`,
-            paymentStatus: 'paid',
+            paymentId: paymentId || (isCash ? `CASH_${Date.now()}` : `WALLET_${Date.now()}`),
+            paymentStatus: isCash ? 'pending' : 'paid',
             amountPaid: amountToPay
         });
 

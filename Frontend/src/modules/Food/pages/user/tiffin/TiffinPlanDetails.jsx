@@ -62,30 +62,42 @@ export default function TiffinPlanDetails() {
     const location = useLocation();
     const navigate = useNavigate();
 
-    const [plan, setPlan] = useState(location.state?.plan || {
-        _id: id,
-        name: 'Homestyle North Indian Tiffin',
-        restaurantName: 'Annapurna Rasoi',
-        mealType: 'Both',
-        durationDays: 30,
-        price: 4500,
-        isVegetarian: true,
-        image: '/food/tiffin/tiffin_box_default.png',
-        itemsDescription: '4 Butter Rotis, Dal Tadka, Seasonal Sabzi, Jeera Rice, Salad, Pickle'
+    const getKitchenName = (p) => p?.restaurantId?.restaurantName || p?.restaurantId?.name || p?.restaurantName || '';
+
+    const [plan, setPlan] = useState(() => {
+        const initial = location.state?.plan;
+        if (initial) {
+            return {
+                ...initial,
+                restaurantName: getKitchenName(initial)
+            };
+        }
+        return {
+            _id: id,
+            name: 'Homestyle North Indian Tiffin',
+            restaurantName: '',
+            mealType: 'Both',
+            durationDays: 30,
+            price: 4500,
+            isVegetarian: true,
+            image: '/food/tiffin/tiffin_box_default.png',
+            itemsDescription: '4 Butter Rotis, Dal Tadka, Seasonal Sabzi, Jeera Rice, Salad, Pickle'
+        };
     });
 
     const [selectedDuration, setSelectedDuration] = useState(plan.durationDays || 30);
     const [selectedTiming, setSelectedTiming] = useState(plan.mealType || 'Both');
 
     useEffect(() => {
-        if (id && (!location.state?.plan || !location.state?.plan?.name)) {
+        if (id) {
             api.get(`/user/tiffin/plan/${id}`)
                 .then((res) => {
                     if (res.data?.success && res.data?.data) {
                         const fetched = res.data.data;
+                        const kName = getKitchenName(fetched) || getKitchenName(location.state?.plan);
                         setPlan({
                             ...fetched,
-                            restaurantName: fetched.restaurantId?.restaurantName || fetched.restaurantId?.name || fetched.restaurantName || "Renuka's Kitchen"
+                            restaurantName: kName
                         });
                         if (fetched.durationDays) setSelectedDuration(fetched.durationDays);
                         if (fetched.mealType) setSelectedTiming(fetched.mealType);
@@ -139,6 +151,8 @@ export default function TiffinPlanDetails() {
         });
     };
 
+    const currentKitchenName = plan.restaurantName || getKitchenName(plan) || 'Featured Kitchen';
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col justify-between pb-32">
             <div>
@@ -149,7 +163,7 @@ export default function TiffinPlanDetails() {
                     </button>
                     <div>
                         <h1 className="font-bold text-gray-900 text-base sm:text-lg">Subscription Details</h1>
-                        <p className="text-xs text-gray-500">{plan.restaurantName || 'Featured Kitchen'}</p>
+                        <p className="text-xs text-gray-500">{currentKitchenName}</p>
                     </div>
                 </div>
 
@@ -181,7 +195,7 @@ export default function TiffinPlanDetails() {
                                     Homestyle Daily Tiffin
                                 </span>
                                 <h2 className="text-xl sm:text-2xl font-black text-gray-900 mt-2">{plan.name}</h2>
-                                <p className="text-xs text-gray-500 mt-1">Kitchen: <span className="font-semibold text-gray-700">{plan.restaurantName || 'Annapurna Rasoi'}</span></p>
+                                <p className="text-xs text-gray-500 mt-1">Kitchen: <span className="font-semibold text-gray-700">{currentKitchenName}</span></p>
 
                                 <p className="text-xs text-gray-600 mt-3 leading-relaxed">
                                     Taste our delicious homestyle cooking for {selectedDuration} days. Freshly prepared with wholesome ingredients and delivered on time.
@@ -247,10 +261,11 @@ export default function TiffinPlanDetails() {
                         <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-[#0cb884]" /> Select Subscription Duration
                         </h3>
-                        <div className="grid grid-cols-3 gap-2.5">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                             {[
                                 { days: 7, label: '1 Week', sub: 'Trial Plan' },
                                 { days: 15, label: '15 Days', sub: 'Popular' },
+                                { days: 28, label: '28 Days', sub: '4 Weeks' },
                                 { days: 30, label: '1 Month', sub: 'Best Value' },
                             ].map((d) => (
                                 <button

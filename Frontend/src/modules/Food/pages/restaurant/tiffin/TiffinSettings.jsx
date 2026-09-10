@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 const DURATION_PRESETS = [
     { label: '7 Days (Weekly)', days: 7 },
     { label: '15 Days (Bi-weekly)', days: 15 },
+    { label: '28 Days (4 Weeks)', days: 28 },
     { label: '30 Days (Monthly)', days: 30 },
 ];
 
