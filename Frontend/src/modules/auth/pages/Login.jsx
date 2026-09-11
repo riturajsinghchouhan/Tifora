@@ -9,6 +9,7 @@ import {
   Star,
   ChevronDown,
   User,
+  Headphones,
 } from "lucide-react"
 import { toast } from "sonner"
 import { authAPI, userAPI } from "@food/api"
@@ -286,7 +287,17 @@ export default function UnifiedOTPFastLogin() {
         style={{ backgroundImage: `url(${authBg})` }}
       >
         {/* Main Content Overlay */}
-        <div className="relative z-10 w-full px-5 sm:px-6 pt-10 sm:pt-12 pb-4 flex flex-col items-center">
+        <div className="relative z-10 w-full px-5 sm:px-6 pt-4 sm:pt-5 pb-4 flex flex-col items-center">
+          {/* Top Header Row with Support Link */}
+          <div className="w-full flex items-center justify-end mb-2">
+            <Link
+              to="/user/auth/support"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-[#00C28A] text-xs font-bold border border-slate-200/80 shadow-2xs backdrop-blur-md transition-all active:scale-95"
+            >
+              <Headphones className="w-3.5 h-3.5 text-[#00C28A]" />
+              <span>Support</span>
+            </Link>
+          </div>
 
           {/* Top Logo & Branding */}
           <div className="flex flex-col items-center text-center mb-5 sm:mb-6">
@@ -531,8 +542,18 @@ export default function UnifiedOTPFastLogin() {
             <img src={logoNew} alt="Tifora" className="w-full h-full object-contain" />
           </div>
 
-          {/* Terms & Privacy Policy Footer */}
-          <div className="w-full text-center mt-6">
+          {/* Terms & Privacy Policy Footer with Support Link */}
+          <div className="w-full text-center mt-6 space-y-2.5">
+            <div>
+              <Link
+                to="/user/auth/support"
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white/90 hover:bg-white text-slate-700 hover:text-[#00C28A] border border-slate-200/90 text-xs font-bold shadow-2xs transition-all active:scale-95"
+              >
+                <Headphones className="w-3.5 h-3.5 text-[#00C28A]" />
+                <span>Need help? Contact Support</span>
+              </Link>
+            </div>
+
             <p className="text-[11px] text-slate-500 font-normal">
               By continuing, you agree to our<br />
               <Link to="/profile/terms" className="text-[#00C28A] font-semibold hover:underline">
