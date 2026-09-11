@@ -8,7 +8,6 @@ import {
   Heart,
   ArrowRight,
   Bike,
-  MapPin,
 } from "lucide-react";
 import api from "@food/api";
 
@@ -170,7 +169,6 @@ export default function HomeTiffinPlansMarquee() {
 
             const rating = plan.rating || (4.6 + ((index * 7) % 4) * 0.1).toFixed(1);
             const cuisine = plan.cuisine || "Homestyle • Nutritious";
-            const distance = plan.distance || `${(0.9 + (index % 5) * 0.4).toFixed(1)} km`;
 
             const mealLabel =
               plan.mealType === "Morning"
@@ -263,16 +261,11 @@ export default function HomeTiffinPlansMarquee() {
                     </p>
                   </div>
 
-                  {/* Row 3: Timing & Distance Row */}
-                  <div className="flex items-center gap-2 text-[10.5px] text-gray-600 dark:text-gray-300 font-medium">
+                  {/* Row 3: Timing Row */}
+                  <div className="flex items-center text-[10.5px] text-gray-600 dark:text-gray-300 font-medium">
                     <div className="flex items-center gap-1 truncate">
                       <Clock className="w-3 h-3 text-gray-400 shrink-0" />
                       <span className="truncate">{mealLabel}</span>
-                    </div>
-                    <span className="text-gray-300 dark:text-gray-600">•</span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <MapPin className="w-3 h-3 text-gray-400 shrink-0" />
-                      <span>{distance}</span>
                     </div>
                   </div>
 

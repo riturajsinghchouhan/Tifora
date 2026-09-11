@@ -16,7 +16,7 @@ const tiffinPlanSchema = new mongoose.Schema(
         durationDays: {
             type: Number,
             required: true,
-            enum: [7, 15, 30, 90]
+            min: 1
         },
         mealType: {
             type: String,

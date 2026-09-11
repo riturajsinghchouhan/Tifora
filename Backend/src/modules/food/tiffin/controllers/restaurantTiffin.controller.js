@@ -138,7 +138,7 @@ export const createTiffinPlan = async (req, res) => {
         res.status(201).json({ success: true, data: newPlan, message: 'Tiffin Plan created successfully' });
     } catch (error) {
         console.error('Error creating Tiffin Plan:', error);
-        res.status(500).json({ success: false, message: 'Server error creating Tiffin Plan' });
+        res.status(500).json({ success: false, message: error.message || 'Server error creating Tiffin Plan' });
     }
 };
 
