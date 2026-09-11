@@ -85,8 +85,9 @@ export default function TiffinPlanDetails() {
         };
     });
 
-    const [selectedDuration, setSelectedDuration] = useState(plan.durationDays || 30);
-    const [selectedTiming, setSelectedTiming] = useState(plan.mealType || 'Both');
+    const selectedDuration = plan.durationDays || 30;
+    const selectedTiming = plan.mealType || 'Both';
+    const totalPrice = plan.price || 0;
 
     useEffect(() => {
         if (id) {
@@ -99,17 +100,24 @@ export default function TiffinPlanDetails() {
                             ...fetched,
                             restaurantName: kName
                         });
-                        if (fetched.durationDays) setSelectedDuration(fetched.durationDays);
-                        if (fetched.mealType) setSelectedTiming(fetched.mealType);
                     }
                 })
                 .catch(() => {});
         }
     }, [id, location.state]);
 
-    // Calculate price adjustments
-    const baseDailyPrice = (plan.price || 4500) / (plan.durationDays || 30);
-    const calculatedPrice = Math.round(baseDailyPrice * selectedDuration * (selectedTiming === 'Both' ? 1 : 0.6));
+    const getTimingInfo = (type) => {
+        switch (type) {
+            case 'Morning':
+                return { label: 'Morning Slot (11:00 AM)', tag: 'Lunch Only' };
+            case 'Evening':
+                return { label: 'Evening Slot (7:00 PM)', tag: 'Dinner Only' };
+            case 'Both':
+            default:
+                return { label: 'Morning (11 AM) & Evening (7 PM)', tag: 'Lunch + Dinner' };
+        }
+    };
+    const timingInfo = getTimingInfo(selectedTiming);
 
     const getParsedItems = () => {
         if (plan.items && Array.isArray(plan.items) && plan.items.length > 0) {
@@ -145,7 +153,7 @@ export default function TiffinPlanDetails() {
                     ...plan,
                     durationDays: selectedDuration,
                     mealType: selectedTiming,
-                    totalPrice: calculatedPrice
+                    totalPrice: totalPrice
                 }
             }
         });
@@ -256,71 +264,40 @@ export default function TiffinPlanDetails() {
                         </div>
                     </div>
 
-                    {/* Duration Selector */}
+                    {/* Subscription Duration */}
                     <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm space-y-3">
                         <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-[#0cb884]" /> Select Subscription Duration
+                            <Calendar className="w-4 h-4 text-[#0cb884]" /> Subscription Duration
                         </h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                            {[
-                                { days: 7, label: '1 Week', sub: 'Trial Plan' },
-                                { days: 15, label: '15 Days', sub: 'Popular' },
-                                { days: 28, label: '28 Days', sub: '4 Weeks' },
-                                { days: 30, label: '1 Month', sub: 'Best Value' },
-                            ].map((d) => (
-                                <button
-                                    key={d.days}
-                                    onClick={() => setSelectedDuration(d.days)}
-                                    className={`py-3.5 px-2 rounded-2xl text-center border-2 transition-all font-bold text-xs active:scale-95 ${
-                                        selectedDuration === d.days
-                                            ? 'border-[#0cb884] bg-[#0cb884]/10 text-[#0cb884] shadow-sm'
-                                            : 'border-gray-200 hover:border-gray-300 text-gray-700 bg-white'
-                                    }`}
-                                >
-                                    <div className="font-extrabold text-sm">{d.label}</div>
-                                    <div className="text-[10px] font-normal mt-0.5 opacity-80">{d.days} Days • {d.sub}</div>
-                                </button>
-                            ))}
+                        <div className="p-4 rounded-2xl border-2 border-[#0cb884] bg-[#0cb884]/10 flex items-center justify-between">
+                            <div>
+                                <h4 className="font-extrabold text-base text-gray-900">{selectedDuration} Days Plan</h4>
+                                <p className="text-xs text-gray-500 mt-0.5">Fixed plan duration configured for this subscription</p>
+                            </div>
+                            <span className="text-xs font-bold bg-[#0cb884] text-white px-3 py-1 rounded-full shadow-sm">
+                                {selectedDuration} Days
+                            </span>
                         </div>
                     </div>
 
-                    {/* Meal Timing Selector */}
+                    {/* Meal Timings */}
                     <div className="bg-white rounded-3xl p-5 border border-gray-200 shadow-sm space-y-3">
                         <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                             <Clock className="w-4 h-4 text-[#0cb884]" /> Meal Timings
                         </h3>
-                        <div className="space-y-2.5">
-                            {[
-                                { type: 'Both', label: 'Morning (11 AM) & Evening (7 PM)', tag: 'Lunch + Dinner' },
-                                { type: 'Morning', label: 'Morning Slot (11:00 AM)', tag: 'Lunch Only' },
-                                { type: 'Evening', label: 'Evening Slot (7:00 PM)', tag: 'Dinner Only' }
-                            ].map((timing) => (
-                                <label
-                                    key={timing.type}
-                                    onClick={() => setSelectedTiming(timing.type)}
-                                    className={`flex items-center justify-between p-3.5 sm:p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                                        selectedTiming === timing.type
-                                            ? 'border-[#0cb884] bg-[#0cb884]/10 shadow-sm'
-                                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="radio"
-                                            name="timing"
-                                            checked={selectedTiming === timing.type}
-                                            onChange={() => setSelectedTiming(timing.type)}
-                                            className="text-[#0cb884] focus:ring-[#0cb884] h-4 w-4"
-                                        />
-                                        <div>
-                                            <p className="text-xs sm:text-sm font-bold text-gray-900">{timing.label}</p>
-                                            <span className="text-[10px] font-semibold text-[#0cb884] bg-[#0cb884]/20 px-2 py-0.5 rounded">
-                                                {timing.tag}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </label>
-                            ))}
+                        <div className="p-4 rounded-2xl border-2 border-[#0cb884] bg-[#0cb884]/10 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-3.5 h-3.5 rounded-full bg-[#0cb884] shrink-0" />
+                                <div>
+                                    <p className="text-xs sm:text-sm font-bold text-gray-900">{timingInfo.label}</p>
+                                    <span className="text-[10px] font-semibold text-[#0cb884] bg-[#0cb884]/20 px-2 py-0.5 rounded mt-0.5 inline-block">
+                                        {timingInfo.tag}
+                                    </span>
+                                </div>
+                            </div>
+                            <span className="text-xs font-bold text-[#0cb884] bg-white px-2.5 py-1 rounded-lg border border-[#0cb884]/20 shrink-0">
+                                {selectedTiming}
+                            </span>
                         </div>
                     </div>
 
@@ -338,7 +315,7 @@ export default function TiffinPlanDetails() {
                     <div>
                         <span className="text-[11px] text-gray-500 font-medium block">Total Subscription Price</span>
                         <div className="text-2xl font-black text-gray-900">
-                            ₹{calculatedPrice}
+                            ₹{totalPrice}
                             <span className="text-xs font-normal text-gray-500 ml-1">/{selectedDuration} Days</span>
                         </div>
                     </div>
