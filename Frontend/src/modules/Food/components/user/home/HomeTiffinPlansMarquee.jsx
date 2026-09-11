@@ -148,7 +148,6 @@ export default function HomeTiffinPlansMarquee() {
             const planKey = `${plan._id || index}`;
             const isFav = !!favorites[plan._id];
             const theme = THEME_ACCENTS[index % THEME_ACCENTS.length];
-            const dailyPrice = Math.round((plan.price || 0) / (plan.durationDays || 30));
             const restaurantName =
               plan.kitchenName ||
               plan.restaurantId?.restaurantName ||
@@ -279,9 +278,6 @@ export default function HomeTiffinPlansMarquee() {
                     <div className="flex items-baseline gap-1">
                       <span className="text-[13.5px] font-black text-gray-900 dark:text-white">
                         ₹{plan.price}
-                      </span>
-                      <span className={`text-[9.5px] font-bold ${theme.accent}`}>
-                        (₹{dailyPrice}/d)
                       </span>
                     </div>
                   </div>

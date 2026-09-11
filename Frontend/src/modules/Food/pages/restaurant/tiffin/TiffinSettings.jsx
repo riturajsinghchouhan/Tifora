@@ -370,7 +370,6 @@ export default function TiffinSettings() {
                     /* Plans List Grid */
                     <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
                         {plans.map(plan => {
-                            const perDayCost = Math.round(plan.price / (plan.durationDays || 1));
                             return (
                                 <div 
                                     key={plan._id} 
@@ -416,9 +415,6 @@ export default function TiffinSettings() {
                                                 <div className="text-right shrink-0">
                                                     <div className="text-2xl font-black text-gray-900 tracking-tight">
                                                         ₹{plan.price}
-                                                    </div>
-                                                    <div className="text-[11px] font-semibold text-orange-600">
-                                                        ~₹{perDayCost}/day
                                                     </div>
                                                 </div>
                                             </div>
@@ -635,11 +631,6 @@ export default function TiffinSettings() {
                                     <label className="block text-xs font-bold uppercase tracking-wider text-gray-700">
                                         Total Subscription Price (₹) <span className="text-red-500">*</span>
                                     </label>
-                                    {formData.price && formData.durationDays > 0 && (
-                                        <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
-                                            ₹{Math.round(formData.price / formData.durationDays)} / day
-                                        </span>
-                                    )}
                                 </div>
                                 <div className="relative">
                                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-base">₹</span>
