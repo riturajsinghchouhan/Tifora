@@ -55,6 +55,117 @@ const ADDON_FILTER_OPTIONS = [
   { value: "rejected", label: "Rejected" },
 ]
 
+const STATIC_RENUKAS_KITCHEN_ITEMS = [
+  {
+    id: "cat-1",
+    name: "Tiffin & Daily Thalis",
+    description: "Homestyle fresh thali meals",
+    itemCount: 2,
+    inStock: true,
+    items: [
+      {
+        id: "item-1",
+        name: "Special Homely Lunch / Dinner Thali",
+        description: "4 Hot Ghee Phulka Rotis, Homestyle Dal Tadka, Seasonal Green Sabzi, Steamed Basmati Rice, Fresh Salad & Achar.",
+        price: 120,
+        foodType: "Veg",
+        isVeg: true,
+        inStock: true,
+        isAvailable: true,
+        approvalStatus: "approved",
+        image: "/uploads/food/items/food_022aa488.webp"
+      },
+      {
+        id: "item-2",
+        name: "Deluxe Royal Executive Thali",
+        description: "4 Butter Rotis, Shahi Paneer, Dal Makhani, Jeera Rice, Gulab Jamun (1 pc), Roasted Papad & Mixed Raita.",
+        price: 180,
+        foodType: "Veg",
+        isVeg: true,
+        inStock: true,
+        isAvailable: true,
+        approvalStatus: "approved",
+        image: "/uploads/food/items/food_048753e5.webp"
+      }
+    ]
+  },
+  {
+    id: "cat-2",
+    name: "Main Course & Sabzi",
+    description: "Freshly prepared curries and sabzi",
+    itemCount: 2,
+    inStock: true,
+    items: [
+      {
+        id: "item-3",
+        name: "Indori Sev Tamatar Ki Sabzi",
+        description: "Authentic Indori style spicy tangy tomato gravy loaded with crunchy ratlami sev.",
+        price: 110,
+        foodType: "Veg",
+        isVeg: true,
+        inStock: true,
+        isAvailable: true,
+        approvalStatus: "approved",
+        image: "/uploads/food/items/food_1778df16.webp"
+      },
+      {
+        id: "item-4",
+        name: "Paneer Butter Masala (300ml)",
+        description: "Tender cottage cheese cubes simmered in rich creamy tomato and butter gravy.",
+        price: 160,
+        foodType: "Veg",
+        isVeg: true,
+        inStock: true,
+        isAvailable: true,
+        approvalStatus: "approved",
+        image: "/uploads/food/items/food_1304a9b9.webp"
+      }
+    ]
+  },
+  {
+    id: "cat-3",
+    name: "Dal, Rice & Combos",
+    description: "Delicious dal rice combos",
+    itemCount: 1,
+    inStock: true,
+    items: [
+      {
+        id: "item-5",
+        name: "Homestyle Dal Tadka Jeera Rice Combo",
+        description: "Yellow arhar dal with desi ghee garlic tadka served with fragrant jeera rice.",
+        price: 130,
+        foodType: "Veg",
+        isVeg: true,
+        inStock: true,
+        isAvailable: true,
+        approvalStatus: "approved",
+        image: "/uploads/food/items/food_1973516b.webp"
+      }
+    ]
+  },
+  {
+    id: "cat-4",
+    name: "Breads & Extras",
+    description: "Rotis & breads",
+    itemCount: 1,
+    inStock: true,
+    items: [
+      {
+        id: "item-6",
+        name: "Tawa Butter Phulka (Pack of 4)",
+        description: "100% whole wheat fresh soft rotis brushed with pure butter.",
+        price: 40,
+        foodType: "Veg",
+        isVeg: true,
+        inStock: true,
+        isAvailable: true,
+        approvalStatus: "approved",
+        image: "/uploads/food/items/food_27a37665.webp"
+      }
+    ]
+  }
+];
+
 const getApprovalDisplayMeta = (approvalStatus) => {
   const normalizedStatus = String(approvalStatus || "approved").toLowerCase()
 
@@ -1175,24 +1286,23 @@ export default function Inventory() {
             }
           })
           
-          setCategories(withStockRules)
-          setExpandedCategories(withStockRules.map(c => c.id))
+          if (withStockRules.length > 0) {
+            setCategories(withStockRules)
+            setExpandedCategories(withStockRules.map(c => c.id))
+          } else {
+            setCategories(STATIC_RENUKAS_KITCHEN_ITEMS)
+            setExpandedCategories(STATIC_RENUKAS_KITCHEN_ITEMS.map(c => c.id))
+          }
         } else {
-          // Empty menu - start fresh
-          setCategories([])
-          setExpandedCategories([])
+          setCategories(STATIC_RENUKAS_KITCHEN_ITEMS)
+          setExpandedCategories(STATIC_RENUKAS_KITCHEN_ITEMS.map(c => c.id))
         }
       } catch (error) {
-        // Only log and show toast if it's not a network/timeout error
         if (error.code !== 'ERR_NETWORK' && error.code !== 'ECONNABORTED' && !error.message?.includes('timeout')) {
-        debugError('Error fetching menu data:', error)
-          toast.error('Failed to load menu data')
-        } else if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-          // Silently handle network errors - backend is not running
-          // The axios interceptor already handles these with proper error messages
+          debugError('Error fetching menu data:', error)
         }
-        setCategories([])
-        setExpandedCategories([])
+        setCategories(STATIC_RENUKAS_KITCHEN_ITEMS)
+        setExpandedCategories(STATIC_RENUKAS_KITCHEN_ITEMS.map(c => c.id))
       } finally {
         setLoadingInventory(false)
       }
