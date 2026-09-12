@@ -67,6 +67,7 @@ export default function AdminHome() {
 
   // Fetch dashboard stats from backend when filters change
   useEffect(() => {
+    let isMounted = true
     const fetchDashboardStats = async () => {
       try {
         setIsLoading(true)
@@ -75,6 +76,7 @@ export default function AdminHome() {
           ...(selectedZone !== "all" ? { zoneId: selectedZone } : {}),
         }
         const response = await adminAPI.getDashboardStats(params)
+        if (!isMounted) return
         if (response.data?.success && response.data?.data) {
           setDashboardData(response.data.data)
           debugLog("Dashboard stats fetched:", response.data.data)
@@ -83,14 +85,20 @@ export default function AdminHome() {
           debugError("Invalid dashboard response format:", response.data)
         }
       } catch (error) {
+        if (!isMounted) return
         setDashboardData(null)
         debugError("Error fetching dashboard stats:", error)
       } finally {
-        setIsLoading(false)
+        if (isMounted) setIsLoading(false)
       }
     }
 
     fetchDashboardStats()
+    const refreshTimer = window.setInterval(fetchDashboardStats, 30000)
+    return () => {
+      isMounted = false
+      window.clearInterval(refreshTimer)
+    }
   }, [selectedZone, selectedPeriod])
 
   // Get order stats from real data

@@ -477,7 +477,10 @@ export async function getRestaurantMenuPdfDownloadUrl(restaurantId) {
 
 const CANCELLED_ORDER_STATUSES = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead'];
 const PENDING_ORDER_STATUSES = ['created', 'confirmed', 'preparing', 'ready_for_pickup', 'picked_up'];
-const DASHBOARD_PENDING_ORDER_STATUSES = ['created', 'confirmed'];
+// Keep dashboard counts aligned with the corresponding admin order pages.
+// "Pending" means an order waiting for restaurant action; confirmed orders are
+// shown under the separate "Accepted" page.
+const DASHBOARD_PENDING_ORDER_STATUSES = ['created'];
 const DASHBOARD_PROCESSING_ORDER_STATUSES = ['preparing', 'ready_for_pickup'];
 const DELIVERED_ORDER_STATUS_EXPR = { $eq: ['$orderStatus', 'delivered'] };
 const DASHBOARD_DERIVED_PLATFORM_FEE_EXPR = {

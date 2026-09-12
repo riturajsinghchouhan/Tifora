@@ -323,7 +323,10 @@ export const adminAPI = {
     adminClient.get("/food/admin/contact-messages", { params }),
   /** Dashboard summary stats (admin home) */
   getDashboardStats: (params = {}) =>
-    adminClient.get("/food/admin/dashboard-stats", { params }),
+    adminClient.get("/food/admin/dashboard-stats", {
+      params: { ...params, _ts: Date.now() },
+      headers: { "Cache-Control": "no-cache" },
+    }),
   /** Live monitor: restaurants + delivery partners with locations */
   getLiveMonitorStatus: () =>
     adminClient.get("/food/admin/live-monitor/status"),
