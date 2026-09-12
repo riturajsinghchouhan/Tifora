@@ -116,7 +116,7 @@ export const adminSidebarMenu = [
         subItems: [
           { label: "Restaurants List", path: "/admin/food/restaurants" },
           { label: "Menu Bulk Upload", path: "/admin/food/restaurants/menu-bulk-upload" },
-          { label: "New Joining Request", path: "/admin/food/restaurants/joining-request" },
+          { label: "Restaurant Registrations", path: "/admin/food/restaurant-registrations" },
           { label: "Restaurant Commission", path: "/admin/food/restaurants/commission" },
           { label: "Restaurant Discount", path: "/admin/food/restaurants/discount" },
           { label: "Restaurant Reviews", path: "/admin/food/restaurants/reviews" },
@@ -211,7 +211,7 @@ export const adminSidebarMenu = [
         label: "Deliveryman",
         icon: "Package",
         subItems: [
-          { label: "New Join Request", path: "/admin/food/delivery-partners/join-request" },
+          { label: "Delivery Partner Registrations", path: "/admin/food/delivery-partner-registrations" },
           { label: "Deliveryman List", path: "/admin/food/delivery-partners" },
           { label: "Deliveryman Reviews", path: "/admin/food/delivery-partners/reviews" },
           { label: "Bonus", path: "/admin/food/delivery-partners/bonus" },

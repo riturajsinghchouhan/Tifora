@@ -12,6 +12,7 @@ import { ValidationError } from '../../../../core/auth/errors.js';
 import { getDeliveryCashLimitSettings, getDeliveryOnboardingFeeSettings } from '../../admin/services/admin.service.js';
 import { createRazorpayOrder, getRazorpayKeyId, isRazorpayConfigured, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
 import { FoodDeliveryOnboardingPayment } from '../models/deliveryOnboardingPayment.model.js';
+import { markOnboardingSubmitted } from '../../admin/services/onboardingRegistration.service.js';
 
 const TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead'];
 const ACTIVE_TIFFIN_DELIVERY_STATUSES = ['pending', 'assigned', 'out_for_delivery'];
@@ -390,6 +391,7 @@ export const registerDeliveryPartner = async (payload, files) => {
         onboardingFee,
         ...images
     });
+    await markOnboardingSubmitted('DELIVERY_PARTNER', normalizedPhone, partner._id);
 
     // Update FCM token if provided
     if (fcmToken) {

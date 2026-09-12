@@ -30,6 +30,7 @@ const DeliveryBoyViewMap = lazy(() => import("@food/pages/admin/restaurant/Deliv
 const RestaurantsList = lazy(() => import("@food/pages/admin/restaurant/RestaurantsList"));
 const AddRestaurant = lazy(() => import("@food/pages/admin/restaurant/AddRestaurant"));
 const JoiningRequest = lazy(() => import("@food/pages/admin/restaurant/JoiningRequest"));
+const OnboardingRegistrations = lazy(() => import("@food/pages/admin/OnboardingRegistrations"));
 const RestaurantCommission = lazy(() => import("@food/pages/admin/restaurant/RestaurantCommission"));
 const RestaurantDiscount = lazy(() => import("@food/pages/admin/restaurant/RestaurantDiscount"));
 const RestaurantComplaints = lazy(() => import("@food/pages/admin/restaurant/RestaurantComplaints"));
@@ -209,6 +210,7 @@ export default function AdminRouter() {
             <Route path="restaurants/add" element={<AddRestaurant />} />
             <Route path="restaurants/edit/:id" element={<EditRestaurant />} />
             <Route path="restaurants/joining-request" element={<JoiningRequest />} />
+            <Route path="restaurant-registrations" element={<OnboardingRegistrations userType="RESTAURANT" />} />
             <Route path="restaurants/commission" element={<RestaurantCommission />} />
             <Route path="restaurants/discount" element={<RestaurantDiscount />} />
             <Route path="restaurants/complaints" element={<RestaurantComplaints />} />
@@ -258,6 +260,7 @@ export default function AdminRouter() {
             <Route path="delivery-partners" element={<DeliverymanList />} />
             <Route path="delivery-partners/add" element={<AddDeliveryman />} />
             <Route path="delivery-partners/join-request" element={<JoinRequest />} />
+            <Route path="delivery-partner-registrations" element={<OnboardingRegistrations userType="DELIVERY_PARTNER" />} />
             <Route path="delivery-partners/reviews" element={<DeliverymanReviews />} />
             <Route path="delivery-partners/bonus" element={<DeliverymanBonus />} />
             <Route path="delivery-partners/earning-addon" element={<EarningAddon />} />

@@ -1283,6 +1283,19 @@ export async function getDeliveryJoinRequests(req, res, next) {
     }
 }
 
+export async function getOnboardingRegistrations(req, res, next) {
+    try {
+        const registrations = await adminService.getOnboardingRegistrations(req.query);
+        return res.status(200).json({
+            success: true,
+            message: 'Onboarding registrations retrieved successfully',
+            data: { registrations }
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
 
 // ----- Support tickets -----
 export async function getSupportTicketStats(req, res, next) {

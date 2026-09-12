@@ -10,6 +10,7 @@ import { upsertOutletTimingsForRestaurant } from './outletTimings.service.js';
 import { getDrivingDistances } from '../../../../services/googleMaps.service.js';
 import { parseQueryLimit, parseQueryPage } from '../../../../utils/helpers.js';
 import { normalizeMediaUrl, toMediaObject, toMediaArray } from '../../../../utils/mediaUrl.js';
+import { markOnboardingSubmitted } from '../../admin/services/onboardingRegistration.service.js';
 
 const normalizeName = (value) =>
     String(value || '')
@@ -408,6 +409,7 @@ export const registerRestaurant = async (payload, files) => {
             pendingUpdateReason: 'New Registration',
             ...images
         });
+        await markOnboardingSubmitted('RESTAURANT', ownerPhone, restaurant._id);
 
         try {
             const outletTimingsToSave = {};

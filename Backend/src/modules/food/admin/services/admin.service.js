@@ -44,6 +44,7 @@ import { FoodDeliveryWithdrawal } from '../../delivery/models/foodDeliveryWithdr
 import { FoodDeliveryWallet } from '../../delivery/models/deliveryWallet.model.js';
 import { FoodDeliveryCashDeposit } from '../../delivery/models/foodDeliveryCashDeposit.model.js';
 import { FoodDeliveryOnboardingPayment } from '../../delivery/models/deliveryOnboardingPayment.model.js';
+import { FoodOnboardingRegistration } from '../models/onboardingRegistration.model.js';
 import { TiffinCommissionSetting } from '../../tiffin/models/tiffinCommission.model.js';
 import { TiffinPayout } from '../../tiffin/models/tiffinPayout.model.js';
 import {
@@ -3996,6 +3997,31 @@ export async function expireExpiredOffers() {
     );
 }
 // ----- Delivery join requests -----
+export async function getOnboardingRegistrations(query = {}) {
+    const userType = String(query.userType || '').trim().toUpperCase();
+    if (!['RESTAURANT', 'DELIVERY_PARTNER'].includes(userType)) {
+        throw new ValidationError('userType must be RESTAURANT or DELIVERY_PARTNER');
+    }
+
+    const status = String(query.status || '').trim().toUpperCase();
+    const search = String(query.search || '').trim();
+    const filter = { userType };
+    if (status && ['REGISTERED', 'IN_PROGRESS', 'SUBMITTED'].includes(status)) {
+        filter.onboardingStatus = status;
+    }
+    if (search) filter.phone = { $regex: search.replace(/\D/g, ''), $options: 'i' };
+
+    const registrations = await FoodOnboardingRegistration.find(filter)
+        .sort({ lastActiveAt: -1, createdAt: -1 })
+        .lean();
+
+    return registrations.map((registration) => ({
+        ...registration,
+        progress: registration.onboardingStatus === 'SUBMITTED' ? 100 : 0,
+        pendingStep: registration.onboardingStatus === 'SUBMITTED' ? 'Admin verification' : 'Profile onboarding'
+    }));
+}
+
 export async function getDeliveryJoinRequests(query) {
     const { status = 'pending', page = 1, limit = 1000, search, zone, vehicleType } = query;
     const filter = {};

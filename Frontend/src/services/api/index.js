@@ -289,6 +289,8 @@ export const adminAPI = {
     return authService.logout(token, resolvedFcmToken, platform);
   },
   // Restaurant approvals and join requests
+  getOnboardingRegistrations: (params = {}) =>
+    adminClient.get("/food/admin/onboarding-registrations", { params }),
   getPendingRestaurants: () =>
     adminClient.get("/food/admin/restaurants/pending"),
   /** List restaurant complaints (admin). */

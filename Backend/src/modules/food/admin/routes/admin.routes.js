@@ -167,6 +167,7 @@ router.patch('/delivery/withdrawals/:id', adminController.updateDeliveryWithdraw
 router.get('/delivery/cash-limit-settlements', adminController.getCashLimitSettlements);
 
 // ----- Delivery partners & general -----
+router.get('/onboarding-registrations', adminController.getOnboardingRegistrations);
 router.get('/delivery/join-requests', adminController.getDeliveryJoinRequests);
 router.get('/delivery/available-partners', adminController.getAvailableDeliveryPartners);
 router.get('/delivery/wallets', adminController.getDeliveryWallets);

@@ -157,7 +157,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
 
     // RESTAURANT MANAGEMENT
     if (l === "restaurants") return (badges.restaurants || 0) + (badges.restaurantComplaints || 0)
-    if (p.includes("restaurants/joining-request")) return badges.restaurants || 0
+    if (p.includes("restaurant-registrations")) return badges.restaurants || 0
     if (p.includes("restaurants/complaints")) return badges.restaurantComplaints || 0
 
     // ORDER MANAGEMENT
@@ -171,7 +171,7 @@ export default function AdminSidebar({ isOpen = false, onClose, onCollapseChange
 
     // DELIVERYMAN MANAGEMENT
     if (l === "deliveryman") return (badges.deliveryPartners || 0) + (badges.earningAddons || 0)
-    if (p.includes("delivery-partners/join-request")) return badges.deliveryPartners || 0
+    if (p.includes("delivery-partner-registrations")) return badges.deliveryPartners || 0
     if (p.includes("delivery-withdrawal")) return badges.deliveryWithdrawals || 0
     if (p.includes("delivery-emergency-help")) return badges.emergencyHelp || 0
     if (p.includes("delivery-support-tickets")) return badges.deliverySupportTickets || 0

@@ -5,6 +5,7 @@ import { FoodAdmin } from "../admin/admin.model.js";
 import { AdminResetOtp } from "../admin/adminResetOtp.model.js";
 import { FoodRestaurant } from "../../modules/food/restaurant/models/restaurant.model.js";
 import { FoodDeliveryPartner } from "../../modules/food/delivery/models/deliveryPartner.model.js";
+import { recordOnboardingLogin } from "../../modules/food/admin/services/onboardingRegistration.service.js";
 import { FoodReferralSettings } from "../../modules/food/admin/models/referralSettings.model.js";
 import { FoodReferralLog } from "../../modules/food/admin/models/referralLog.model.js";
 import { createOrUpdateOtp, verifyOtp } from "../otp/otp.service.js";
@@ -364,6 +365,7 @@ export const verifyRestaurantOtpAndLogin = async (phone, otp, fcmToken, platform
   });
     const restaurantDoc = restaurant;
     if (!restaurantDoc) {
+      await recordOnboardingLogin("RESTAURANT", phone);
       return {
         needsRegistration: true,
         phone,
@@ -460,6 +462,7 @@ export const verifyDeliveryOtpAndLogin = async (phone, otp, fcmToken, platform) 
   });
 
   if (!deliveryPartner) {
+    await recordOnboardingLogin("DELIVERY_PARTNER", phone);
     return { needsRegistration: true, phone };
   }
 
