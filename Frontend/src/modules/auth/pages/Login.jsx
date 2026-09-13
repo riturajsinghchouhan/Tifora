@@ -596,7 +596,7 @@ export default function UnifiedOTPFastLogin() {
                 id="name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Rahul Sharma"
+                placeholder="e.g. Rituraj Singh Chouhan"
                 className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium text-sm focus:border-[#00C28A] focus:bg-white focus:ring-2 focus:ring-[#00C28A]/20 transition-all outline-none"
                 autoFocus
               />
