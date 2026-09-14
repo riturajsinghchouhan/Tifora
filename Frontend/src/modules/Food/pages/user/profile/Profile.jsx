@@ -659,7 +659,6 @@ export default function Profile() {
             </motion.div>
           </Link>
 
-          <Link to="/user/profile/refer-earn" className="block">
 {/* <Link to="/user/profile/refer-earn" className="block">
             <motion.div
               whileHover={{ x: 4, scale: 1.01 }}
@@ -705,7 +704,6 @@ export default function Profile() {
               </CardContent>
             </Card>
             </motion.div>
-          </Link>
           </Link> */}
 
           <motion.div
