@@ -660,6 +660,7 @@ export default function Profile() {
           </Link>
 
           <Link to="/user/profile/refer-earn" className="block">
+{/* <Link to="/user/profile/refer-earn" className="block">
             <motion.div
               whileHover={{ x: 4, scale: 1.01 }}
               transition={{ duration: 0.2, type: "spring", stiffness: 300 }}>
@@ -705,6 +706,7 @@ export default function Profile() {
             </Card>
             </motion.div>
           </Link>
+          </Link> */}
 
           <motion.div
             whileHover={{ x: 4, scale: 1.01 }}
