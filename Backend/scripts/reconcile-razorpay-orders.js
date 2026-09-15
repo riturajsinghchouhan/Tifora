@@ -35,11 +35,15 @@ const CANDIDATE_STATUSES = [
     'created'
 ];
 
-async function findCandidateOrders() {
+// Razorpay order id / payment status live on FoodTransaction, not FoodOrder — the
+// order document has no "payment" field of its own (it's merged in at read time via
+// attachFinancialSnapshotToOrder). So candidates must be found by scanning
+// transactions first, then joining back to the order for its current status.
+async function findCandidateTransactions() {
     const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
-    return FoodOrder.find({
+    return FoodTransaction.find({
         'payment.razorpay.orderId': { $exists: true, $ne: '' },
-        orderStatus: { $in: CANDIDATE_STATUSES },
+        'payment.status': { $nin: ['paid', 'refunded'] },
         createdAt: { $gte: since }
     }).lean();
 }
@@ -55,21 +59,22 @@ async function main() {
 
     try {
         console.log(`Mode: ${shouldApply ? 'APPLY (will restore paid orders)' : 'DRY RUN (report only — pass --apply to fix)'}`);
-        console.log(`Scanning Razorpay orders created in the last ${sinceDays} day(s)...\n`);
+        console.log(`Scanning Razorpay transactions created in the last ${sinceDays} day(s)...\n`);
 
-        const candidates = await findCandidateOrders();
-        console.log(`Found ${candidates.length} candidate order(s) with a Razorpay order id to check.\n`);
+        const candidateTransactions = await findCandidateTransactions();
+        console.log(`Found ${candidateTransactions.length} unpaid/failed Razorpay transaction(s) to check.\n`);
 
         const restored = [];
         const stillUnpaid = [];
         const errors = [];
 
-        for (const order of candidates) {
-            const razorpayOrderId = order.payment?.razorpay?.orderId || order.gateway?.razorpayOrderId;
+        for (const transaction of candidateTransactions) {
+            const razorpayOrderId = transaction.payment?.razorpay?.orderId || transaction.gateway?.razorpayOrderId;
             if (!razorpayOrderId) continue;
 
-            const transaction = await FoodTransaction.findOne({ orderId: order._id }).lean();
-            if (String(transaction?.payment?.status || '').toLowerCase() === 'paid') continue;
+            const order = await FoodOrder.findById(transaction.orderId).lean();
+            if (!order) continue;
+            if (!CANDIDATE_STATUSES.includes(order.orderStatus)) continue;
 
             const displayId = order.order_id || order.orderId || String(order._id);
 

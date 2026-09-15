@@ -6,6 +6,7 @@ import { normalizeImageUrl } from "@food/utils/common"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@food/components/ui/dialog"
 import { exportJoinRequestsToExcel, exportJoinRequestsToPDF } from "@food/components/admin/deliveryman/joinRequestExportUtils"
+import DeliverymanNavTabs from "@food/components/admin/deliveryman/DeliverymanNavTabs"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -283,6 +284,8 @@ export default function JoinRequest() {
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <DeliverymanNavTabs activeTab="join-request" count={filteredRequests.length} />
+
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center">
               <Package className="w-5 h-5 text-white" />

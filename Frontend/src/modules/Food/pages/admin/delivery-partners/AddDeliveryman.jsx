@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Upload, Calendar, Eye, EyeOff, Settings } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@food/components/ui/dialog"
 import { EMAIL_REGEX } from "@/shared/utils/emailValidation"
+import DeliverymanNavTabs from "@food/components/admin/deliveryman/DeliverymanNavTabs"
 
 export default function AddDeliveryman() {
   const [formData, setFormData] = useState({
@@ -88,6 +89,8 @@ export default function AddDeliveryman() {
     <div className="p-4 lg:p-6 bg-slate-50 min-h-screen">
       <div className="max-w-5xl mx-auto">
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative">
+          <DeliverymanNavTabs activeTab="add" />
+
           {/* Settings Icon */}
           <button className="absolute top-6 right-6 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors">
             <Settings className="w-5 h-5 text-slate-600" />

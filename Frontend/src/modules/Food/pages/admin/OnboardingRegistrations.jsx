@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Clock3, Loader2, Search, Store, Truck } from "lucide-react";
 import { adminAPI } from "@food/api";
+import DeliverymanNavTabs from "@food/components/admin/deliveryman/DeliverymanNavTabs";
 
 const STATUS_LABELS = {
   REGISTERED: "Registered",
@@ -59,6 +60,8 @@ export default function OnboardingRegistrations({ userType }) {
   return (
     <div className="min-h-screen bg-slate-50 p-4 lg:p-6">
       <div className="mx-auto max-w-7xl rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        {!isRestaurant && <DeliverymanNavTabs activeTab="registrations" count={visibleRegistrations.length} />}
+
         <div className="mb-6 flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600">
             <Icon className="h-5 w-5 text-white" />

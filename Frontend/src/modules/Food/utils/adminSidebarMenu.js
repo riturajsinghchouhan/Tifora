@@ -115,6 +115,8 @@ export const adminSidebarMenu = [
         icon: "UtensilsCrossed",
         subItems: [
           { label: "Restaurants List", path: "/admin/food/restaurants" },
+          { label: "New Joining Request", path: "/admin/food/restaurants/joining-request" },
+          { label: "Add Restaurant", path: "/admin/food/restaurants/add" },
           { label: "Menu Bulk Upload", path: "/admin/food/restaurants/menu-bulk-upload" },
           { label: "Restaurant Registrations", path: "/admin/food/restaurant-registrations" },
           { label: "Restaurant Commission", path: "/admin/food/restaurants/commission" },
@@ -211,8 +213,10 @@ export const adminSidebarMenu = [
         label: "Deliveryman",
         icon: "Package",
         subItems: [
+          { label: "New Joining Request", path: "/admin/food/delivery-partners/join-request" },
           { label: "Delivery Partner Registrations", path: "/admin/food/delivery-partner-registrations" },
           { label: "Deliveryman List", path: "/admin/food/delivery-partners" },
+          { label: "Add Deliveryman", path: "/admin/food/delivery-partners/add" },
           { label: "Deliveryman Reviews", path: "/admin/food/delivery-partners/reviews" },
           { label: "Bonus", path: "/admin/food/delivery-partners/bonus" },
           { label: "Earning Addon", path: "/admin/food/delivery-partners/earning-addon" },
