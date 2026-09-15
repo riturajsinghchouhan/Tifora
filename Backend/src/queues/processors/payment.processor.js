@@ -1,6 +1,7 @@
 import { logger } from '../../utils/logger.js';
 import { creditWallet } from '../../core/payments/wallet.service.js';
 import { syncOrderFinanceDocuments } from '../../core/payments/foodFinance.service.js';
+import { FoodOrder } from '../../modules/food/orders/models/order.model.js';
 import { FoodTransaction } from '../../modules/food/orders/models/foodTransaction.model.js';
 import { checkEarningAddonCompletions } from '../../modules/food/admin/services/admin.service.js';
 

@@ -130,6 +130,25 @@ export const handleRazorpayWebhook = async (req, res) => {
                     const order = await FoodOrder.findById(existingTransaction.orderId).session(session);
                     if (!order) return;
 
+                    // If the 15-minute "unpaid order" watchdog (or a manual cancel) already
+                    // flipped this order to cancelled before this webhook arrived, the payment
+                    // still went through — restore the order instead of leaving it stuck as
+                    // "cancelled" with a "paid" transaction underneath it.
+                    const cancelledStatuses = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead'];
+                    if (cancelledStatuses.includes(order.orderStatus)) {
+                        const fromStatus = order.orderStatus;
+                        order.orderStatus = 'created';
+                        order.statusHistory.push({
+                            at: new Date(),
+                            byRole: 'SYSTEM',
+                            from: fromStatus,
+                            to: 'created',
+                            note: 'Payment captured via Razorpay webhook after order was auto-cancelled; order restored'
+                        });
+                        await order.save({ session });
+                        logger.warn(`Webhook [payment.captured]: Order ${order._id} was ${fromStatus} but payment was captured — restored to created.`);
+                    }
+
                     const expectedAmountMajor = Number(
                         existingTransaction?.payment?.amountDue ??
                         existingTransaction?.pricing?.total ??

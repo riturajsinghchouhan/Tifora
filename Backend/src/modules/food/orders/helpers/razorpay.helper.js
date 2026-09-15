@@ -79,6 +79,19 @@ export function verifyPaymentSignature(orderId, paymentId, signature) {
 }
 
 /**
+ * Fetch all payment attempts recorded against a Razorpay order (server-side reconciliation).
+ * Used to detect payments that were actually captured by Razorpay but never confirmed
+ * back to our system (client callback dropped, webhook missed, etc).
+ * @param {string} razorpayOrderId
+ */
+export async function fetchRazorpayOrderPayments(razorpayOrderId) {
+    const instance = getRazorpayInstance();
+    if (!instance) throw new Error('Razorpay not configured');
+    if (!razorpayOrderId) throw new Error('razorpayOrderId is required');
+    return instance.orders.fetchPayments(String(razorpayOrderId));
+}
+
+/**
  * Fetch Razorpay payment (server-side) for additional validation (amount/status/order match).
  * @param {string} paymentId
  */
