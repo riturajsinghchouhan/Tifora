@@ -81,9 +81,20 @@ async function main() {
             try {
                 if (!shouldApply) {
                     const result = await fetchRazorpayOrderPayments(razorpayOrderId);
-                    const captured = (result?.items || []).find((p) => p.status === 'captured');
-                    if (captured) {
-                        restored.push({ orderId: displayId, razorpayPaymentId: captured.id, amountPaise: captured.amount });
+                    const items = result?.items || [];
+                    // `authorized` counts too: Razorpay is holding the customer's money,
+                    // it just has not been claimed yet. --apply captures it before
+                    // confirming the order.
+                    const paid =
+                        items.find((p) => p.status === 'captured') ||
+                        items.find((p) => p.status === 'authorized');
+                    if (paid) {
+                        restored.push({
+                            orderId: displayId,
+                            razorpayPaymentId: paid.id,
+                            amountPaise: paid.amount,
+                            razorpayStatus: paid.status
+                        });
                     } else {
                         stillUnpaid.push({ orderId: displayId, razorpayOrderId });
                     }

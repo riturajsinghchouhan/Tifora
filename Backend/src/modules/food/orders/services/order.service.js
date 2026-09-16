@@ -25,7 +25,8 @@ import {
     verifyPaymentSignature,
     getRazorpayKeyId,
     isRazorpayConfigured,
-    fetchRazorpayOrderPayments
+    fetchRazorpayOrderPayments,
+    captureRazorpayPayment
 } from '../helpers/razorpay.helper.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { addOrderJob } from '../../../../queues/producers/order.producer.js';
@@ -765,12 +766,40 @@ export async function verifyPayment(userId, dto) {
 }
 
 /**
- * Server-side safety net: checks Razorpay directly for a captured payment against
+ * Reasons that mean "Razorpay told us, definitively, that nobody paid".
+ *
+ * Every other failure reason is inconclusive — we could not reach Razorpay, are
+ * missing credentials, or hit something unexpected. Callers that destroy state
+ * (the auto-cancel watchdog) must only act on a conclusive answer, otherwise a
+ * transient API outage silently cancels orders the customer already paid for.
+ */
+const CONCLUSIVE_UNPAID_REASONS = [
+  // Razorpay listed the order's payment attempts and none of them took money.
+  "no_payment_found",
+  // No Razorpay order was ever created for this order, so the customer never even
+  // reached a checkout session and no payment can exist. Callers must only trust
+  // this after successfully loading the payment snapshot — an order whose snapshot
+  // failed to hydrate looks identical and must be treated as inconclusive.
+  "no_razorpay_order_id",
+];
+
+export function isConclusivelyUnpaid(reconcileResult) {
+  return CONCLUSIVE_UNPAID_REASONS.includes(String(reconcileResult?.reason || ""));
+}
+
+/**
+ * Server-side safety net: checks Razorpay directly for a real payment against
  * this order's Razorpay order id. Used before auto-cancelling a stale "awaiting
  * payment" order, and to repair orders that were already wrongly auto-cancelled
  * because the client never called verifyPayment and the webhook never landed.
  *
- * Returns { reconciled: boolean, reason?: string, order? }.
+ * Accepts `authorized` payments as well as `captured` ones. An authorised payment
+ * means Razorpay is already holding the customer's money — it just has not been
+ * claimed yet — so it is captured here before the order is confirmed. Treating it
+ * as unpaid is what let genuinely-paid orders get auto-cancelled.
+ *
+ * Returns { reconciled: boolean, reason?: string, order? }. A false result is only
+ * safe to act destructively on when isConclusivelyUnpaid() agrees.
  */
 export async function reconcileOrderWithRazorpay(order) {
   if (!isRazorpayConfigured()) {
@@ -797,24 +826,55 @@ export async function reconcileOrderWithRazorpay(order) {
     return { reconciled: false, reason: "razorpay_fetch_failed" };
   }
 
-  const capturedPayment = payments.find((p) => p?.status === "captured");
-  if (!capturedPayment) {
-    return { reconciled: false, reason: "no_captured_payment" };
+  // Prefer an already-captured payment; fall back to one Razorpay is holding.
+  let payment = payments.find((p) => p?.status === "captured");
+  let wasAuthorizedOnly = false;
+  if (!payment) {
+    payment = payments.find((p) => p?.status === "authorized");
+    wasAuthorizedOnly = Boolean(payment);
+  }
+
+  if (!payment) {
+    return { reconciled: false, reason: "no_payment_found" };
   }
 
   const expectedAmountPaise = Math.round(Number(order?.pricing?.total || 0) * 100);
-  const capturedAmountPaise = Number(capturedPayment.amount || 0);
-  if (expectedAmountPaise > 0 && capturedAmountPaise < expectedAmountPaise) {
-    logger.warn(
-      `reconcileOrderWithRazorpay: captured amount (${capturedAmountPaise}) < expected (${expectedAmountPaise}) for order ${order._id}; not restoring`
+  const paidAmountPaise = Number(payment.amount || 0);
+  if (expectedAmountPaise > 0 && paidAmountPaise < expectedAmountPaise) {
+    // The customer paid something, just not enough — never silently cancel this.
+    // It needs a human decision (top-up or refund), so leave the order alone.
+    logger.error(
+      `reconcileOrderWithRazorpay: PARTIAL PAYMENT on order ${order._id} — Razorpay has ${paidAmountPaise} paise but order expects ${expectedAmountPaise} paise (payment ${payment.id}). Needs manual review; order left untouched.`
     );
     return { reconciled: false, reason: "amount_mismatch" };
+  }
+
+  if (wasAuthorizedOnly) {
+    const captureResult = await captureRazorpayPayment(
+      payment.id,
+      paidAmountPaise,
+      payment.currency || "INR"
+    );
+
+    if (!captureResult.success) {
+      // Money is held but we could not claim it. Confirming the order would
+      // promise food against funds we may never receive; cancelling would bin a
+      // paid order. Leave it untouched and make it loud enough to act on.
+      logger.error(
+        `reconcileOrderWithRazorpay: order ${order._id} has an AUTHORIZED payment ${payment.id} that could not be captured (${captureResult.error}). Razorpay will void the authorisation if it stays unclaimed — needs manual attention.`
+      );
+      return { reconciled: false, reason: "capture_failed" };
+    }
+
+    logger.info(
+      `reconcileOrderWithRazorpay: captured previously-authorized payment ${payment.id} for order ${order._id}`
+    );
   }
 
   const { order: finalizedOrder, restoredFromCancellation, alreadyPaid } =
     await finalizeCapturedPayment(order._id, {
       razorpayOrderId,
-      razorpayPaymentId: capturedPayment.id,
+      razorpayPaymentId: payment.id,
       recordedByRole: "SYSTEM",
       source: "razorpay_reconciliation",
     });
@@ -824,7 +884,7 @@ export async function reconcileOrderWithRazorpay(order) {
   }
 
   logger.info(
-    `reconcileOrderWithRazorpay: order ${order._id} ${restoredFromCancellation ? "restored from cancellation" : "confirmed"} using captured payment ${capturedPayment.id}`
+    `reconcileOrderWithRazorpay: order ${order._id} ${restoredFromCancellation ? "restored from cancellation" : "confirmed"} using ${wasAuthorizedOnly ? "newly captured" : "captured"} payment ${payment.id}`
   );
 
   return { reconciled: true, restoredFromCancellation, order: finalizedOrder };
@@ -1024,14 +1084,22 @@ export async function recoverStuckOrders() {
     if (stalePendingOrders.length > 0) {
       const toCancelIds = [];
       let restoredCount = 0;
+      const deferred = [];
 
       for (const staleOrder of stalePendingOrders) {
-        let hydrated = staleOrder;
+        // A failed hydration leaves the order with no payment snapshot, which is
+        // indistinguishable from "never had a Razorpay order". Defer rather than
+        // let a transient DB hiccup look like proof the customer never paid.
+        let hydrated;
         try {
           hydrated = await attachFinancialSnapshotToOrder(staleOrder);
-        } catch {}
+        } catch (err) {
+          logger.error(`Watchdog: could not load payment snapshot for order ${staleOrder._id}: ${err.message}`);
+          deferred.push({ orderId: String(staleOrder._id), reason: "hydrate_failed" });
+          continue;
+        }
 
-        let result = { reconciled: false };
+        let result = { reconciled: false, reason: "reconcile_threw" };
         try {
           result = await reconcileOrderWithRazorpay(hydrated);
         } catch (err) {
@@ -1040,13 +1108,29 @@ export async function recoverStuckOrders() {
 
         if (result.reconciled) {
           restoredCount += 1;
-        } else {
+          continue;
+        }
+
+        // Only cancel when Razorpay positively confirmed there is no payment.
+        // Anything else — API unreachable, missing credentials, an authorised
+        // payment we could not capture, a partial payment — is inconclusive, and
+        // cancelling on it destroys orders the customer has already paid for.
+        // Leave those alone; the next watchdog pass retries in 5 minutes.
+        if (isConclusivelyUnpaid(result)) {
           toCancelIds.push(staleOrder._id);
+        } else {
+          deferred.push({ orderId: String(staleOrder._id), reason: result.reason });
         }
       }
 
       if (restoredCount > 0) {
         logger.info(`Watchdog: Restored ${restoredCount} order(s) that had a captured Razorpay payment and were about to be wrongly auto-cancelled.`);
+      }
+
+      if (deferred.length > 0) {
+        logger.warn(
+          `Watchdog: Deferred cancellation for ${deferred.length} order(s) because Razorpay could not confirm they were unpaid: ${JSON.stringify(deferred)}`
+        );
       }
 
       if (toCancelIds.length > 0) {

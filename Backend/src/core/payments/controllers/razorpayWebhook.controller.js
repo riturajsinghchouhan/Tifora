@@ -11,6 +11,7 @@ import {
     markGatewayEventFailed,
     markGatewayEventProcessed
 } from '../gatewayEvent.service.js';
+import { captureRazorpayPayment } from '../../../modules/food/orders/helpers/razorpay.helper.js';
 
 function extractWebhookRefs(event, payload) {
     const paymentEntity = payload?.payment?.entity || null;
@@ -95,8 +96,37 @@ export const handleRazorpayWebhook = async (req, res) => {
     let transactionId = null;
 
     try {
-        if (event === 'payment.captured') {
+        // `payment.authorized` is handled alongside `payment.captured`. An authorised
+        // payment means Razorpay is already holding the customer's money; if nothing
+        // captures it, Razorpay voids the authorisation after a few days and the
+        // order would meanwhile have been auto-cancelled as "never paid". So capture
+        // it here, then apply exactly the same order/finance updates.
+        if (event === 'payment.captured' || event === 'payment.authorized') {
             const paymentObj = payload?.payment?.entity || {};
+
+            if (event === 'payment.authorized') {
+                const captureResult = await captureRazorpayPayment(
+                    paymentObj.id,
+                    Number(paymentObj.amount || 0),
+                    paymentObj.currency || 'INR'
+                );
+
+                if (!captureResult.success) {
+                    // Do not mark the order paid against money we could not claim.
+                    // Razorpay retries this webhook, and the watchdog reconciliation
+                    // will retry the capture too.
+                    logger.error(
+                        `Webhook [payment.authorized]: capture failed for payment ${paymentObj.id} (${captureResult.error}). Order left unconfirmed; will retry via reconciliation.`
+                    );
+                    await markGatewayEventProcessed(registeredEvent.eventDoc._id, {
+                        processingResult: { event, status: 'capture_failed', error: captureResult.error }
+                    });
+                    return res.status(200).json({ status: 'capture_failed' });
+                }
+
+                logger.info(`Webhook [payment.authorized]: captured payment ${paymentObj.id}.`);
+            }
+
             const rzOrderId = String(paymentObj.order_id || '').trim();
             const rzPaymentId = String(paymentObj.id || '').trim();
             const qrCodeId = String(paymentObj.qr_code_id || '').trim();
@@ -166,19 +196,28 @@ export const handleRazorpayWebhook = async (req, res) => {
                         orderId: order._id,
                         razorpayOrderId: rzOrderId || qrCodeId || existingTransaction.payment?.razorpay?.orderId || '',
                         razorpayPaymentId: rzPaymentId,
-                        note: 'Payment status synced via webhook payment.captured',
+                        note: `Payment status synced via webhook ${event}`,
                         recordedByRole: 'SYSTEM',
                         session
                     });
 
+                    // Only relabel the transaction as a QR collection when the payment
+                    // actually came through a QR code. This used to be unconditional,
+                    // which rewrote ordinary checkout orders as `razorpay_qr` and fed
+                    // the wrong method into finance reporting and the COD flow.
+                    const isQrPayment = Boolean(qrCodeId);
                     await FoodTransaction.updateOne(
                         { _id: existingTransaction._id },
                         {
                             $set: {
-                                'payment.qr.status': 'paid',
                                 'payment.status': 'paid',
-                                'payment.method': 'razorpay_qr',
-                                'paymentMethod': 'razorpay_qr',
+                                ...(isQrPayment
+                                    ? {
+                                        'payment.qr.status': 'paid',
+                                        'payment.method': 'razorpay_qr',
+                                        'paymentMethod': 'razorpay_qr',
+                                    }
+                                    : {}),
                             }
                         },
                         { session }
@@ -188,7 +227,7 @@ export const handleRazorpayWebhook = async (req, res) => {
                         orderId: order._id,
                         orderDoc: order,
                         transactionDoc: transaction,
-                        source: 'razorpay_webhook_payment_captured',
+                        source: `razorpay_webhook_${String(event).replace('.', '_')}`,
                         rawResponse: paymentObj,
                         session
                     });
@@ -201,9 +240,9 @@ export const handleRazorpayWebhook = async (req, res) => {
             }
 
             if (orderId) {
-                logger.info(`Webhook [payment.captured]: Synced order ${String(orderId)} (Status=paid)`);
+                logger.info(`Webhook [${event}]: Synced order ${String(orderId)} (Status=paid)`);
             } else {
-                logger.warn(`Webhook [payment.captured]: Order not found or already paid for RZ-Order: ${rzOrderId || qrCodeId}`);
+                logger.warn(`Webhook [${event}]: Order not found or already paid for RZ-Order: ${rzOrderId || qrCodeId}`);
             }
         }
 
