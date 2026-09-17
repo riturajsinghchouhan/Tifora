@@ -1975,44 +1975,36 @@ export default function Cart() {
         onError: async (error) => {
           if (paymentHandled) return
           paymentHandled = true
-          debugError("? Razorpay payment error:", error)
-          // Auto-cancel the unpaid order in backend
-          const cancelOrderId = order?._id || order?.id || order?.orderMongoId
-          if (cancelOrderId) {
-            try {
-              await orderAPI.cancelOrder(cancelOrderId, {
-                reason: "Payment failed or was not completed"
-              })
-            } catch (cancelErr) {
-              debugError("Failed to cancel unpaid order:", cancelErr)
-            }
-          }
-          // Don't show alert for user cancellation
+          debugError("Razorpay payment error:", error)
+          // SAFETY FIX: Do NOT call cancelOrder here.
+          // Razorpay can fire onError even when payment was actually captured
+          // (e.g. transient network error during callback). Cancelling the order here
+          // would destroy a paid order. Instead let the 15-min watchdog/webhook handle recovery.
           if (error?.code !== 'PAYMENT_CANCELLED' && error?.message !== 'PAYMENT_CANCELLED') {
             const errorMessage = error?.description || error?.message || "Payment failed. Please try again."
-            alert(errorMessage)
+            toast.error(errorMessage)
           } else {
-            toast.info("Payment was cancelled. No order has been placed.")
+            toast.info("Payment cancel ho gayi.")
           }
+          toast.info(
+            "Agar aapke account se paisa kat gaya hai, aapka order 15 minute mein automatically confirm ho jayega. Support se contact karein agar issue rahe.",
+            { duration: 6000 }
+          )
           setIsPlacingOrder(false)
         },
         onClose: async () => {
           if (paymentHandled) return
           paymentHandled = true
-          debugLog("?? Payment modal closed by user")
-          // Auto-cancel the unpaid order since user left without paying
-          const cancelOrderId = order?._id || order?.id || order?.orderMongoId
-          if (cancelOrderId) {
-            try {
-              await orderAPI.cancelOrder(cancelOrderId, {
-                reason: "User closed payment gateway without paying"
-              })
-              toast.info("Payment was not completed. No order has been placed.")
-            } catch (cancelErr) {
-              debugError("Failed to cancel unpaid order:", cancelErr)
-              toast.warning("Payment was not completed. If you see a pending order, please cancel it manually.")
-            }
-          }
+          debugLog("Payment modal closed by user")
+          // SAFETY FIX: Do NOT call cancelOrder here.
+          // Razorpay fires onClose even when payment was captured but the handler
+          // callback couldn't fire (network drop, app background, etc.).
+          // Cancelling here would destroy a paid order permanently.
+          // The 15-min watchdog and Razorpay webhook will handle recovery automatically.
+          toast.info(
+            "Payment window band ho gayi. Agar aapke account se paisa kat gaya hai, aapka order 15 minute mein automatically confirm ho jayega.",
+            { duration: 6000 }
+          )
           setIsPlacingOrder(false)
         }
       })

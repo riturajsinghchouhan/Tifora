@@ -1080,7 +1080,46 @@ export async function recoverStuckOrders() {
       }
     }
 
-    // 4. Removed 1-hour auto-kill limit as per user request to allow infinite dispatch hunt.
+    // 4. Recover recently cancelled Razorpay orders where payment was ACTUALLY captured.
+    // This handles the race: onClose/onError cancelled the order AFTER Razorpay captured,
+    // but BEFORE the webhook arrived. These orders have payment.status='failed' and are
+    // invisible to the normal stale-pending scan above.
+    const THIRTY_MIN_MS = 30 * 60 * 1000;
+    const recentlyCancelledRazorpayTxIds = await getTransactionOrderIds({
+      paymentMethod: 'razorpay',
+      'payment.status': 'failed',
+    });
+    if (recentlyCancelledRazorpayTxIds.length > 0) {
+      const recentlyCancelledOrders = await FoodOrder.find({
+        _id: { $in: recentlyCancelledRazorpayTxIds },
+        orderStatus: 'cancelled_by_user',
+        updatedAt: { $gt: new Date(now - THIRTY_MIN_MS) },
+      }).limit(20);
+
+      if (recentlyCancelledOrders.length > 0) {
+        logger.info(`Watchdog: Checking ${recentlyCancelledOrders.length} recently-cancelled Razorpay order(s) for missed captures.`);
+        let recoveredCancelledCount = 0;
+        for (const cancelledOrder of recentlyCancelledOrders) {
+          let hydrated = cancelledOrder;
+          try { hydrated = await attachFinancialSnapshotToOrder(cancelledOrder); } catch {}
+          let result = { reconciled: false };
+          try {
+            result = await reconcileOrderWithRazorpay(hydrated);
+          } catch (err) {
+            logger.error(`Watchdog: reconcile recently-cancelled order ${cancelledOrder._id}: ${err.message}`);
+          }
+          if (result.reconciled) {
+            recoveredCancelledCount += 1;
+            logger.warn(`Watchdog: Recovered order ${cancelledOrder._id} — was cancelled (onClose race) but Razorpay had a captured payment.`);
+          }
+        }
+        if (recoveredCancelledCount > 0) {
+          logger.info(`Watchdog: Recovered ${recoveredCancelledCount} order(s) incorrectly cancelled after Razorpay capture.`);
+        }
+      }
+    }
+
+    // 5. Removed 1-hour auto-kill limit as per user request to allow infinite dispatch hunt.
 
   } catch (err) {
     logger.error(`Watchdog recovery error: ${err.message}`);
@@ -1217,7 +1256,21 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
       throw new ValidationError("Order cannot be cancelled in its current state");
   }
 
-  {
+  // SAFETY GUARD: If payment is already captured in Razorpay, reject the cancel.
+  // This prevents the onClose/onError race from destroying a paid order.
+  // (Webhook may have already marked the transaction 'paid' before this call arrives.)
+  if (String(order.payment?.method || '').toLowerCase() === 'razorpay') {
+    const paymentTx = await FoodTransaction.findOne({ orderId: order._id })
+      .select('payment.status')
+      .lean();
+    const txStatus = String(paymentTx?.payment?.status || '').toLowerCase();
+    if (txStatus === 'paid' || txStatus === 'captured') {
+      throw new ValidationError(
+        'Aapki Razorpay payment already capture ho chuki hai. Order cancel nahi ho sakta. Refund ke liye support se contact karein.'
+      );
+    }
+  }
+
     const cancelSession = await mongoose.startSession();
     try {
       await cancelSession.withTransaction(async () => {

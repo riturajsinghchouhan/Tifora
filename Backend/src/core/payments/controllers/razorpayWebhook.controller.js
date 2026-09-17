@@ -11,6 +11,12 @@ import {
     markGatewayEventFailed,
     markGatewayEventProcessed
 } from '../gatewayEvent.service.js';
+import {
+    notifyRestaurantNewOrder,
+    notifyOwnersSafely,
+    enqueueOrderEvent
+} from '../../../modules/food/orders/services/order.helpers.js';
+import { addOrderJob } from '../../../queues/producers/order.producer.js';
 
 function extractWebhookRefs(event, payload) {
     const paymentEntity = payload?.payment?.entity || null;
@@ -102,6 +108,9 @@ export const handleRazorpayWebhook = async (req, res) => {
             const qrCodeId = String(paymentObj.qr_code_id || '').trim();
             const noteOrderId = String(paymentObj.notes?.order_id || paymentObj.notes?.order_mongo_id || '').trim();
             const capturedAmountPaise = Number(paymentObj.amount || 0);
+            // Track if this is a fresh capture (used to fire notifications after commit)
+            let isNewCapture = false;
+            let capturedOrder = null;
 
             const session = await mongoose.startSession();
             try {
@@ -127,10 +136,16 @@ export const handleRazorpayWebhook = async (req, res) => {
                     }).session(session);
                     if (!existingTransaction?.orderId) return;
 
+                    // Track if this is a fresh capture (not already marked paid)
+                    const priorPaymentStatus = String(existingTransaction?.payment?.status || '').toLowerCase();
+                    if (priorPaymentStatus !== 'paid') {
+                        isNewCapture = true;
+                    }
+
                     const order = await FoodOrder.findById(existingTransaction.orderId).session(session);
                     if (!order) return;
 
-                    // If the 15-minute "unpaid order" watchdog (or a manual cancel) already
+                    // If the 15-minute watchdog (or a manual cancel) already
                     // flipped this order to cancelled before this webhook arrived, the payment
                     // still went through — restore the order instead of leaving it stuck as
                     // "cancelled" with a "paid" transaction underneath it.
@@ -171,18 +186,23 @@ export const handleRazorpayWebhook = async (req, res) => {
                         session
                     });
 
-                    await FoodTransaction.updateOne(
-                        { _id: existingTransaction._id },
-                        {
-                            $set: {
-                                'payment.qr.status': 'paid',
-                                'payment.status': 'paid',
-                                'payment.method': 'razorpay_qr',
-                                'paymentMethod': 'razorpay_qr',
-                            }
-                        },
-                        { session }
-                    );
+                    // FIX: Only overwrite paymentMethod for QR payments.
+                    // For standard Razorpay (card/UPI/netbanking), preserve existing paymentMethod.
+                    // Previously this block ran for ALL payment types, corrupting refund routing.
+                    if (qrCodeId) {
+                        await FoodTransaction.updateOne(
+                            { _id: existingTransaction._id },
+                            {
+                                $set: {
+                                    'payment.qr.status': 'paid',
+                                    'payment.status': 'paid',
+                                    'payment.method': 'razorpay_qr',
+                                    'paymentMethod': 'razorpay_qr',
+                                }
+                            },
+                            { session }
+                        );
+                    }
 
                     await syncOrderFinanceDocuments({
                         orderId: order._id,
@@ -195,13 +215,60 @@ export const handleRazorpayWebhook = async (req, res) => {
 
                     orderId = order._id;
                     transactionId = transaction?._id || null;
+                    capturedOrder = order;
                 });
             } finally {
                 session.endSession();
             }
 
             if (orderId) {
-                logger.info(`Webhook [payment.captured]: Synced order ${String(orderId)} (Status=paid)`);
+                logger.info(`Webhook [payment.captured]: Synced order ${String(orderId)} (newCapture=${isNewCapture})`);
+
+                // Fire downstream side-effects for fresh captures.
+                // These are non-transactional — a failure here does NOT roll back the payment.
+                // Mirrors what finalizeCapturedPayment does in the normal verifyPayment path.
+                if (isNewCapture && capturedOrder) {
+                    try {
+                        await notifyRestaurantNewOrder(capturedOrder);
+                    } catch (err) {
+                        logger.warn(`Webhook [payment.captured]: Restaurant notify failed for ${String(orderId)}: ${err?.message}`);
+                    }
+                    try {
+                        await notifyOwnersSafely(
+                            [{ ownerType: 'USER', ownerId: capturedOrder.userId }],
+                            {
+                                title: 'Payment Successful! ✅',
+                                body: `Aapka payment receive ho gaya! Order #${capturedOrder.order_id || capturedOrder._id.toString()} process ho raha hai.`,
+                                image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                                data: {
+                                    type: 'payment_success',
+                                    orderId: String(capturedOrder.order_id || capturedOrder._id.toString()),
+                                    orderMongoId: String(capturedOrder._id),
+                                },
+                            }
+                        );
+                    } catch (err) {
+                        logger.warn(`Webhook [payment.captured]: Customer notify failed for ${String(orderId)}: ${err?.message}`);
+                    }
+                    try {
+                        enqueueOrderEvent('payment_verified', {
+                            orderMongoId: String(capturedOrder._id),
+                            orderId: capturedOrder.order_id || capturedOrder._id.toString(),
+                            userId: capturedOrder.userId?.toString?.(),
+                            source: 'razorpay_webhook'
+                        });
+                        addOrderJob(
+                            {
+                                action: 'SYNC_PETPOOJA',
+                                orderId: capturedOrder.order_id || capturedOrder._id.toString(),
+                                orderMongoId: capturedOrder._id.toString()
+                            },
+                            { jobId: `petpooja-webhook-${capturedOrder._id.toString()}`, delay: 2000 }
+                        );
+                    } catch (err) {
+                        logger.warn(`Webhook [payment.captured]: Event enqueue failed for ${String(orderId)}: ${err?.message}`);
+                    }
+                }
             } else {
                 logger.warn(`Webhook [payment.captured]: Order not found or already paid for RZ-Order: ${rzOrderId || qrCodeId}`);
             }
