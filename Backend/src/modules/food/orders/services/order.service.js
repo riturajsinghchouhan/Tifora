@@ -2282,9 +2282,10 @@ export async function listOrdersAdmin(query) {
   const { page, limit, skip } = buildPaginationOptions(query);
   const filter = {};
   const transactionMatch = buildVisibleFinanceTransactionMatch();
-  // Admin must see every order, including online orders still awaiting payment.
-  // Only the payment-scoped tabs below need to join through FoodTransaction.
-  let requiresTransactionJoin = false;
+  // FIX: User requested that admin should NOT see online orders that are unpaid.
+  // We default this to true so that it always applies buildVisibleFinanceTransactionMatch()
+  // which filters out unpaid Razorpay orders, same as the restaurant dashboard.
+  let requiresTransactionJoin = true;
 
   const rawStatus =
     typeof query.status === "string" ? query.status.trim().toLowerCase() : "";
