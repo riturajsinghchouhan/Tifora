@@ -10,20 +10,34 @@ try {
 
 import { config } from '../../../../config/env.js';
 
-const KEY_ID = config.razorpayKeyId || process.env.RAZORPAY_KEY_ID || '';
-const KEY_SECRET = config.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || '';
+/**
+ * Credentials are resolved on every call, never captured at module load.
+ *
+ * This module is pulled in through the route graph (server.js -> app.js -> routes),
+ * which ESM evaluates before startServer() ever awaits loadEnvFromDb(). Keys read
+ * into a module-level const here would freeze the pre-DB values — and the admin
+ * panel stores Razorpay keys in the DB (EnvSetting), so they would never be seen.
+ * An empty secret also makes verifyPaymentSignature() reject every payment.
+ */
+function getKeyId() {
+    return config.razorpayKeyId || process.env.RAZORPAY_KEY_ID || '';
+}
+
+function getKeySecret() {
+    return config.razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET || '';
+}
 
 export function isRazorpayConfigured() {
-    return Boolean(KEY_ID && KEY_SECRET && Razorpay);
+    return Boolean(getKeyId() && getKeySecret() && Razorpay);
 }
 
 export function getRazorpayKeyId() {
-    return KEY_ID;
+    return getKeyId();
 }
 
 export function getRazorpayInstance() {
     if (!isRazorpayConfigured()) return null;
-    return new Razorpay({ key_id: KEY_ID, key_secret: KEY_SECRET });
+    return new Razorpay({ key_id: getKeyId(), key_secret: getKeySecret() });
 }
 
 export function createRazorpayOrder(amountPaise, currency = 'INR', receipt = '') {
@@ -32,7 +46,11 @@ export function createRazorpayOrder(amountPaise, currency = 'INR', receipt = '')
     return instance.orders.create({
         amount: Math.round(amountPaise),
         currency,
-        receipt: receipt || undefined
+        receipt: receipt || undefined,
+        // Force auto-capture. Without this the account-level dashboard setting
+        // decides, and if it is off every payment stops at `authorized` — which
+        // the confirmation/reconciliation paths used to treat as unpaid.
+        payment_capture: 1
     });
 }
 
@@ -72,9 +90,10 @@ export async function fetchRazorpayQrCodePayments(qrCodeId) {
 }
 
 export function verifyPaymentSignature(orderId, paymentId, signature) {
-    if (!KEY_SECRET) return false;
+    const secret = getKeySecret();
+    if (!secret) return false;
     const body = `${orderId}|${paymentId}`;
-    const expected = crypto.createHmac('sha256', KEY_SECRET).update(body).digest('hex');
+    const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
     return expected === signature;
 }
 
@@ -100,6 +119,54 @@ export async function fetchRazorpayPayment(paymentId) {
     if (!instance) throw new Error('Razorpay not configured');
     if (!paymentId) throw new Error('paymentId is required');
     return instance.payments.fetch(String(paymentId));
+}
+
+/**
+ * Capture an `authorized` payment so it becomes `captured`.
+ *
+ * An authorized payment means Razorpay is holding the customer's money but the
+ * funds have not been claimed yet; Razorpay voids the authorisation after a few
+ * days if nobody captures it. Every confirmation path here treats `captured` as
+ * the paid state, so an authorised-only payment must be captured before the
+ * order can be confirmed.
+ *
+ * Capturing twice is safe: Razorpay rejects the second call, and we surface an
+ * already-captured payment as a success.
+ *
+ * @param {string} paymentId
+ * @param {number} amountPaise - must match the authorised amount exactly
+ * @param {string} currency
+ * @returns {Promise<{ success: boolean, payment?: object, error?: string }>}
+ */
+export async function captureRazorpayPayment(paymentId, amountPaise, currency = 'INR') {
+    const instance = getRazorpayInstance();
+    if (!instance) return { success: false, error: 'Razorpay not configured' };
+    if (!paymentId) return { success: false, error: 'paymentId is required' };
+
+    try {
+        const payment = await instance.payments.capture(
+            String(paymentId),
+            Math.round(Number(amountPaise) || 0),
+            currency
+        );
+        return { success: true, payment };
+    } catch (err) {
+        // Already captured by a concurrent webhook/reconcile pass, or auto-capture
+        // beat us to it — re-fetch and treat a captured payment as success.
+        try {
+            const existing = await instance.payments.fetch(String(paymentId));
+            if (existing?.status === 'captured') {
+                return { success: true, payment: existing };
+            }
+        } catch {
+            // fall through to the original failure below
+        }
+
+        return {
+            success: false,
+            error: err?.error?.description || err?.message || 'Razorpay capture failed'
+        };
+    }
 }
 
 /**
