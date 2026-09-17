@@ -1707,7 +1707,6 @@ export async function cancelOrder(orderId, userId, reason, refundDestination = "
 
   return normalizeOrderForClient(order);
   */
-}
 
 export async function submitOrderRatings(orderId, userId, dto) {
   const identity = buildOrderIdentityFilter(orderId);
