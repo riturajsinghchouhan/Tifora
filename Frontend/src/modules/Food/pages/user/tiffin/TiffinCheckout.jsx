@@ -112,8 +112,7 @@ export default function TiffinCheckout() {
                             const verifyPayload = {
                                 razorpayOrderId: paymentResponse.razorpay_order_id,
                                 razorpayPaymentId: paymentResponse.razorpay_payment_id,
-                                razorpaySignature: paymentResponse.razorpay_signature,
-                                subscriptionTemp: response.data.subscriptionTemp
+                                razorpaySignature: paymentResponse.razorpay_signature
                             };
                             
                             const verifyRes = await api.post('/user/tiffin/purchase/verify', verifyPayload);

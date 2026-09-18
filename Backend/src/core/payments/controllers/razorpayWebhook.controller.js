@@ -18,6 +18,10 @@ import {
 } from '../../../modules/food/orders/services/order.helpers.js';
 import { addOrderJob } from '../../../queues/producers/order.producer.js';
 import { captureRazorpayPayment } from '../../../modules/food/orders/helpers/razorpay.helper.js';
+import { TiffinSubscription } from '../../../modules/food/tiffin/models/tiffinSubscription.model.js';
+import { TiffinPlan } from '../../../modules/food/tiffin/models/tiffinPlan.model.js';
+import { ensureSubscriptionDeliveriesForDate } from '../../../modules/food/tiffin/scripts/tiffinScheduler.js';
+import { getIO, rooms } from '../../../config/socket.js';
 
 function extractWebhookRefs(event, payload) {
     const paymentEntity = payload?.payment?.entity || null;
@@ -141,6 +145,7 @@ export const handleRazorpayWebhook = async (req, res) => {
             // Track if this is a fresh capture (used to fire notifications after commit)
             let isNewCapture = false;
             let capturedOrder = null;
+            let isTiffin = false;
 
             const session = await mongoose.startSession();
             try {
@@ -164,7 +169,26 @@ export const handleRazorpayWebhook = async (req, res) => {
                     const existingTransaction = await FoodTransaction.findOne({
                         $or: orConditions
                     }).session(session);
-                    if (!existingTransaction?.orderId) return;
+
+                    if (!existingTransaction?.orderId) {
+                        // Check if it's a Tiffin Subscription
+                        if (rzOrderId) {
+                            const tiffinSub = await TiffinSubscription.findOne({ razorpayOrderId: rzOrderId }).session(session);
+                            if (tiffinSub) {
+                                isTiffin = true;
+                                if (tiffinSub.status !== 'active') {
+                                    tiffinSub.paymentStatus = 'paid';
+                                    tiffinSub.status = 'active';
+                                    tiffinSub.razorpayPaymentId = rzPaymentId;
+                                    await tiffinSub.save({ session });
+                                    isNewCapture = true;
+                                    capturedOrder = tiffinSub;
+                                }
+                                orderId = tiffinSub._id;
+                            }
+                        }
+                        return; // Exit transaction block
+                    }
 
                     // Track if this is a fresh capture (not already marked paid)
                     const priorPaymentStatus = String(existingTransaction?.payment?.status || '').toLowerCase();
@@ -279,45 +303,82 @@ export const handleRazorpayWebhook = async (req, res) => {
                 // These are non-transactional — a failure here does NOT roll back the payment.
                 // Mirrors what finalizeCapturedPayment does in the normal verifyPayment path.
                 if (isNewCapture && capturedOrder) {
-                    try {
-                        await notifyRestaurantNewOrder(capturedOrder);
-                    } catch (err) {
-                        logger.warn(`Webhook [payment.captured]: Restaurant notify failed for ${String(orderId)}: ${err?.message}`);
-                    }
-                    try {
-                        await notifyOwnersSafely(
-                            [{ ownerType: 'USER', ownerId: capturedOrder.userId }],
-                            {
-                                title: 'Payment Successful! ✅',
-                                body: `Aapka payment receive ho gaya! Order #${capturedOrder.order_id || capturedOrder._id.toString()} process ho raha hai.`,
-                                image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
-                                data: {
-                                    type: 'payment_success',
-                                    orderId: String(capturedOrder.order_id || capturedOrder._id.toString()),
-                                    orderMongoId: String(capturedOrder._id),
-                                },
+                    if (isTiffin) {
+                        try {
+                            const plan = await TiffinPlan.findById(capturedOrder.planId);
+                            let createdDeliveries = 0;
+                            if (plan) {
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                const startCheck = new Date(capturedOrder.startDate);
+                                startCheck.setHours(0, 0, 0, 0);
+                                if (startCheck.getTime() <= today.getTime()) {
+                                    createdDeliveries = await ensureSubscriptionDeliveriesForDate(capturedOrder, today, plan);
+                                }
                             }
-                        );
-                    } catch (err) {
-                        logger.warn(`Webhook [payment.captured]: Customer notify failed for ${String(orderId)}: ${err?.message}`);
-                    }
-                    try {
-                        enqueueOrderEvent('payment_verified', {
-                            orderMongoId: String(capturedOrder._id),
-                            orderId: capturedOrder.order_id || capturedOrder._id.toString(),
-                            userId: capturedOrder.userId?.toString?.(),
-                            source: 'razorpay_webhook'
-                        });
-                        addOrderJob(
-                            {
-                                action: 'SYNC_PETPOOJA',
+                            
+                            const io = getIO();
+                            if (io) {
+                                const restaurantRoom = rooms.restaurant(capturedOrder.restaurantId);
+                                const payload = {
+                                    subscription: capturedOrder,
+                                    createdDeliveries,
+                                    restaurantId: String(capturedOrder.restaurantId),
+                                    timestamp: new Date().toISOString()
+                                };
+                                io.to(restaurantRoom).emit('new-tiffin-subscription', payload);
+                                io.to(restaurantRoom).emit('tiffin_dispatch_updated', {
+                                    restaurantId: String(capturedOrder.restaurantId),
+                                    subscriptionId: String(capturedOrder._id),
+                                    createdDeliveries,
+                                    reason: 'subscription_created',
+                                    timestamp: payload.timestamp
+                                });
+                            }
+                        } catch (err) {
+                            logger.warn(`Webhook [payment.captured]: Tiffin side-effects failed for ${String(orderId)}: ${err?.message}`);
+                        }
+                    } else {
+                        try {
+                            await notifyRestaurantNewOrder(capturedOrder);
+                        } catch (err) {
+                            logger.warn(`Webhook [payment.captured]: Restaurant notify failed for ${String(orderId)}: ${err?.message}`);
+                        }
+                        try {
+                            await notifyOwnersSafely(
+                                [{ ownerType: 'USER', ownerId: capturedOrder.userId }],
+                                {
+                                    title: 'Payment Successful! ✅',
+                                    body: `Aapka payment receive ho gaya! Order #${capturedOrder.order_id || capturedOrder._id.toString()} process ho raha hai.`,
+                                    image: 'https://i.ibb.co/3m2Yh7r/Appzeto-Brand-Image.png',
+                                    data: {
+                                        type: 'payment_success',
+                                        orderId: String(capturedOrder.order_id || capturedOrder._id.toString()),
+                                        orderMongoId: String(capturedOrder._id),
+                                    },
+                                }
+                            );
+                        } catch (err) {
+                            logger.warn(`Webhook [payment.captured]: Customer notify failed for ${String(orderId)}: ${err?.message}`);
+                        }
+                        try {
+                            enqueueOrderEvent('payment_verified', {
+                                orderMongoId: String(capturedOrder._id),
                                 orderId: capturedOrder.order_id || capturedOrder._id.toString(),
-                                orderMongoId: capturedOrder._id.toString()
-                            },
-                            { jobId: `petpooja-webhook-${capturedOrder._id.toString()}`, delay: 2000 }
-                        );
-                    } catch (err) {
-                        logger.warn(`Webhook [payment.captured]: Event enqueue failed for ${String(orderId)}: ${err?.message}`);
+                                userId: capturedOrder.userId?.toString?.(),
+                                source: 'razorpay_webhook'
+                            });
+                            addOrderJob(
+                                {
+                                    action: 'SYNC_PETPOOJA',
+                                    orderId: capturedOrder.order_id || capturedOrder._id.toString(),
+                                    orderMongoId: capturedOrder._id.toString()
+                                },
+                                { jobId: `petpooja-webhook-${capturedOrder._id.toString()}`, delay: 2000 }
+                            );
+                        } catch (err) {
+                            logger.warn(`Webhook [payment.captured]: Event enqueue failed for ${String(orderId)}: ${err?.message}`);
+                        }
                     }
                 }
                 logger.info(`Webhook [${event}]: Synced order ${String(orderId)} (Status=paid)`);
