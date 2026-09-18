@@ -97,6 +97,15 @@ const tiffinSubscriptionSchema = new mongoose.Schema(
             type: Number,
             required: true,
             min: 0
+        },
+        razorpayOrderId: {
+            type: String,
+            default: '',
+            index: true
+        },
+        razorpayPaymentId: {
+            type: String,
+            default: ''
         }
     },
     {

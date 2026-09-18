@@ -81,6 +81,21 @@ export const purchaseSubscription = async (req, res) => {
             const amountPaise = Math.round(amountToPay * 100);
             const rzOrder = await createRazorpayOrder(amountPaise, 'INR', `tiffin_plan_${planId}`);
             
+            // Create pending subscription immediately
+            const pendingSubscription = new TiffinSubscription({
+                userId,
+                restaurantId: plan.restaurantId,
+                planId,
+                startDate: start,
+                endDate: end,
+                deliveryAddress: normalizedAddress,
+                paymentStatus: 'pending',
+                status: 'pending',
+                amountPaid: amountToPay,
+                razorpayOrderId: rzOrder.id
+            });
+            await pendingSubscription.save();
+
             return res.status(200).json({
                 success: true,
                 razorpay: {
@@ -89,14 +104,7 @@ export const purchaseSubscription = async (req, res) => {
                     amount: amountPaise,
                     currency: 'INR'
                 },
-                subscriptionTemp: {
-                    restaurantId: plan.restaurantId,
-                    planId,
-                    startDate: start,
-                    endDate: end,
-                    deliveryAddress: normalizedAddress,
-                    amountPaid: amountToPay
-                }
+                subscriptionId: pendingSubscription._id
             });
         }
 
@@ -142,7 +150,7 @@ export const verifyTiffinPayment = async (req, res) => {
         const userId = getUserId(req);
         if (!userId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-        const { razorpayOrderId, razorpayPaymentId, razorpaySignature, subscriptionTemp } = req.body;
+        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
         
         if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
             return res.status(400).json({ success: false, message: 'Missing Razorpay payload' });
@@ -153,27 +161,28 @@ export const verifyTiffinPayment = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid payment signature' });
         }
 
-        const plan = await TiffinPlan.findById(subscriptionTemp.planId);
+        const subscription = await TiffinSubscription.findOne({ razorpayOrderId });
+        if (!subscription) {
+             return res.status(404).json({ success: false, message: 'Subscription not found for this Order ID' });
+        }
+
+        // If already active, return success (webhook might have beaten the client)
+        if (subscription.status === 'active') {
+             return res.status(200).json({ success: true, message: 'Payment verified and subscription activated', data: subscription });
+        }
+
+        const plan = await TiffinPlan.findById(subscription.planId);
         if (!plan) return res.status(404).json({ success: false, message: 'Plan not found' });
 
-        const newSubscription = new TiffinSubscription({
-            userId,
-            restaurantId: plan.restaurantId,
-            planId: subscriptionTemp.planId,
-            startDate: subscriptionTemp.startDate,
-            endDate: subscriptionTemp.endDate,
-            deliveryAddress: normalizeAddressCoords(subscriptionTemp.deliveryAddress),
-            paymentId: null, // Could link to a transaction doc if needed
-            paymentStatus: 'paid',
-            amountPaid: Number(plan.price || 0),
-            status: 'active'
-        });
+        subscription.paymentStatus = 'paid';
+        subscription.status = 'active';
+        subscription.razorpayPaymentId = razorpayPaymentId;
+        
+        await subscription.save();
+        const createdDeliveries = await generateInitialDeliveries(subscription, plan, new Date(subscription.startDate));
+        await emitRestaurantSubscriptionUpdate(subscription, createdDeliveries);
 
-        await newSubscription.save();
-        const createdDeliveries = await generateInitialDeliveries(newSubscription, plan, new Date(subscriptionTemp.startDate));
-        await emitRestaurantSubscriptionUpdate(newSubscription, createdDeliveries);
-
-        res.status(200).json({ success: true, message: 'Payment verified and subscription activated', data: newSubscription });
+        res.status(200).json({ success: true, message: 'Payment verified and subscription activated', data: subscription });
     } catch (error) {
         console.error('Error verifying tiffin payment:', error);
         res.status(500).json({ success: false, message: 'Failed to verify payment' });
