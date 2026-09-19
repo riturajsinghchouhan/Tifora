@@ -25,6 +25,7 @@ import RestaurantBentoGrid from "@food/components/restaurant/RestaurantBentoGrid
 import { toast } from "sonner"
 import { downloadFile } from "@/shared/utils/downloadUtils"
 import { getImageUrl } from "@food/utils/getImageUrl"
+import * as XLSX from "xlsx"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -951,26 +952,10 @@ export default function Inventory() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [showCalendar, showTimePicker, togglePopupOpen, filterOpen, isAddPopupOpen, showBulkUpload, isMenuOpen]);
 
-  // XLSX Helper: Loads the library dynamically from CDN
-  const loadXlsx = () => {
-    return new Promise((resolve, reject) => {
-      if (window.XLSX) return resolve(window.XLSX);
-      const script = document.createElement("script");
-      script.src = "https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js";
-      script.onload = () => {
-        if (window.XLSX) resolve(window.XLSX);
-        else reject(new Error("XLSX not found after script load"));
-      };
-      script.onerror = () => reject(new Error("Failed to load XLSX library"));
-      document.head.appendChild(script);
-    });
-  };
-
   // Bulk Upload Functions
   const downloadTemplate = async () => {
     try {
       setIsUploadingBulk(true);
-      const XLSX = await loadXlsx();
       const headers = ["Name", "Description", "Price", "Category Name", "Food Type (Veg/Non-Veg)", "Preparation Time", "Is Available (TRUE/FALSE)", "Image URL", "Variants (Name:Price, Name:Price)"];
       const rows = [
         ["Chicken Dum Biryani", "Authentic slow-cooked chicken biryani with aromatic spices", 350, "Biryani", "Non-Veg", "30 mins", "TRUE", "https://res.cloudinary.com/demo/image/upload/sample.jpg", "Half:180, Full:350"],
@@ -1010,7 +995,6 @@ export default function Inventory() {
 
     setIsUploadingBulk(true);
     try {
-      const XLSX = await loadXlsx();
       const reader = new FileReader();
       
       reader.onload = async (event) => {
