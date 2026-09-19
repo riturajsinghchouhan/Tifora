@@ -12,6 +12,7 @@ const AdminSettings = lazy(() => import("@food/pages/admin/AdminSettings"));
 const NewRefundRequests = lazy(() => import("@food/pages/admin/refunds/NewRefundRequests"));
 const FoodApproval = lazy(() => import("@food/pages/admin/restaurant/FoodApproval"));
 const OrdersPage = lazy(() => import("@food/pages/admin/orders/OrdersPage"));
+const MultiOrderManagement = lazy(() => import("@food/pages/admin/orders/MultiOrderManagement"));
 const AdminTiffinManagement = lazy(() => import("@food/pages/admin/tiffin/AdminTiffinManagement"));
 const TiffinRestaurantPayouts = lazy(() => import("@food/pages/admin/tiffin/TiffinRestaurantPayouts"));
 const TiffinRestaurantCommission = lazy(() => import("@food/pages/admin/tiffin/TiffinRestaurantCommission"));
@@ -177,6 +178,7 @@ export default function AdminRouter() {
             <Route path="orders/all" element={<OrdersPage statusKey="all" />} />
             <Route path="orders/scheduled" element={<OrdersPage statusKey="scheduled" />} />
             <Route path="orders/pending" element={<OrdersPage statusKey="pending" />} />
+            <Route path="orders/multi-order" element={<MultiOrderManagement />} />
             {/* ... other order routes ... */}
             <Route path="orders/accepted" element={<OrdersPage statusKey="accepted" />} />
             <Route path="orders/processing" element={<OrdersPage statusKey="processing" />} />

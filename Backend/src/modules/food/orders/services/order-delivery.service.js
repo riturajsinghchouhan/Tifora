@@ -139,7 +139,7 @@ export async function getPartnerCashCapacity(deliveryPartnerId) {
   };
 }
 
-function emitOrderUpdate(order, deliveryPartnerId, options = {}) {
+export function emitOrderUpdate(order, deliveryPartnerId, options = {}) {
   const shouldSendMilestonePush = options?.sendMilestonePush !== false;
   try {
     const io = getIO();
@@ -384,6 +384,14 @@ export async function getCurrentTripDelivery(deliveryPartnerId) {
     orderStatus: {
       $in: ['confirmed', 'preparing', 'ready_for_pickup', 'picked_up'],
     },
+    // Multi-order batches are collected from the Batches screen with one shared
+    // pickup OTP, so they must not surface as the single active trip until the
+    // whole batch has actually left the restaurant.
+    $or: [
+      { batchId: null },
+      { batchId: { $exists: false } },
+      { orderStatus: 'picked_up' },
+    ],
   })
     .populate({
       path: 'restaurantId',
@@ -1283,7 +1291,7 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
     throw new ForbiddenError('Not your order');
   }
 
-  const { otp, ratings } = body;
+  const { otp, ratings, paymentMethod: declaredPaymentMethod } = body;
 
   // 1. Handover OTP Verification
   if (
@@ -1321,14 +1329,38 @@ export async function completeDelivery(orderId, deliveryPartnerId, body = {}) {
   const syncedPayment = await syncRazorpayQrPayment(order);
   const currentPayment = syncedPayment || tx?.payment || order?.payment || {};
   const prevPayStatus = String(currentPayment?.status || order?.payment?.status || 'cod_pending');
-  const finalPayMethod = String(currentPayment?.method || order?.payment?.method || order?.paymentMethod || 'cash').toLowerCase();
+  let finalPayMethod = String(currentPayment?.method || order?.payment?.method || order?.paymentMethod || 'cash').toLowerCase();
   const finalPayStatus = String(currentPayment?.status || '').toLowerCase();
   const amountDue = Number(
     currentPayment?.amountDue ?? tx?.pricing?.total ?? tx?.amounts?.totalCustomerPaid ?? order?.pricing?.total ?? 0,
   ) || 0;
 
-  if (amountDue > 0 && !['paid', 'captured', 'authorized'].includes(finalPayStatus)) {
+  // A cash order is settled by the rider taking the money at the door - the
+  // ledger write further down records exactly that ('cod_marked_paid_on_delivery'),
+  // so requiring it to already read as paid made COD orders impossible to close.
+  // Online and QR payments still have to show as received first, because there
+  // the money only exists once the gateway confirms it.
+  const CASH_METHODS = ['cash', 'cod', 'cash_on_delivery'];
+  const declaredMethod = String(declaredPaymentMethod || '').trim().toLowerCase();
+  const resolvedMethod = String(
+    currentPayment?.method || tx?.paymentMethod || order?.payment?.method || order?.paymentMethod || '',
+  ).toLowerCase();
+
+  const riderCollectedCash = CASH_METHODS.includes(declaredMethod);
+  const isCashOrder = CASH_METHODS.includes(resolvedMethod);
+  // Either the rider explicitly confirmed cash, or an older client sent nothing
+  // at all for an order that was COD to begin with.
+  const settledByCashAtDoor = riderCollectedCash || (isCashOrder && declaredMethod === '');
+
+  const paymentAlreadyReceived = ['paid', 'captured', 'authorized'].includes(finalPayStatus);
+
+  if (amountDue > 0 && !paymentAlreadyReceived && !settledByCashAtDoor) {
     throw new ValidationError('Please complete and verify the payment before marking the order delivered.');
+  }
+
+  // Record how the money actually arrived, so the rider's cash ledger is right.
+  if (!paymentAlreadyReceived && riderCollectedCash) {
+    finalPayMethod = 'cash';
   }
 
   // 4. Update Order State

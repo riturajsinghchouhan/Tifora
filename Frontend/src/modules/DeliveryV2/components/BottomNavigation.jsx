@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom"
 import { useEffect, useState } from "react"
-import { User, Package } from "lucide-react"
+import { User, Package, Layers } from "lucide-react"
 import { deliveryAPI } from "@food/api"
 
 // Heroicons Outline
@@ -118,6 +118,15 @@ export default function BottomNavigation() {
         >
           <Package className={`w-6 h-6 ${isActive("/food/delivery/tiffin") ? "text-[var(--dv-primary)]" : "text-gray-500"}`} />
           {TabLabel(isActive("/food/delivery/tiffin"), "Tiffins")}
+        </button>
+
+        {/* Multi Orders */}
+        <button
+          onClick={() => navigate("/food/delivery/multi-orders")}
+          className="flex flex-col items-center gap-1.5 p-2.5"
+        >
+          <Layers className={`w-6 h-6 ${isActive("/food/delivery/multi-orders") ? "text-[var(--dv-primary)]" : "text-gray-500"}`} />
+          {TabLabel(isActive("/food/delivery/multi-orders"), "Batches")}
         </button>
 
         {/* Trip History */}

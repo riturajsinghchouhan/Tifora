@@ -1712,6 +1712,8 @@ export default function OrderTracking() {
           <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
         </div>
         
+        {/* Drag handle pill removed */}
+
         <div className="flex-1 overflow-y-auto px-4 md:px-6 lg:px-8 py-4 space-y-4 md:space-y-6 pb-24">
           <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
         {/* Cancellation window removed as per user request to hide immediately after acceptance */}

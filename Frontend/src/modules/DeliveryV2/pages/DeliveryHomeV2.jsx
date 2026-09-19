@@ -32,13 +32,14 @@ import PocketV2 from '@/modules/DeliveryV2/pages/PocketV2';
 import HistoryV2 from '@/modules/DeliveryV2/pages/HistoryV2';
 import ProfileV2 from '@/modules/DeliveryV2/pages/ProfileV2';
 import TiffinDeliverySection from '@/modules/DeliveryV2/pages/tiffin/TiffinDeliverySection';
+import MultiOrdersV2 from '@/modules/DeliveryV2/pages/MultiOrdersV2';
 
 // Icons
 import { 
   Bell, HelpCircle, AlertTriangle, 
   Wallet, History, User as UserIcon, LayoutGrid, Layers, UtensilsCrossed,
   Plus, Minus, Navigation2, Navigation, Target, Play, CheckCircle2, Clock, ChevronDown,
-  Contact, Package, Phone, MapPin
+  Contact, Package, Phone, MapPin, Copy
 } from 'lucide-react';
 
 import { shouldSendLocationUpdate } from "@delivery/utils/trackingInterval";
@@ -177,7 +178,23 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     setCurrentTab(tab);
   }, [tab]);
 
+  // The trip action sheet (arrive / verify / collect payment) acts on ONE
+  // order. Rendering it over the Batches list made it look like a batch-wide
+  // action, so it is confined to the feed where the active order is visible.
+  const isTripTab = currentTab === 'feed';
   const [showVerification, setShowVerification] = useState(false);
+  // Close the verify/collect-payment sheet whenever the rider moves to a
+  // different order. Without this it stays mounted across the switch and
+  // re-asks for payment against the newly active order.
+  const verifiedOrderIdRef = useRef(null);
+  useEffect(() => {
+    const currentId = getOrderAcceptId(activeOrder);
+    if (verifiedOrderIdRef.current && verifiedOrderIdRef.current !== currentId) {
+      setShowVerification(false);
+      setShowPhotoModal(false);
+    }
+    verifiedOrderIdRef.current = currentId;
+  }, [activeOrder]);
   const [showEmergencyPopup, setShowEmergencyPopup] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
   const [emergencyNumbers, setEmergencyNumbers] = useState({
@@ -1033,22 +1050,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
             customerLocation: cusLoc
           });
 
-          // Sync status with server
-          const backendStatus = String(currentPayload.deliveryStatus || currentPayload.orderState?.status || currentPayload.orderStatus || currentPayload.status || "").toLowerCase();
-          const currentPhase = currentPayload.deliveryState?.currentPhase;
-
-          if (['delivered', 'completed'].includes(backendStatus)) {
-            updateTripStatus('COMPLETED');
-          } else if (currentPhase === 'at_drop' || backendStatus === 'reached_drop') {
-            updateTripStatus('REACHED_DROP');
-          } else if (['picked_up', 'delivering'].includes(backendStatus)) {
-            updateTripStatus('PICKED_UP');
-          } else if (currentPhase === 'at_pickup' || backendStatus === 'reached_pickup') {
-            updateTripStatus('REACHED_PICKUP');
-          } else if (['confirmed', 'preparing', 'ready_for_pickup'].includes(backendStatus)) {
-             // Only set to PICKING_UP if we aren't already further ahead
-             if (tripStatus === 'IDLE') updateTripStatus('PICKING_UP');
-          }
+          // setActiveOrder derives the stage from this order itself, so the
+          // stage can never leak over from whichever order was active before.
           return;
         }
 
@@ -1165,22 +1168,18 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
     ) {
       const payload = orderStatusUpdate;
       if (payload && (payload._id || payload.orderId || payload.orderMongoId)) {
-        setActiveOrder({
-          ...payload,
-          _id: payload._id || payload.orderMongoId,
-          orderId: payload.orderId || payload.order_id || payload._id,
-        });
-        const backendStatus = String(
-          payload.deliveryStatus || payload.orderStatus || payload.status || '',
-        ).toLowerCase();
-        if (['delivered', 'completed'].includes(backendStatus)) {
-          updateTripStatus('COMPLETED');
-        } else if (['picked_up', 'delivering'].includes(backendStatus)) {
-          updateTripStatus('PICKED_UP');
-        } else if (backendStatus === 'reached_pickup' || payload.deliveryState?.currentPhase === 'at_pickup') {
-          updateTripStatus('REACHED_PICKUP');
-        } else {
-          updateTripStatus('PICKING_UP');
+        // The current-trip API returns whichever of the rider's orders was
+        // touched last. With a multi-order batch that is often NOT the order
+        // the rider is working on, so adopting it blindly used to yank them
+        // onto a sibling order (and drag its stage along). Only resync the
+        // order already in hand, or adopt one when nothing is in hand.
+        const isForActiveOrder = !activeOrder || isSameOrder(activeOrder, payload);
+        if (isForActiveOrder) {
+          setActiveOrder({
+            ...payload,
+            _id: payload._id || payload.orderMongoId,
+            orderId: payload.orderId || payload.order_id || payload._id,
+          });
         }
       }
     }
@@ -1438,7 +1437,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
       />
 
       {/* ─── 2. MAIN CONTENT ─── */}
-      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'history' || currentTab === 'profile' || currentTab === 'pocket' || currentTab === 'tiffin' ? 'pt-0' : 'pt-[120px]'} no-scrollbar`}>
+      <div className={`flex-1 relative overflow-y-auto ${currentTab === 'history' || currentTab === 'profile' || currentTab === 'pocket' || currentTab === 'tiffin' || currentTab === 'multi-orders' ? 'pt-0' : 'pt-[120px]'} no-scrollbar`}>
          {currentTab === 'feed' ? (
            <div className="absolute inset-0 top-[-120px]">
              {isOnline ? (
@@ -1577,6 +1576,8 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
            </div>
          ) : currentTab === 'tiffin' ? (
            <TiffinDeliverySection />
+         ) : currentTab === 'multi-orders' ? (
+           <MultiOrdersV2 embedded />
          ) : currentTab === 'pocket' ? (
            <PocketV2 />
          ) : currentTab === 'history' ? (
@@ -1587,7 +1588,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
          {/* OVERLAYS (Persistent if active) */}
       </div>
-      {(currentTab === 'feed' || activeOrder || incomingOrder || showVerification || isModalMinimized) && (
+      {(isTripTab || incomingOrder || isModalMinimized) && (
         <AnimatePresence>
           {!isModalMinimized && (
             <motion.div
@@ -1648,7 +1649,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                     onMinimize={() => setIsModalMinimized(true)}
                   />
                 )}
-                {(tripStatus === 'PICKING_UP' || tripStatus === 'REACHED_PICKUP') && (
+                {isTripTab && (tripStatus === 'PICKING_UP' || tripStatus === 'REACHED_PICKUP') && (
                   <PickupActionModal 
                     order={activeOrder} 
                     status={tripStatus} 
@@ -1660,7 +1661,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                     onMinimize={() => setIsModalMinimized(true)}
                   />
                 )}
-                {(tripStatus === 'PICKED_UP' || tripStatus === 'REACHED_DROP') && (
+                {isTripTab && (tripStatus === 'PICKED_UP' || tripStatus === 'REACHED_DROP') && (
                   <div className="absolute inset-x-0 z-[120] px-4" style={{ bottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
                     {tripStatus === 'PICKED_UP' ? (
                       <div className="bg-white rounded-[3rem] p-8 shadow-[0_-20px_80px_rgba(0,0,0,0.4)] border border-gray-100 flex flex-col items-center">
@@ -1763,7 +1764,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
 
                   </div>
                 )}
-                {showVerification && tripStatus !== 'COMPLETED' && (
+                {isTripTab && showVerification && tripStatus !== 'COMPLETED' && (
                   <DeliveryVerificationModal 
                     order={activeOrder} 
                     onComplete={async (otp, paymentOverride) => {
@@ -1774,7 +1775,20 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
                     onClose={() => setShowVerification(false)}
                   />
                 )}
-                {tripStatus === 'COMPLETED' && <OrderSummaryModal order={activeOrder} onDone={resetTrip} />}
+                {isTripTab && tripStatus === 'COMPLETED' && (
+                  <OrderSummaryModal
+                    order={activeOrder}
+                    onDone={() => {
+                      // Finishing one order of a batch sends the rider back to
+                      // their batch list. Staying on the feed would silently
+                      // load the next sibling order as the active trip, which
+                      // reads as if the batch moved on by itself.
+                      const finishedBatchId = activeOrder?.batchId;
+                      resetTrip();
+                      if (finishedBatchId) navigate('/food/delivery/multi-orders');
+                    }}
+                  />
+                )}
               </div>
             </motion.div>
           )}
@@ -1885,7 +1899,7 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
        </BottomPopup>
 
        {/* Floating Minimize/Restore Toggle - Above navbar */}
-       {isModalMinimized && (activeOrder || incomingOrder || showVerification) && (
+       {isModalMinimized && (incomingOrder || (isTripTab && (activeOrder || showVerification))) && (
          <motion.div 
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -1921,6 +1935,9 @@ export default function DeliveryHomeV2({ tab = 'feed' }) {
           </button>
           <button onClick={() => navigate('/food/delivery/tiffin')} className={`flex flex-col items-center gap-1 transition-all relative ${currentTab === 'tiffin' ? 'text-[#0ea5e9] scale-105 font-bold' : 'text-gray-400 opacity-70'}`}>
              <Layers className={`w-5 h-5 ${currentTab === 'tiffin' ? 'text-[#0ea5e9]' : ''}`} /><span className="text-[11px] font-medium font-sans">Tiffins</span>
+          </button>
+          <button onClick={() => navigate('/food/delivery/multi-orders')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'multi-orders' ? 'text-gray-950 scale-105 font-bold' : 'text-gray-400 opacity-70'}`}>
+             <Copy className="w-5 h-5" /><span className="text-[11px] font-medium font-sans">Batches</span>
           </button>
           <button onClick={() => navigate('/food/delivery/pocket')} className={`flex flex-col items-center gap-1 transition-all ${currentTab === 'pocket' ? 'text-gray-950 scale-105 font-bold' : 'text-gray-400 opacity-70'}`}>
              <Wallet className="w-5 h-5" /><span className="text-[11px] font-medium font-sans">Pocket</span>

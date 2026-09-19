@@ -11,6 +11,7 @@ import * as orderController from '../../orders/controllers/order.controller.js';
 import { getAdminPageController, upsertAdminPageController } from '../controllers/pageContent.controller.js';
 import * as liveMonitorController from '../controllers/liveMonitor.controller.js';
 import * as appIntroAdController from '../controllers/appIntroAd.controller.js';
+import * as multiOrderController from '../controllers/multiOrder.controller.js';
 import { upload } from '../../../../middleware/upload.js';
 import menuBulkRoutes from './menuBulk.routes.js';
 
@@ -227,6 +228,13 @@ router.patch('/orders/:orderId/status', orderController.updateOrderStatusAdminCo
 router.delete('/orders/:orderId', orderController.deleteOrderAdminController);
 router.post('/orders/:orderId/assign-delivery', orderController.assignDeliveryPartnerController);
 router.post('/orders/:orderId/resend-notification', orderController.resendDeliveryNotificationAdminController);
+
+// ----- Multi Orders -----
+router.get('/multi-orders/pending', multiOrderController.getGroupedPendingOrders);
+router.get('/multi-orders/active-delivery-boys', multiOrderController.getActiveDeliveryBoys);
+router.post('/multi-orders/assign', multiOrderController.assignMultiOrders);
+router.get('/multi-orders/batches', multiOrderController.getActiveBatches);
+router.post('/multi-orders/release', multiOrderController.releaseMultiOrders);
 
 // ----- CMS Pages (About + legal) -----
 router.get('/pages-social-media/:key', getAdminPageController);

@@ -156,6 +156,12 @@ export const adminSidebarMenu = [
         path: "/admin/food/order-detect-delivery",
         icon: "Truck",
       },
+      {
+        type: "link",
+        label: "Multi-Order Batches",
+        path: "/admin/food/orders/multi-order",
+        icon: "Package",
+      },
     ],
   },
   {

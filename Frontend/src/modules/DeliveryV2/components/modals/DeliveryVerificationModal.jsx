@@ -363,7 +363,17 @@ const PaymentModal = ({ order, otpString, onComplete, onClose }) => {
                </div>
                <div>
                  <h2 className="text-xl font-bold text-gray-900">Collect Payment</h2>
-                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Step 2 of Verification</p>
+                 {/* A rider on a multi-order batch is holding several orders at
+                     once - name the one being settled so cash never lands on
+                     the wrong order. */}
+                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                   Order #{orderId}
+                 </p>
+                 {(order?.user?.name || order?.deliveryAddress?.name) && (
+                   <p className="text-[11px] font-semibold text-gray-500 mt-0.5">
+                     {order?.user?.name || order?.deliveryAddress?.name}
+                   </p>
+                 )}
                </div>
              </div>
              <button onClick={onClose} className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-gray-600"><X className="w-5 h-5"/></button>

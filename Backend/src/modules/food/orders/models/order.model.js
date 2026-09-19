@@ -146,6 +146,11 @@ const orderSchema = new mongoose.Schema(
             ref: 'FoodUser',
             required: true
         },
+        batchId: {
+            type: String,
+            default: null,
+            index: true
+        },
         restaurantId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'FoodRestaurant',

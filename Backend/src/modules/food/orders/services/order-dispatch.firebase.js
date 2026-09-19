@@ -1,6 +1,15 @@
 import { getFirebaseDB } from '../../../../config/firebase.js';
 import { logger } from '../../../../utils/logger.js';
 
+/**
+ * Best-effort Firebase offer channel.
+ *
+ * Every export here MUST resolve (false on failure) and never throw:
+ * dispatch treats Firebase as the primary channel with Socket.IO as the
+ * fallback, so a throw from here would take the fallback down with it and
+ * riders would stop receiving orders entirely.
+ */
+
 function sanitizeFirebaseKey(value) {
   return String(value || '').trim().replace(/[.#$/[\]]/g, '_');
 }
@@ -14,10 +23,11 @@ function stripUndefined(value) {
 }
 
 export async function publishDeliveryOfferToFirebase(partnerId, orderMongoId, payload = {}) {
-  const db = getFirebaseDB();
-  if (!db || !partnerId || !orderMongoId) return false;
+  if (!partnerId || !orderMongoId) return false;
 
   try {
+    const db = getFirebaseDB();
+    if (!db) return false;
     const offeredAt = Number(payload.offeredAt) || Date.now();
     await db.ref(getOfferPath(partnerId, orderMongoId)).set(
       stripUndefined({
@@ -35,10 +45,11 @@ export async function publishDeliveryOfferToFirebase(partnerId, orderMongoId, pa
 }
 
 export async function removeDeliveryOfferFromFirebase(partnerId, orderMongoId) {
-  const db = getFirebaseDB();
-  if (!db || !partnerId || !orderMongoId) return false;
+  if (!partnerId || !orderMongoId) return false;
 
   try {
+    const db = getFirebaseDB();
+    if (!db) return false;
     await db.ref(getOfferPath(partnerId, orderMongoId)).remove();
     return true;
   } catch (err) {

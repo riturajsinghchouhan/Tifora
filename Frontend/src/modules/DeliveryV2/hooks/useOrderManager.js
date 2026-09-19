@@ -209,8 +209,23 @@ export const useOrderManager = () => {
           finalOrder = completeRes.data.data.order;
         }
       } catch (completeErr) {
-        console.warn('Complete call failed, but OTP was verified.', completeErr);
-        // If already completed, we proceed to show the summary with whatever we have
+        // Only an order the server already considers finished is safe to treat
+        // as success. Swallowing everything else showed the rider a "Delivered"
+        // summary for an order the server never closed - so the verify sheet
+        // came straight back the next time state resynced.
+        const serverMessage = String(
+          completeErr?.response?.data?.error ||
+            completeErr?.response?.data?.message ||
+            '',
+        );
+        const alreadyFinished = /already\s+(at\s+status\s+'?delivered'?|delivered|completed)/i.test(
+          serverMessage,
+        );
+        if (!alreadyFinished) {
+          console.error('Complete delivery failed:', serverMessage || completeErr);
+          throw completeErr;
+        }
+        console.warn('Order was already completed server-side; showing summary.');
       }
       
       // Update local order state so Summary Modal shows 'delivered' status

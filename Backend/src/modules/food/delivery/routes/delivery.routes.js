@@ -5,6 +5,7 @@ import { requireRoles } from '../../../../core/roles/role.middleware.js';
 import * as orderController from '../../orders/controllers/order.controller.js';
 import { registerDeliveryPartnerController, updateDeliveryPartnerProfileController, updateDeliveryPartnerBankDetailsController, listSupportTicketsController, createSupportTicketController, getSupportTicketByIdController, updateDeliveryPartnerDetailsController, updateDeliveryPartnerProfilePhotoBase64Controller, updateAvailabilityController, getWalletController, createWithdrawalRequestController, createCashDepositOrderController, verifyCashDepositPaymentController, getEarningsController, getTripHistoryController, getPocketDetailsController, getEmergencyHelpController, getCashLimitController, getDeliveryReferralStatsController, getActiveEarningAddonsController, getDeliveryOnboardingFeeConfigController, createDeliveryOnboardingFeeOrderController } from '../controllers/delivery.controller.js';
 import { deleteDeliveryAccountController } from '../controllers/deleteAccount.controller.js';
+import * as multiOrderController from '../controllers/multiOrder.controller.js';
 
 const router = express.Router();
 
@@ -58,6 +59,11 @@ router.patch('/orders/:orderId/status', authMiddleware, requireRoles('DELIVERY_P
 router.post('/orders/:orderId/collect/qr', authMiddleware, requireRoles('DELIVERY_PARTNER'), orderController.createCollectQrController);
 router.post('/orders/:orderId/payment-qr', authMiddleware, requireRoles('DELIVERY_PARTNER'), orderController.createCollectQrController);
 router.get('/orders/:orderId/payment-status', authMiddleware, requireRoles('DELIVERY_PARTNER'), orderController.getPaymentStatusController);
+
+// ----- Multi Orders -----
+router.get('/multi-orders', authMiddleware, requireRoles('DELIVERY_PARTNER'), multiOrderController.getAssignedMultiOrders);
+router.post('/multi-orders/request-otp', authMiddleware, requireRoles('DELIVERY_PARTNER'), multiOrderController.requestMultiOrderPickupOtp);
+router.post('/multi-orders/verify-pickup', authMiddleware, requireRoles('DELIVERY_PARTNER'), multiOrderController.verifyMultiOrderPickup);
 
 // ----- Earnings / Settings -----
 router.get('/earning-addons/active', authMiddleware, requireRoles('DELIVERY_PARTNER'), getActiveEarningAddonsController);

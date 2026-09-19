@@ -222,6 +222,8 @@ export const useDeliveryNotifications = () => {
   const [orderReady, setOrderReady] = useState(null);
   const [orderStatusUpdate, setOrderStatusUpdate] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  // Mirror of socketRef so consumers re-render when the socket is (re)created.
+  const [socketInstance, setSocketInstance] = useState(null);
   const [deliveryPartnerId, setDeliveryPartnerId] = useState(null);
   const [autoKilledOrder, setAutoKilledOrder] = useState(null);
   const [claimedOrderId, setClaimedOrderId] = useState(null); // set when another partner claims an order
@@ -1412,7 +1414,15 @@ export const useDeliveryNotifications = () => {
     return true;
   }, []);
 
+  // socketRef is reassigned inside effects; publish it as state so screens
+  // that attach their own listeners (e.g. multi-order batches) re-run.
+  useEffect(() => {
+    setSocketInstance(socketRef.current);
+  }, [isConnected, deliveryPartnerId, deliverySessionToken]);
+
   return {
+    socket: socketInstance,
+    socketRef,
     newOrder,
     clearNewOrder,
     orderReady,

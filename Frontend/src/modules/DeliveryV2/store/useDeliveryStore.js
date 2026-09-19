@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { deriveTripStatus, furthestTripStatus } from '@/modules/DeliveryV2/utils/tripStatus'
+import { getOrderAcceptId } from '@food/utils/orderDispatchId'
 
 /**
  * @typedef {Object} Location
@@ -28,8 +30,11 @@ export const useDeliveryStore = create(
       riderLocation: null, // { lat, lng }
       
       // --- Trip State ---
+      // A rider can hold several orders at once (multi-order batches), so
+      // tripStatus always describes activeOrderId and nothing else.
       activeOrder: null, // ActiveOrder | null
-      tripStatus: 'IDLE', // 'IDLE' | 'PICKING_UP' | 'REACHED_PICKUP' | 'PICKED_UP' | 'DELIVERING' | 'REACHED_DROP' | 'COMPLETED'
+      activeOrderId: null, // id tripStatus belongs to
+      tripStatus: 'IDLE', // 'IDLE' | 'PICKING_UP' | 'REACHED_PICKUP' | 'PICKED_UP' | 'REACHED_DROP' | 'COMPLETED'
       
       // --- Admin / Business Settings ---
       settings: {
@@ -48,17 +53,29 @@ export const useDeliveryStore = create(
         settings: { ...state.settings, ...newSettings }
       })),
 
-      setActiveOrder: (order) => set((state) => ({ 
-        activeOrder: order, 
-        tripStatus: order 
-          ? (state.tripStatus === 'IDLE' ? 'PICKING_UP' : state.tripStatus) 
-          : 'IDLE' 
-      })),
+      setActiveOrder: (order) => set((state) => {
+        if (!order) return { activeOrder: null, activeOrderId: null, tripStatus: 'IDLE' };
+
+        const nextId = getOrderAcceptId(order);
+        const derived = deriveTripStatus(order);
+        const isSameOrder = Boolean(nextId) && nextId === state.activeOrderId;
+
+        return {
+          activeOrder: order,
+          activeOrderId: nextId || state.activeOrderId,
+          // Switching to a DIFFERENT order must never inherit the previous
+          // order's stage - that is what made every order in a batch move
+          // together. For the same order, keep whichever stage is further
+          // along so a stale payload cannot walk the rider backwards.
+          tripStatus: isSameOrder ? furthestTripStatus(state.tripStatus, derived) : derived,
+        };
+      }),
 
       updateTripStatus: (status) => set({ tripStatus: status }),
 
       clearActiveOrder: () => set({ 
         activeOrder: null, 
+        activeOrderId: null,
         tripStatus: 'IDLE' 
       }),
 

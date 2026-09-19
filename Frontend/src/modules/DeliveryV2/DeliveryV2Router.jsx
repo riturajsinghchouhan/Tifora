@@ -33,8 +33,7 @@ import { ProfileDetailsV2 } from './pages/profile/ProfileDetailsV2';
 import TermsAndConditionsV2 from './pages/TermsAndConditionsV2';
 import PrivacyPolicyV2 from './pages/PrivacyPolicyV2';
 import NotificationsV2 from './pages/NotificationsV2';
-
-
+import MultiOrdersV2 from './pages/MultiOrdersV2';
 
 const DeliveryV2Router = () => {
   return (
@@ -61,6 +60,7 @@ const DeliveryV2Router = () => {
         <Route path="/tiffin-route" element={<ProtectedRoute><DeliveryHomeV2 tab="tiffin" /></ProtectedRoute>} />
         <Route path="/tiffin-dropoff/:id" element={<ProtectedRoute><TiffinDropoff /></ProtectedRoute>} />
         <Route path="/tiffin-nav/:id" element={<ProtectedRoute><TiffinNavigationPage /></ProtectedRoute>} />
+        <Route path="/multi-orders" element={<ProtectedRoute><DeliveryHomeV2 tab="multi-orders" /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><NotificationsV2 /></ProtectedRoute>} />
         <Route path="/profile/details" element={<ProtectedRoute><ProfileDetailsV2 /></ProtectedRoute>} />
         <Route path="/profile/bank" element={<ProtectedRoute><ProfileBankV2 /></ProtectedRoute>} />
