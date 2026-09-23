@@ -99,6 +99,7 @@ export default function TiffinCheckout() {
                     name: 'Tifora Tiffin',
                     description: `Subscription for ${plan.name}`,
                     order_id: rzData.orderId,
+                    image: '', // Override default logo
                     prefill: {
                         name: userName,
                         email: userEmail,

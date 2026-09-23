@@ -76,7 +76,7 @@ export const initRazorpayPayment = async (options) => {
       order_id: options.order_id,
       name: options.name || 'Appzeto Food',
       description: options.description || 'Order Payment',
-      image: options.image || '/logo.png',
+      image: options.image !== undefined ? options.image : '/logo.png',
       prefill: {
         name: options.prefill?.name || '',
         email: options.prefill?.email || '',
@@ -84,7 +84,7 @@ export const initRazorpayPayment = async (options) => {
       },
       notes: options.notes || {},
       theme: {
-        color: '#E23744'
+        color: options.theme?.color || '#E23744'
       },
       handler: function(response) {
         if (options.handler) {
