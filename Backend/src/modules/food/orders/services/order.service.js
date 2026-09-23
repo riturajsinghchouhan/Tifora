@@ -289,6 +289,30 @@ export async function createOrder(userId, dto) {
   const isCash = paymentMethod === "cash";
   const isWallet = paymentMethod === "wallet";
 
+  // Validate items against the database to ensure correctness and availability
+  const createItems = Array.isArray(dto.items) ? dto.items : [];
+  const createItemIds = createItems.map(it => it.itemId).filter(Boolean);
+  const realOrderItems = await FoodItem.find({ _id: { $in: createItemIds } }).lean();
+  const realOrderItemMap = new Map(realOrderItems.map(it => [String(it._id), it]));
+
+  for (const it of createItems) {
+    const realItem = realOrderItemMap.get(String(it.itemId));
+    if (!realItem) throw new ValidationError(`Item "${it.name}" is no longer available`);
+    if (!realItem.isAvailable) throw new ValidationError(`Item "${it.name}" is currently out of stock`);
+
+    let realPrice = realItem.price;
+    if (it.variantId) {
+      const variant = realItem.variants?.find(v => String(v._id) === String(it.variantId));
+      if (!variant) throw new ValidationError(`Variant for "${it.name}" is no longer available`);
+      realPrice = variant.price;
+      it.variantPrice = realPrice;
+    }
+
+    if (Number(it.price) !== realPrice) {
+      throw new ValidationError(`Price mismatch for "${it.name}". Please refresh your cart.`);
+    }
+  }
+
   // Ensure pricing is present and consistent.
   const computedSubtotal = (dto.items || []).reduce((sum, item) => {
     const price = Number(item?.price);

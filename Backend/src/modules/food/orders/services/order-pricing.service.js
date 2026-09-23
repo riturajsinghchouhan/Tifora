@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { FoodItem } from '../../admin/models/food.model.js';
 import { FoodOrder } from '../models/order.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { FoodFeeSettings } from '../../admin/models/feeSettings.model.js';
@@ -42,11 +43,32 @@ export async function calculateOrderPricing(userId, dto) {
     throw new ValidationError("Restaurant not available");
 
   const items = Array.isArray(dto.items) ? dto.items : [];
+  
+  // Validate items against database
+  const itemIds = items.map(it => it.itemId).filter(Boolean);
+  const realItems = await FoodItem.find({ _id: { $in: itemIds } }).lean();
+  const realItemMap = new Map(realItems.map(it => [String(it._id), it]));
+
   let itemDiscountTotal = 0;
   let subtotal = 0;
   let eligibleSubtotalForCoupon = 0;
 
   items.forEach((it) => {
+    const realItem = realItemMap.get(String(it.itemId));
+    if (!realItem) throw new ValidationError(`Item "${it.name}" is no longer available`);
+    if (!realItem.isAvailable) throw new ValidationError(`Item "${it.name}" is currently out of stock`);
+
+    let realPrice = realItem.price;
+    if (it.variantId) {
+      const variant = realItem.variants?.find(v => String(v._id) === String(it.variantId));
+      if (!variant) throw new ValidationError(`Variant for "${it.name}" is no longer available`);
+      realPrice = variant.price;
+      it.variantPrice = realPrice;
+    }
+    
+    // Override the user provided price with the authentic database price
+    it.price = realPrice;
+
     let price = Number(it.price) || 0;
     const qty = Number(it.quantity) || 1;
     let hasItemDiscount = false;
