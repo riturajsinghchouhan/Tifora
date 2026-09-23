@@ -66,7 +66,7 @@ const tiffinSubscriptionSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ['active', 'paused', 'cancelled', 'expired'],
+            enum: ['pending', 'active', 'paused', 'cancelled', 'expired'],
             default: 'active',
             index: true
         },

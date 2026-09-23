@@ -129,7 +129,7 @@ export const purchaseSubscription = async (req, res) => {
             startDate: start,
             endDate: end,
             deliveryAddress: normalizedAddress,
-            paymentId: paymentId || (isCash ? `CASH_${Date.now()}` : `WALLET_${Date.now()}`),
+            ...(paymentId && { paymentId }),
             paymentStatus: isCash ? 'pending' : 'paid',
             amountPaid: amountToPay
         });
