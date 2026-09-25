@@ -4,58 +4,83 @@ import { logger } from '../../utils/logger.js';
 /** @type {Map<string, NodeJS.Timeout>} */
 const pendingFallbackTimers = new Map();
 
+const DISPATCH_TIMEOUT_JOB_PREFIX = 'dispatch-timeout';
+
+/** Shared id prefix of every dispatch timeout job belonging to one order. */
+function dispatchTimeoutJobPrefix(orderMongoId) {
+    return `${DISPATCH_TIMEOUT_JOB_PREFIX}-${String(orderMongoId)}-`;
+}
+
 /**
- * Build a stable job id for dispatch timeout checks so only one pending job exists per order.
+ * Build a job id for a dispatch timeout check.
+ *
+ * Every scheduling gets its own id, and that is load-bearing. BullMQ silently drops
+ * an `add` whose job id already exists in Redis — it emits a `duplicated` event and
+ * hands back the old job, so the call looks successful — and these jobs re-arm
+ * themselves from inside their own run. A single stable id per order therefore made
+ * each follow-up collide with the still-active job and get thrown away, ending the
+ * radius cascade (2 -> 4 -> ... -> 15km) after one timeout and leaving the order
+ * unassigned until the watchdog swept it up. The order id stays in the prefix so
+ * pending jobs for an order can still be found and cancelled.
+ *
  * @param {string} orderMongoId
  */
 export function dispatchTimeoutJobId(orderMongoId) {
-    return `dispatch-timeout-${String(orderMongoId)}`;
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    return `${dispatchTimeoutJobPrefix(orderMongoId)}${unique}`;
 }
 
 /**
- * Cancel a pending dispatch timeout job (BullMQ or setTimeout fallback).
+ * Cancel every pending dispatch timeout job for an order (BullMQ + setTimeout fallback).
+ *
+ * Best-effort on purpose: a run that is already active is left alone, and both
+ * processDispatchTimeout() and tryAutoAssign() re-check the order's state before
+ * they touch anything, so a check that slips through is a no-op rather than a
+ * duplicate broadcast.
+ *
  * @param {string} orderMongoId
  */
 export async function cancelDispatchTimeoutJob(orderMongoId) {
-    const jobId = dispatchTimeoutJobId(orderMongoId);
-    const queue = getOrderQueue();
+    const prefix = dispatchTimeoutJobPrefix(orderMongoId);
 
-    const fallbackTimer = pendingFallbackTimers.get(jobId);
-    if (fallbackTimer) {
-        clearTimeout(fallbackTimer);
-        pendingFallbackTimers.delete(jobId);
+    for (const [timerKey, timerId] of pendingFallbackTimers) {
+        if (!timerKey.startsWith(prefix)) continue;
+        clearTimeout(timerId);
+        pendingFallbackTimers.delete(timerKey);
     }
 
+    const queue = getOrderQueue();
     if (!queue) return;
 
     try {
-        const existing = await queue.getJob(jobId);
-        if (!existing) return;
-        const state = await existing.getState();
-        if (['delayed', 'waiting', 'paused'].includes(state)) {
-            await existing.remove();
-            logger.info(`Removed pending dispatch timeout job ${jobId} (state=${state})`);
+        // Ids only — one Redis round trip, no per-job fetch. Active jobs are not
+        // listed here, which is what we want: that run already owns the order.
+        const pendingIds = await queue.getRanges(['delayed', 'waiting', 'paused'], 0, -1);
+        for (const jobId of pendingIds) {
+            if (!String(jobId).startsWith(prefix)) continue;
+            const removed = await queue.remove(jobId);
+            if (removed) logger.info(`Removed pending dispatch timeout job ${jobId}`);
         }
     } catch (err) {
-        logger.warn(`Could not cancel dispatch timeout job ${jobId}: ${err.message}`);
+        logger.warn(`Could not cancel dispatch timeout jobs for order ${orderMongoId}: ${err.message}`);
     }
 }
 
 /**
- * Schedule (or replace) a dispatch timeout check for an order.
+ * Schedule a dispatch timeout check, replacing any still-pending one for the order.
+ *
  * @param {string} orderMongoId
  * @param {object} data - Job payload (must include attempt)
  * @param {number} [delay=20000]
  */
 export async function scheduleDispatchTimeoutJob(orderMongoId, data, delay = 20000) {
-    const jobId = dispatchTimeoutJobId(orderMongoId);
     const queue = getOrderQueue();
+    const jobId = dispatchTimeoutJobId(orderMongoId);
+
+    await cancelDispatchTimeoutJob(orderMongoId);
 
     if (!queue) {
         logger.warn('BullMQ order queue not available. Using setTimeout fallback for dispatch timeout.');
-
-        const existing = pendingFallbackTimers.get(jobId);
-        if (existing) clearTimeout(existing);
 
         const timerId = setTimeout(async () => {
             pendingFallbackTimers.delete(jobId);
@@ -71,10 +96,11 @@ export async function scheduleDispatchTimeoutJob(orderMongoId, data, delay = 200
         return { id: jobId };
     }
 
-    await cancelDispatchTimeoutJob(orderMongoId);
-
     try {
-        const job = await queue.add('process-order', data, { jobId, delay });
+        // removeOnComplete: these fire constantly, and retaining them would crowd out
+        // the queue's shared 1000-job completed window that is useful for debugging
+        // other actions. Failures are still retained by the queue default.
+        const job = await queue.add('process-order', data, { jobId, delay, removeOnComplete: true });
         logger.info(`Dispatch timeout job scheduled: ${job.id} attempt=${data.attempt} delay=${delay}ms`);
         return job;
     } catch (err) {

@@ -38,6 +38,17 @@ export const processOrderJob = async (job) => {
         }
     }
 
+    // Handle self-healing payment confirmation for orders awaiting online payment
+    if (action === 'PAYMENT_RECONCILE_CHECK') {
+        try {
+            const { runPaymentReconcileCheck } = await import('../../modules/food/orders/services/order.service.js');
+            await runPaymentReconcileCheck(orderMongoId, { attempt: Number(data.attempt) || 1 });
+        } catch (err) {
+            logger.error(`[BullMQ:order] PAYMENT_RECONCILE_CHECK failed: ${err.message}`);
+            throw err; // Re-throw for BullMQ exponential backoff retry
+        }
+    }
+
     // Handle Petpooja Sync
     if (action === 'SYNC_PETPOOJA') {
         try {

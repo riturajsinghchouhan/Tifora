@@ -516,6 +516,13 @@ export async function createOrder(userId, dto) {
 
   if (paymentMethod === "razorpay" && payment?.razorpay?.orderId) {
     // Audit can still happen here or via FinanceService events
+
+    // A Razorpay order stays invisible to the restaurant until its payment is
+    // confirmed. verifyPayment (client) and the webhook normally do that within
+    // seconds, but both can be missed — a killed app, a dropped webhook — and the
+    // order would then sit unseen until the 5-minute watchdog swept it up. Arm a
+    // short ladder of reconciliation checks so that window is ~20s, not ~5min.
+    schedulePaymentReconcileCheck(order._id.toString(), 1);
   }
 
   // Realtime + push notifications.
@@ -912,6 +919,115 @@ export async function reconcileOrderWithRazorpay(order) {
   );
 
   return { reconciled: true, restoredFromCancellation, order: finalizedOrder };
+}
+
+// ----- Self-healing payment confirmation -----
+
+/**
+ * Delay before each post-checkout payment check, measured from the previous one.
+ *
+ * An online order is hidden from the restaurant until its payment is confirmed, so
+ * when the client never calls verifyPayment (app killed, network dropped mid-
+ * checkout) and the webhook is missed too, nothing surfaces the order until a
+ * reconciliation pass runs. That used to be the 5-minute watchdog sweep alone,
+ * which is why genuinely paid orders sometimes reached the restaurant minutes late.
+ * This ladder narrows the common case to ~20s and then tapers off; the watchdog
+ * stays as the long-tail backstop (and remains the only thing that cancels).
+ */
+const PAYMENT_RECONCILE_DELAYS_MS = [20_000, 40_000, 75_000, 150_000, 300_000, 600_000];
+
+/**
+ * Payment states that mean the order is already through — nothing left to reconcile.
+ *
+ * `authorized` is deliberately absent even though the finance-visibility lists count
+ * it: it means Razorpay is holding the money but a capture failed, so the order was
+ * never confirmed and the restaurant was never notified. That is precisely the case
+ * reconciliation exists to repair, so the ladder must keep running on it.
+ */
+const SETTLED_PAYMENT_STATUSES = [
+  "paid",
+  "captured",
+  "settled",
+  "refunded",
+];
+
+/**
+ * Queue the next payment check for an order still awaiting online payment.
+ *
+ * Every attempt gets its own job id on purpose: BullMQ ignores an `add` whose job
+ * id already exists, and completed jobs are retained, so reusing a single id per
+ * order would silently drop every check after the first.
+ *
+ * @param {string} orderMongoId
+ * @param {number} [attempt=1] - 1-based rung of PAYMENT_RECONCILE_DELAYS_MS.
+ */
+function schedulePaymentReconcileCheck(orderMongoId, attempt = 1) {
+  const delay = PAYMENT_RECONCILE_DELAYS_MS[attempt - 1];
+  if (!delay) return;
+
+  const id = String(orderMongoId);
+  addOrderJob(
+    {
+      action: "PAYMENT_RECONCILE_CHECK",
+      orderId: id,
+      orderMongoId: id,
+      attempt,
+    },
+    { jobId: `payment-reconcile-${id}-${attempt}`, delay },
+  ).catch((err) => {
+    // Order placement must not fail because the follow-up check could not be
+    // queued; the watchdog still covers this order, just more slowly.
+    logger.error(
+      `[PaymentReconcile] Could not queue check #${attempt} for order ${id}: ${err?.message || err}`,
+    );
+  });
+}
+
+/**
+ * One rung of the self-healing check for an order awaiting online payment.
+ *
+ * If Razorpay is already holding the customer's money this confirms the order —
+ * which is what finally makes it visible to the restaurant — otherwise it re-arms
+ * itself for the next rung and gives up once the ladder runs out.
+ *
+ * Deliberately non-destructive: it never cancels an order. Only the watchdog does
+ * that, and only on a conclusive "nobody paid" answer from Razorpay.
+ *
+ * @param {string} orderMongoId
+ * @param {{ attempt?: number }} [options]
+ */
+export async function runPaymentReconcileCheck(orderMongoId, { attempt = 1 } = {}) {
+  const order = await FoodOrder.findById(orderMongoId);
+  if (!order) return { done: true, reason: "order_not_found" };
+
+  // Restoring a cancelled-but-paid order needs the refund/restore bookkeeping that
+  // watchdog step 4 owns, so leave those alone rather than half-handling them here.
+  if (CANCELLED_ORDER_STATUSES.includes(order.orderStatus)) {
+    return { done: true, reason: "order_cancelled" };
+  }
+
+  const hydrated = await attachFinancialSnapshotToOrder(order);
+  if (String(hydrated.payment?.method || "").toLowerCase() !== "razorpay") {
+    return { done: true, reason: "not_an_online_payment" };
+  }
+
+  // verifyPayment or the webhook already landed — stop rather than spend a
+  // Razorpay API call to be told the same thing.
+  const paymentStatus = String(hydrated.payment?.status || "").toLowerCase();
+  if (SETTLED_PAYMENT_STATUSES.includes(paymentStatus)) {
+    return { done: true, reason: "already_settled" };
+  }
+
+  const result = await reconcileOrderWithRazorpay(hydrated);
+  if (result.reconciled || result.reason === "already_paid") {
+    logger.info(
+      `[PaymentReconcile] Order ${orderMongoId} confirmed on check #${attempt}; client verifyPayment and webhook had not landed.`,
+    );
+    return { done: true, reason: "reconciled" };
+  }
+
+  schedulePaymentReconcileCheck(orderMongoId, attempt + 1);
+  return { done: false, reason: result.reason || "still_unpaid" };
 }
 
 // ----- Auto-assign -----
