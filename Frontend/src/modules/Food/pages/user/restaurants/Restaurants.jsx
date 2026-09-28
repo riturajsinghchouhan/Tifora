@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+﻿import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { ArrowLeft, Clock, MapPin, Heart, Star } from "lucide-react"
 import AnimatedPage from "@food/components/user/AnimatedPage"
@@ -17,14 +17,7 @@ import { useDelayedLoading } from "@food/hooks/useDelayedLoading"
 const BACKEND_ORIGIN = API_BASE_URL.replace(/\/api(?:\/v\d+)?\/?$/, "")
 
 const normalizeImageUrl = (imageUrl) => {
-  if (typeof imageUrl !== "string" || !imageUrl.trim()) return ""
-  const trimmed = imageUrl.trim()
-  if (/^(https?:)?\/\//i.test(trimmed) || /^data:/i.test(trimmed) || /^blob:/i.test(trimmed)) {
-    return trimmed
-  }
-  return trimmed.startsWith("/")
-    ? `${BACKEND_ORIGIN}${trimmed}`
-    : `${BACKEND_ORIGIN}/${trimmed}`
+  return commonNormalizeImageUrl(imageUrl, BACKEND_ORIGIN);
 }
 
 const pickRestaurantImage = (restaurant) => {
@@ -225,4 +218,5 @@ export default function Restaurants() {
     </AnimatedPage>
   )
 }
+
 

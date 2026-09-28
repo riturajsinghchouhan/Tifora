@@ -1,4 +1,4 @@
-import { useSearchParams, Link, useNavigate } from "react-router-dom";
+﻿import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import React, {
   useRef,
   useEffect,
@@ -79,6 +79,7 @@ const debugError = (...args) => { };
 
 // Import shared food images - prevents duplication
 import { foodImages } from "@food/constants/images";
+import { normalizeImageUrl as commonNormalizeImageUrl } from "@food/utils/common";
 
 import { Avatar, AvatarFallback } from "@food/components/ui/avatar";
 import {
@@ -369,85 +370,7 @@ export default function Home() {
 
   const normalizeImageUrl = useCallback(
     (imageUrl) => {
-      if (typeof imageUrl !== "string") return "";
-      const trimmed = imageUrl.trim();
-      if (!trimmed) return "";
-      if (/^data:/i.test(trimmed) || /^blob:/i.test(trimmed)) {
-        return trimmed;
-      }
-      const appProtocol =
-        typeof window !== "undefined" ? window.location?.protocol : "";
-      const appHost =
-        typeof window !== "undefined" ? window.location?.hostname : "";
-      let normalizedInput = trimmed
-        .replace(/\\/g, "/")
-        .replace(/^(https?):\/(?!\/)/i, "$1://")
-        .replace(/^(https?:\/\/)(https?:\/\/)/i, "$1");
-
-      if (/^\/\//.test(normalizedInput)) {
-        normalizedInput = `${appProtocol || "https:"}${normalizedInput}`;
-      }
-
-      // WebView can fail on unescaped spaces/special chars; keep URLs safely encoded.
-      if (/^(https?:)?\/\//i.test(normalizedInput)) {
-        try {
-          const parsed = new URL(normalizedInput, window.location.origin);
-
-          // In mobile production, localhost/127.0.0.1 inside image URLs is unreachable.
-          // Use BACKEND_ORIGIN (API server) for image host, not frontend hostï¿½uploads are served by the backend.
-          if (
-            appHost &&
-            appHost !== "localhost" &&
-            appHost !== "127.0.0.1" &&
-            /^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname)
-          ) {
-            try {
-              const backendUrl = new URL(BACKEND_ORIGIN);
-              parsed.protocol = backendUrl.protocol;
-              parsed.hostname = backendUrl.hostname;
-              parsed.port = backendUrl.port;
-            } catch {
-              parsed.protocol = window.location.protocol;
-              parsed.hostname = window.location.hostname;
-              if (window.location.port) parsed.port = window.location.port;
-            }
-          }
-
-          // Prevent mixed-content image blocking in HTTPS WebView.
-          if (appProtocol === "https:" && parsed.protocol === "http:") {
-            parsed.protocol = "https:";
-          }
-
-          const finalUrl = parsed.toString();
-          // Do not encode signed URLs (S3/Cloudfront/Cloudinary); encoding query params can break signatures.
-          const hasSignedParams =
-            /[?&](X-Amz-|Signature=|Expires=|AWSAccessKeyId=|GoogleAccessId=|token=|sig=|se=|sp=|sv=)/i.test(
-              finalUrl,
-            );
-          return hasSignedParams ? finalUrl : encodeURI(finalUrl);
-        } catch {
-          return normalizedInput;
-        }
-      }
-
-      const absolutePath = normalizedInput.startsWith("/")
-        ? `${BACKEND_ORIGIN}${normalizedInput}`
-        : `${BACKEND_ORIGIN}/${normalizedInput.replace(/^\.?\/*/, "")}`;
-
-      try {
-        const parsed = new URL(absolutePath, window.location.origin);
-        if (appProtocol === "https:" && parsed.protocol === "http:") {
-          parsed.protocol = "https:";
-        }
-        const finalUrl = parsed.toString();
-        const hasSignedParams =
-          /[?&](X-Amz-|Signature=|Expires=|AWSAccessKeyId=|GoogleAccessId=|token=|sig=|se=|sp=|sv=)/i.test(
-            finalUrl,
-          );
-        return hasSignedParams ? finalUrl : encodeURI(finalUrl);
-      } catch {
-        return absolutePath;
-      }
+      return commonNormalizeImageUrl(imageUrl, BACKEND_ORIGIN);
     },
     [BACKEND_ORIGIN],
   );
@@ -3345,3 +3268,4 @@ export default function Home() {
     </div>
   );
 }
+

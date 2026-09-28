@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Search, Grid2x2, ShoppingBag } from "lucide-react";
 import { motion } from "framer-motion";
 import { adminAPI } from "@food/api";
 import { foodImages } from "@food/constants/images";
+import { normalizeImageUrl as commonNormalizeImageUrl } from "@food/utils/common";
 import OptimizedImage from "@food/components/OptimizedImage";
 import { useAppLocation } from "@food/hooks/useAppLocation"
 import useAppBackNavigation from "@food/hooks/useAppBackNavigation";
@@ -20,21 +21,7 @@ export default function Categories() {
   const BACKEND_ORIGIN = useMemo(() => API_BASE_URL.replace(/\/api(?:\/v\d+)?\/?$/, ""), []);
 
   const normalizeImageUrl = (imageUrl) => {
-    if (typeof imageUrl !== "string") return "";
-    const trimmed = imageUrl.trim();
-    if (!trimmed) return "";
-    if (/^data:/i.test(trimmed) || /^blob:/i.test(trimmed)) return trimmed;
-    
-    const normalizedInput = trimmed
-      .replace(/\\/g, "/")
-      .replace(/^(https?):\/(?!\/)/i, "$1://")
-      .replace(/^(https?:\/\/)(https?:\/\/)/i, "$1");
-
-    if (/^(https?:)?\/\//i.test(normalizedInput)) return normalizedInput;
-
-    return normalizedInput.startsWith("/")
-      ? `${BACKEND_ORIGIN}${normalizedInput}`
-      : `${BACKEND_ORIGIN}/${normalizedInput.replace(/^\.?\/*/, "")}`;
+    return commonNormalizeImageUrl(imageUrl, BACKEND_ORIGIN);
   };
 
   useEffect(() => {
@@ -162,3 +149,4 @@ export default function Categories() {
     </div>
   );
 }
+
