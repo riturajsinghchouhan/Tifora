@@ -1,4 +1,4 @@
-﻿import { useSearchParams, Link, useNavigate } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import React, {
   useRef,
   useEffect,
@@ -91,7 +91,7 @@ import {
 import { useAppLocation } from "@food/hooks/useAppLocation";
 
 import offerImage from "@food/assets/offerimage.png";
-import api, { publicGetOnce, restaurantAPI, getPublicLandingSettings, getPublicExploreIcons, getPublicCategories } from "@food/api";
+import api, { adminAPI, publicGetOnce, restaurantAPI, getPublicLandingSettings, getPublicExploreIcons, getPublicCategories } from "@food/api";
 import { API_BASE_URL } from "@food/api/config";
 import OptimizedImage, { ShopPlaceholder } from "@food/components/OptimizedImage";
 import { getRestaurantAvailabilityStatus } from "@food/utils/restaurantAvailability";
@@ -809,14 +809,17 @@ export default function Home() {
       try {
         setLoadingRealCategories(true);
         // Fetch 10 categories at a time
-        const data = await api.getPublicCategories({
+        const response = await adminAPI.getPublicCategories({
           zoneId: effectiveZoneId || null,
           page: 1,
           limit: 10
         });
         if (cancelled) return;
 
-        const list = data?.categories || (Array.isArray(data) ? data : []);
+        const list =
+          response?.data?.data?.categories ||
+          response?.data?.categories ||
+          (Array.isArray(response?.data) ? response.data : []);
         const categories = Array.isArray(list)
           ? list.map((cat, idx) => ({
               id: String(cat?.id || cat?._id || cat?.slug || idx),
@@ -865,13 +868,16 @@ export default function Home() {
     setIsLoadingMoreCategories(true);
     try {
       const nextPage = categoryPage + 1;
-      const data = await api.getPublicCategories({
+      const response = await adminAPI.getPublicCategories({
         zoneId: effectiveZoneId || null,
         page: nextPage,
         limit: 10
       });
 
-      const list = data?.categories || (Array.isArray(data) ? data : []);
+      const list =
+        response?.data?.data?.categories ||
+        response?.data?.categories ||
+        (Array.isArray(response?.data) ? response.data : []);
       const newCategories = Array.isArray(list)
         ? list.map((cat, idx) => ({
             id: String(cat?.id || cat?._id || cat?.slug || idx),
