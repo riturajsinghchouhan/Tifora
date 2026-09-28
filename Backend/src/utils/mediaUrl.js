@@ -43,8 +43,8 @@ export const normalizeMediaUrl = (value) => {
   if (/^(data:|blob:)/i.test(raw)) return raw;
 
   // Remap legacy domain to relative uploads path
-  if (raw.includes("theindianbite.com")) {
-    const match = raw.match(/theindianbite\.com(?:\/api\/v1)?\/(.+)$/i);
+  if (raw.includes("theindianbite.com") || raw.includes("tifora.in")) {
+    const match = raw.match(/(?:theindianbite\.com|tifora\.in)(?:\/api\/v1)?\/(.+)$/i);
     if (match && match[1]) {
       raw = `/${match[1]}`;
     }

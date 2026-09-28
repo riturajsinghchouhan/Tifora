@@ -56,9 +56,9 @@ export const normalizeImageUrl = (imageUrl, backendOrigin = "") => {
     }
   }
 
-  // Remap legacy theindianbite to local uploads
-  if (trimmed.includes("theindianbite.com")) {
-    const match = trimmed.match(/theindianbite\.com(?:\/api\/v1)?\/(.+)$/i);
+  // Remap legacy domains to local uploads
+  if (trimmed.includes("theindianbite.com") || trimmed.includes("tifora.in")) {
+    const match = trimmed.match(/(?:theindianbite\.com|tifora\.in)(?:\/api\/v1)?\/(.+)$/i);
     if (match && match[1]) {
       trimmed = `/${match[1]}`;
     }

@@ -183,14 +183,17 @@ export async function listPublicCategories(query = {}) {
 
     const approvedCategoryIds = await FoodItem.distinct('categoryId', itemFilter);
 
-    if (!approvedCategoryIds.length) {
-        return { categories: [], total: 0, page, limit };
-    }
-
     const filter = {
-        _id: { $in: approvedCategoryIds },
         isActive: true,
-        $and: [{ $or: GLOBAL_CATEGORY_FILTER }, { $or: APPROVED_CATEGORY_FILTER }]
+        $and: [
+            { $or: APPROVED_CATEGORY_FILTER },
+            { 
+               $or: [
+                   ...GLOBAL_CATEGORY_FILTER,
+                   { _id: { $in: approvedCategoryIds } }
+               ]
+            }
+        ]
     };
 
     if (search) {

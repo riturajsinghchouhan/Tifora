@@ -94,7 +94,7 @@ const OptimizedImage = React.memo(({
     if (imageSrc.startsWith('data:') || imageSrc.startsWith('/')) return false
     
     // Do not proxy our own domain or localhost (we optimize natively via sharp)
-    if (/localhost|127\.0\.0\.1|theindianbite\.com/i.test(imageSrc)) return false;
+    if (/localhost|127\.0\.0\.1|theindianbite\.com|tifora\.in/i.test(imageSrc)) return false;
     
     // We are migrating off Cloudinary, do not proxy it
     if (/res\.cloudinary\.com/i.test(imageSrc)) return false;
