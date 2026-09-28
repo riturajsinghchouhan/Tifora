@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -16,56 +16,56 @@ const DEFAULT_PLATE_CATEGORIES = [
     id: "breads-sabzi",
     name: "Breads & Sabzi",
     slug: "breads-sabzi",
-    image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=400&h=400&fit=crop&q=80",
+    image: "",
     kitchenCount: 18,
   },
   {
     id: "dal-rice-more",
     name: "Dal, Rice & More",
     slug: "dal-rice-more",
-    image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&h=400&fit=crop&q=80",
+    image: "",
     kitchenCount: 24,
   },
   {
     id: "main-course",
     name: "Main Course",
     slug: "main-course",
-    image: "https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=400&h=400&fit=crop&q=80",
+    image: "",
     kitchenCount: 32,
   },
   {
     id: "tiffin-snacks",
     name: "Tiffin & Snacks",
     slug: "tiffin-snacks",
-    image: "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=400&h=400&fit=crop&q=80",
+    image: "",
     kitchenCount: 15,
   },
   {
     id: "healthy-diet",
     name: "Healthy & Diet",
     slug: "healthy-diet",
-    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=400&fit=crop&q=80",
+    image: "",
     kitchenCount: 12,
   },
   {
     id: "south-indian",
     name: "South Indian",
     slug: "south-indian",
-    image: "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=400&h=400&fit=crop&q=80",
+    image: "",
     kitchenCount: 14,
   },
   {
     id: "biryani-pulao",
     name: "Biryani & Pulao",
     slug: "biryani-pulao",
-    image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&h=400&fit=crop&q=80",
+    image: "",
     kitchenCount: 20,
   },
   {
     id: "sweets-desserts",
     name: "Sweets & Desserts",
     slug: "sweets-desserts",
-    image: "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=400&h=400&fit=crop&q=80",
+    image: "",
     kitchenCount: 9,
   }
 ];
@@ -275,3 +275,4 @@ export default function HomeExploreTiffinPlans({
     </div>
   );
 }
+
