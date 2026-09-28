@@ -187,12 +187,7 @@ export async function listPublicCategories(query = {}) {
         isActive: true,
         $and: [
             { $or: APPROVED_CATEGORY_FILTER },
-            { 
-               $or: [
-                   ...GLOBAL_CATEGORY_FILTER,
-                   { _id: { $in: approvedCategoryIds } }
-               ]
-            }
+            { $or: GLOBAL_CATEGORY_FILTER }
         ]
     };
 

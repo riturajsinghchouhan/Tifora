@@ -133,7 +133,16 @@ const OptimizedImage = React.memo(({
     return proxyUrl;
   }
 
-  const finalSrc = useMemo(() => normalizeImageUrl(src, BACKEND_ORIGIN), [src])
+  // Only normalize relative paths or localhost URLs; pass through already-valid absolute URLs
+  const finalSrc = useMemo(() => {
+    if (!src || typeof src !== 'string') return src || ''
+    const trimmed = src.trim()
+    // Already an absolute production URL (tifora.in or current host) — don't re-normalize
+    if (/^https?:\/\//i.test(trimmed) && !/localhost|127\.0\.0\.1/i.test(trimmed)) {
+      return trimmed
+    }
+    return normalizeImageUrl(trimmed, BACKEND_ORIGIN)
+  }, [src])
 
   // Generate responsive srcset
   const srcSet = useMemo(() => {
