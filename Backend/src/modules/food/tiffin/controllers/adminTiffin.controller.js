@@ -32,15 +32,15 @@ export const getAdminTiffinOverview = async (req, res) => {
             kitchensCount
         ] = await Promise.all([
             TiffinSubscription.countDocuments({
-                $or: [{ paymentStatus: 'paid' }, { paymentMethod: 'cod' }]
+                $or: [{ paymentStatus: 'paid' }, { paymentMethod: { $in: ['cod', 'cash'] } }]
             }),
             TiffinSubscription.countDocuments({ 
                 status: 'active',
-                $or: [{ paymentStatus: 'paid' }, { paymentMethod: 'cod' }]
+                $or: [{ paymentStatus: 'paid' }, { paymentMethod: { $in: ['cod', 'cash'] } }]
             }),
             TiffinSubscription.countDocuments({ 
                 status: 'paused',
-                $or: [{ paymentStatus: 'paid' }, { paymentMethod: 'cod' }]
+                $or: [{ paymentStatus: 'paid' }, { paymentMethod: { $in: ['cod', 'cash'] } }]
             }),
             TiffinSubscription.aggregate([
                 { $match: { paymentStatus: 'paid' } },
@@ -131,7 +131,7 @@ export const getAllSubscriptions = async (req, res) => {
         let query = {
             $or: [
                 { paymentStatus: 'paid' },
-                { paymentMethod: 'cod' }
+                { paymentMethod: { $in: ['cod', 'cash'] } }
             ]
         };
 
