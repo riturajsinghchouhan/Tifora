@@ -91,6 +91,7 @@ export const purchaseSubscription = async (req, res) => {
                 deliveryAddress: normalizedAddress,
                 paymentStatus: 'pending',
                 status: 'pending',
+                paymentMethod: 'online',
                 amountPaid: amountToPay,
                 razorpayOrderId: rzOrder.id
             });
@@ -121,7 +122,8 @@ export const purchaseSubscription = async (req, res) => {
         }
 
         // For non-razorpay (wallet / cash / offline)
-        const isCash = paymentMethod === 'cash';
+        const isCash = paymentMethod === 'cash' || paymentMethod === 'cod';
+        const normalizedPaymentMethod = paymentMethod === 'wallet' ? 'wallet' : (isCash ? 'cod' : 'online');
         const newSubscription = new TiffinSubscription({
             userId,
             restaurantId: plan.restaurantId,
@@ -131,14 +133,23 @@ export const purchaseSubscription = async (req, res) => {
             deliveryAddress: normalizedAddress,
             ...(paymentId && { paymentId }),
             paymentStatus: isCash ? 'pending' : 'paid',
+            status: isCash ? 'pending' : 'active',
+            paymentMethod: normalizedPaymentMethod,
             amountPaid: amountToPay
         });
 
         await newSubscription.save();
-        const createdDeliveries = await generateInitialDeliveries(newSubscription, plan, start);
-        await emitRestaurantSubscriptionUpdate(newSubscription, createdDeliveries);
 
-        res.status(201).json({ success: true, data: newSubscription, message: 'Subscription purchased successfully' });
+        if (!isCash) {
+            const createdDeliveries = await generateInitialDeliveries(newSubscription, plan, start);
+            await emitRestaurantSubscriptionUpdate(newSubscription, createdDeliveries);
+        }
+
+        const successMessage = isCash
+            ? 'COD Subscription request submitted successfully. It will be activated after admin verification.'
+            : 'Subscription purchased successfully';
+
+        res.status(201).json({ success: true, data: newSubscription, message: successMessage });
     } catch (error) {
         console.error('Error purchasing subscription:', error);
         res.status(500).json({ success: false, message: 'Server error purchasing subscription' });

@@ -559,3 +559,104 @@ export const assignDeliveriesToPartner = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error assigning deliveries' });
     }
 };
+
+/**
+ * Bulk Mark Deliveries as Delivered (Direct Restaurant Delivery / Complete Batch)
+ */
+export const bulkMarkDeliveriesAsDelivered = async (req, res) => {
+    try {
+        const restaurantId = getRestaurantId(req);
+        const { deliveryIds } = req.body;
+
+        if (!restaurantId || !mongoose.isValidObjectId(restaurantId)) {
+            return res.status(401).json({ success: false, message: 'Unauthorized restaurant context' });
+        }
+
+        if (!deliveryIds || !Array.isArray(deliveryIds) || deliveryIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'No deliveries selected' });
+        }
+
+        const normalizedDeliveryIds = deliveryIds
+            .filter((id) => mongoose.isValidObjectId(id))
+            .map((id) => new mongoose.Types.ObjectId(id));
+
+        if (normalizedDeliveryIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid delivery IDs provided' });
+        }
+
+        const restaurantObjectId = new mongoose.Types.ObjectId(restaurantId);
+
+        const filter = {
+            _id: { $in: normalizedDeliveryIds },
+            restaurantId: restaurantObjectId
+        };
+
+        const deliveriesToDeliver = await TiffinDelivery.find(filter)
+            .populate('restaurantId', 'name profileImage logo address')
+            .populate({
+                path: 'subscriptionId',
+                populate: { path: 'planId', select: 'name mealType' }
+            })
+            .lean();
+
+        if (deliveriesToDeliver.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'No matching deliveries found for this restaurant'
+            });
+        }
+
+        await TiffinDelivery.updateMany(
+            filter,
+            {
+                $set: {
+                    status: 'delivered',
+                    deliveredAt: new Date()
+                }
+            }
+        );
+
+        // Real-time broadcast to users and restaurant
+        try {
+            const { getIO, rooms } = await import('../../../../config/socket.js');
+            const io = getIO();
+            if (io) {
+                for (const del of deliveriesToDeliver) {
+                    if (del.userId) {
+                        const userRoom = rooms.user(del.userId.toString());
+                        const payload = {
+                            deliveryId: del._id,
+                            _id: del._id,
+                            status: 'delivered',
+                            type: del.type,
+                            date: del.date,
+                            deliveredAt: new Date(),
+                            restaurantName: del.restaurantId?.name || 'Tiffin Kitchen',
+                            title: 'Tiffin Delivered! 🍱',
+                            message: `Your ${del.type} tiffin has been delivered. Enjoy your meal!`
+                        };
+                        io.to(userRoom).emit('tiffin_delivery_updated', payload);
+                        io.to(userRoom).emit('tiffin_delivery_status', payload);
+                    }
+                }
+
+                const restaurantRoom = rooms.restaurant(restaurantId);
+                io.to(restaurantRoom).emit('tiffin_dispatch_updated', {
+                    deliveredCount: deliveriesToDeliver.length
+                });
+            }
+        } catch (socketErr) {
+            console.error('Socket emission error during bulk delivery:', socketErr);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: `Successfully marked ${deliveriesToDeliver.length} tiffin(s) as Delivered!`,
+            count: deliveriesToDeliver.length
+        });
+    } catch (error) {
+        console.error('Error in bulkMarkDeliveriesAsDelivered:', error);
+        return res.status(500).json({ success: false, message: 'Server error marking deliveries as delivered' });
+    }
+};
+

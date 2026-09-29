@@ -990,10 +990,16 @@ export default function MySubscriptions() {
                                                                 ? 'bg-emerald-100/80 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                                                                 : currentSub.status === 'paused'
                                                                 ? 'bg-amber-100/80 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                                                : currentSub.status === 'pending'
+                                                                ? 'bg-amber-100/90 text-amber-900 border border-amber-300 dark:bg-amber-950/80 dark:text-amber-300'
                                                                 : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                                                         }`}>
-                                                            <span className={`w-1.5 h-1.5 rounded-full ${currentSub.status === 'active' ? 'bg-emerald-600 dark:bg-emerald-400 animate-pulse' : 'bg-amber-600'}`} />
-                                                            {currentSub.status === 'active' ? 'Delivering Daily' : currentSub.status.toUpperCase()}
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                                                currentSub.status === 'active' ? 'bg-emerald-600 dark:bg-emerald-400 animate-pulse' :
+                                                                currentSub.status === 'pending' ? 'bg-amber-500 animate-ping' :
+                                                                'bg-amber-600'
+                                                            }`} />
+                                                            {currentSub.status === 'active' ? 'Delivering Daily' : currentSub.status === 'pending' ? 'Verification Pending' : currentSub.status.toUpperCase()}
                                                         </span>
 
                                                         {currentSub.skippedDates?.length > 0 && (
@@ -1024,6 +1030,19 @@ export default function MySubscriptions() {
                                                     </div>
                                                 </div>
                                             </div>
+
+                                            {/* COD Pending Verification Alert Banner */}
+                                            {currentSub.status === 'pending' && (
+                                                <div className="bg-amber-500/10 border border-amber-300/80 dark:border-amber-700/50 rounded-xl p-3 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200 shadow-2xs">
+                                                    <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <p className="font-bold">Pending Admin Verification (COD)</p>
+                                                        <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5">
+                                                            Aapki Cash on Delivery subscription review ke liye submit ho chuki hai. Admin ke verify karne ke baad plan active hoga aur daily meal delivery schedule shuru hogi.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             {/* Middle Compact Row: Metrics & Progress in a Single Unified Strip */}
                                             <div className="bg-white/85 dark:bg-slate-900/85 backdrop-blur-xs rounded-xl p-3 border border-emerald-100/80 dark:border-slate-700/60 space-y-2 shadow-2xs">

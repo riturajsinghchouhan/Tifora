@@ -12,7 +12,8 @@ import {
     deleteTiffinPlan,
     getDailyPrepDashboard,
     getUnassignedDeliveries,
-    assignDeliveriesToPartner
+    assignDeliveriesToPartner,
+    bulkMarkDeliveriesAsDelivered
 } from '../controllers/restaurantTiffin.controller.js';
 
 // User Controllers
@@ -133,6 +134,7 @@ router.delete(['/restaurant/plans/:planId', '/plans/:planId'], restaurantAuth, d
 router.get(['/restaurant/prep-dashboard', '/prep-dashboard'], restaurantAuth, getDailyPrepDashboard);
 router.get(['/restaurant/unassigned-deliveries', '/unassigned-deliveries'], restaurantAuth, getUnassignedDeliveries);
 router.post(['/restaurant/assign', '/assign'], restaurantAuth, assignDeliveriesToPartner);
+router.post(['/restaurant/bulk-mark-delivered', '/bulk-mark-delivered'], restaurantAuth, bulkMarkDeliveriesAsDelivered);
 
 // --- User Tiffin Routes ---
 router.get('/user/plans/available', getAvailablePlans);

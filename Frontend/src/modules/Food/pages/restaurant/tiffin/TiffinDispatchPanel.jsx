@@ -36,10 +36,14 @@ export default function TiffinDispatchPanel() {
     const [selectedPartner, setSelectedPartner] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedZone, setSelectedZone] = useState('all');
-    const [selectedSlot, setSelectedSlot] = useState('all');
+    const [selectedSlot, setSelectedSlot] = useState(() => {
+        const hour = new Date().getHours();
+        return hour >= 15 ? 'Evening' : 'Morning';
+    });
     const [collapsedZones, setCollapsedZones] = useState({});
     const [loading, setLoading] = useState(true);
     const [isAssigning, setIsAssigning] = useState(false);
+    const [isDelivering, setIsDelivering] = useState(false);
 
     useEffect(() => {
         fetchDispatchData();
@@ -204,6 +208,40 @@ export default function TiffinDispatchPanel() {
         }
     };
 
+    // Bulk Mark as Delivered action
+    const handleBulkMarkDelivered = async () => {
+        if (selectedIds.size === 0) {
+            if (toast?.error) toast.error('Please select at least one order to mark as delivered');
+            return;
+        }
+
+        const confirmMsg = `Are you sure you want to mark ${selectedIds.size} selected tiffin(s) as DELIVERED?`;
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            setIsDelivering(true);
+            const res = await api.post('/food/tiffin/restaurant/bulk-mark-delivered', {
+                deliveryIds: Array.from(selectedIds)
+            }, { contextModule: 'restaurant' });
+
+            if (res?.data?.success) {
+                const msg = res.data.message || `Successfully marked ${selectedIds.size} tiffin(s) as Delivered!`;
+                if (toast?.success) toast.success(msg);
+
+                setDeliveries(prev => prev.filter(d => !selectedIds.has(d._id)));
+                setSelectedIds(new Set());
+                fetchDispatchData();
+            } else {
+                if (toast?.error) toast.error(res?.data?.message || 'Failed to update deliveries');
+            }
+        } catch (error) {
+            console.error('Error marking deliveries as delivered:', error);
+            if (toast?.error) toast.error(error?.response?.data?.message || 'Failed to mark deliveries as delivered');
+        } finally {
+            setIsDelivering(false);
+        }
+    };
+
     // Calculate selected count breakdown
     const selectedBreakdown = useMemo(() => {
         const zoneCounts = {};
@@ -359,8 +397,8 @@ export default function TiffinDispatchPanel() {
                     {/* Left Column: Zone Grouped Deliveries */}
                     <div className="lg:col-span-8 space-y-4">
                         {/* Global Selection Toolbar */}
-                        <div className="bg-white rounded-xl px-4 py-3 border border-gray-200 shadow-sm flex items-center justify-between gap-3 text-xs">
-                            <div className="flex items-center gap-3">
+                        <div className="bg-white rounded-xl px-4 py-3 border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-3 flex-wrap">
                                 <button
                                     onClick={handleSelectAllGlobal}
                                     className="inline-flex items-center gap-2 font-medium text-gray-700 hover:text-gray-900 transition"
@@ -383,8 +421,26 @@ export default function TiffinDispatchPanel() {
                                 )}
                             </div>
 
-                            <div className="text-gray-500 font-medium">
-                                Showing <strong className="text-gray-900">{filteredDeliveries.length}</strong> of {deliveries.length}
+                            <div className="flex items-center gap-3 flex-wrap">
+                                {selectedIds.size > 0 && (
+                                    <button
+                                        onClick={handleBulkMarkDelivered}
+                                        disabled={isDelivering}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition active:scale-95 disabled:opacity-50"
+                                        title="Directly mark selected orders as Delivered"
+                                    >
+                                        {isDelivering ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                        )}
+                                        <span>Mark Delivered ({selectedIds.size})</span>
+                                    </button>
+                                )}
+
+                                <div className="text-gray-500 font-medium">
+                                    Showing <strong className="text-gray-900">{filteredDeliveries.length}</strong> of {deliveries.length}
+                                </div>
                             </div>
                         </div>
 
@@ -523,13 +579,30 @@ export default function TiffinDispatchPanel() {
                                                                             </span>
                                                                         </div>
 
-                                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold shrink-0 ${
-                                                                            d.type === 'Morning'
-                                                                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                                                                : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                                                        }`}>
-                                                                            {d.type === 'Morning' ? 'Lunch' : 'Dinner'}
-                                                                        </span>
+                                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                                            {d?.subscriptionId?.mealType === 'Both' && (
+                                                                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                                                                    Both Plan
+                                                                                </span>
+                                                                            )}
+                                                                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 shrink-0 ${
+                                                                                d.type === 'Morning'
+                                                                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                                                            }`}>
+                                                                                {d.type === 'Morning' ? (
+                                                                                    <>
+                                                                                        <Sun className="w-2.5 h-2.5" />
+                                                                                        <span>Lunch</span>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <Moon className="w-2.5 h-2.5" />
+                                                                                        <span>Dinner</span>
+                                                                                    </>
+                                                                                )}
+                                                                            </span>
+                                                                        </div>
                                                                     </div>
 
                                                                     {/* Row 2: Plan Name */}
@@ -674,6 +747,33 @@ export default function TiffinDispatchPanel() {
                                             {selectedIds.size > 0 
                                                 ? `Dispatch ${selectedIds.size} Tiffins` 
                                                 : 'Select Orders & Rider'}
+                                        </span>
+                                    </>
+                                )}
+                            </button>
+
+                            {/* Self / Direct Delivery Action */}
+                            <button
+                                onClick={handleBulkMarkDelivered}
+                                disabled={selectedIds.size === 0 || isDelivering}
+                                className={`w-full py-2.5 px-4 rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2 border shadow-sm ${
+                                    selectedIds.size > 0 && !isDelivering
+                                        ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700 active:scale-[0.99]'
+                                        : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                                }`}
+                            >
+                                {isDelivering ? (
+                                    <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <span>Marking Delivered...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>
+                                            {selectedIds.size > 0 
+                                                ? `Mark ${selectedIds.size} as Delivered (Direct)` 
+                                                : 'Mark as Delivered (Direct)'}
                                         </span>
                                     </>
                                 )}

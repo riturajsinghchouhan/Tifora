@@ -5,7 +5,7 @@ import { TiffinPayout } from '../models/tiffinPayout.model.js';
 import { TiffinCommissionSetting } from '../models/tiffinCommission.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
-import { ensureTodayDeliveriesSync } from '../scripts/tiffinScheduler.js';
+import { ensureTodayDeliveriesSync, generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import mongoose from 'mongoose';
 
@@ -366,6 +366,14 @@ export const adminToggleSubscriptionStatus = async (req, res) => {
 
         if (!subscription) {
             return res.status(404).json({ success: false, message: 'Subscription not found' });
+        }
+
+        if (status === 'active') {
+            try {
+                await generateDailyDeliveries(true);
+            } catch (syncErr) {
+                console.error('Error generating deliveries after activating subscription:', syncErr);
+            }
         }
 
         res.status(200).json({ success: true, data: subscription, message: `Subscription marked as ${status}` });

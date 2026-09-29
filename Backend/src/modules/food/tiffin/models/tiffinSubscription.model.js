@@ -98,6 +98,11 @@ const tiffinSubscriptionSchema = new mongoose.Schema(
             required: true,
             min: 0
         },
+        paymentMethod: {
+            type: String,
+            enum: ['cod', 'online', 'wallet'],
+            default: 'online'
+        },
         razorpayOrderId: {
             type: String,
             default: '',

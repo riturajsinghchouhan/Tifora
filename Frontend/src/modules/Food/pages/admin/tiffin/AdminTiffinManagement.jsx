@@ -27,9 +27,13 @@ import {
     ChevronRight,
     MapPin,
     Phone,
-    RefreshCw
+    RefreshCw,
+    Wallet,
+    CreditCard,
+    Banknote
 } from 'lucide-react';
 import api from '@food/api';
+import CodRequestsSection from './components/CodRequestsSection';
 
 const DEFAULT_ITEM_PRESETS = [
     { name: '4 Fresh Butter Rotis', quantity: '4 Pcs', image: '/food/tiffin/roti.png', description: 'Freshly puffed whole wheat rotis' },
@@ -66,6 +70,7 @@ export default function AdminTiffinManagement() {
 
     // Filters & Search
     const [subFilterStatus, setSubFilterStatus] = useState('all');
+    const [subFilterPayment, setSubFilterPayment] = useState('all');
     const [subSearchQuery, setSubSearchQuery] = useState('');
     const [planMealFilter, setPlanMealFilter] = useState('all');
 
@@ -228,6 +233,38 @@ export default function AdminTiffinManagement() {
         }
     };
 
+    const handleApproveCod = async (subId) => {
+        try {
+            const res = await api.patch(`/admin/tiffin/subscriptions/${subId}/status`, { status: 'active' }, { contextModule: 'admin' }).catch(() => null);
+            if (res?.data?.success) {
+                alert('COD Subscription verified and activated successfully! Daily meal deliveries scheduled.');
+                setSubscriptions(prev => prev.map(s => s._id === subId ? { ...s, status: 'active' } : s));
+                fetchOverview();
+                fetchDeliveries();
+            } else {
+                alert(res?.data?.message || 'Failed to approve COD subscription');
+            }
+        } catch (e) {
+            alert('Failed to approve COD subscription');
+        }
+    };
+
+    const handleRejectCod = async (subId) => {
+        if (!window.confirm('Are you sure you want to reject this COD subscription request?')) return;
+        try {
+            const res = await api.patch(`/admin/tiffin/subscriptions/${subId}/status`, { status: 'cancelled' }, { contextModule: 'admin' }).catch(() => null);
+            if (res?.data?.success) {
+                alert('COD Subscription request has been rejected.');
+                setSubscriptions(prev => prev.map(s => s._id === subId ? { ...s, status: 'cancelled' } : s));
+                fetchOverview();
+            } else {
+                alert(res?.data?.message || 'Failed to reject COD subscription');
+            }
+        } catch (e) {
+            alert('Failed to reject COD subscription');
+        }
+    };
+
     const handleOpenPlanModal = (plan = null) => {
         if (plan) {
             setEditingPlan(plan);
@@ -334,17 +371,59 @@ export default function AdminTiffinManagement() {
         }
     };
 
+    // Payment helpers (Strictly 3 methods: cod, online, wallet)
+    const getPaymentMethod = (sub) => {
+        const raw = (sub?.paymentMethod || '').toLowerCase();
+        if (raw === 'wallet') return 'wallet';
+        if (raw === 'cod' || raw === 'cash') return 'cod';
+        if (raw === 'online' || raw === 'razorpay') return 'online';
+        if (sub?.razorpayOrderId || sub?.razorpayPaymentId) return 'online';
+        return 'online';
+    };
+
+    const renderPaymentBadge = (method) => {
+        if (method === 'cod') {
+            return (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200/70 shadow-xs">
+                    <Banknote className="w-3.5 h-3.5 text-amber-600" />
+                    COD
+                </span>
+            );
+        }
+        if (method === 'wallet') {
+            return (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200/70 shadow-xs">
+                    <Wallet className="w-3.5 h-3.5 text-purple-600" />
+                    Wallet
+                </span>
+            );
+        }
+        return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70 shadow-xs">
+                <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+                Online
+            </span>
+        );
+    };
+
     // Filtered lists
     const filteredSubscriptions = subscriptions.filter(sub => {
         const matchesStatus = subFilterStatus === 'all' || sub.status === subFilterStatus;
+        const currentMethod = getPaymentMethod(sub);
+        const matchesPayment = subFilterPayment === 'all' || currentMethod === subFilterPayment;
         const q = subSearchQuery.toLowerCase();
         const matchesSearch = !q ||
             sub.userId?.name?.toLowerCase().includes(q) ||
             sub.userId?.phone?.includes(q) ||
             sub._id?.toLowerCase().includes(q) ||
+            currentMethod.includes(q) ||
             sub.restaurantId?.name?.toLowerCase().includes(q);
-        return matchesStatus && matchesSearch;
+        return matchesStatus && matchesPayment && matchesSearch;
     });
+
+    const pendingCodRequests = subscriptions.filter(sub => 
+        getPaymentMethod(sub) === 'cod' && sub.status === 'pending'
+    );
 
     const filteredPlans = plans.filter(plan => {
         if (planMealFilter === 'all') return true;
@@ -392,6 +471,7 @@ export default function AdminTiffinManagement() {
                 {[
                     { id: 'overview', label: 'Overview & Stats', icon: LayoutDashboard },
                     { id: 'plans', label: 'Subscription Plans', count: plans.length, icon: Package },
+                    { id: 'cod-requests', label: 'COD Requests', count: pendingCodRequests.length, icon: Clock, isAlert: pendingCodRequests.length > 0 },
                     { id: 'subscriptions', label: 'Customer Subscriptions', count: subscriptions.length, icon: Users },
                     { id: 'deliveries', label: 'Daily Meal Dispatch', count: deliveries.length, icon: Truck },
                     { id: 'kitchens', label: 'Kitchen Partners', count: kitchens.length, icon: ChefHat },
@@ -406,14 +486,20 @@ export default function AdminTiffinManagement() {
                             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${
                                 isActive
                                     ? 'bg-[#be123c] text-white shadow-md shadow-[#be123c]/20'
+                                    : tab.isAlert
+                                    ? 'bg-amber-50 text-amber-900 border-2 border-amber-400 hover:bg-amber-100 shadow-xs'
                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 bg-white border border-gray-200'
                             }`}
                         >
-                            <Icon className="w-4 h-4" />
+                            <Icon className={`w-4 h-4 ${tab.isAlert && !isActive ? 'text-amber-600' : ''}`} />
                             <span>{tab.label}</span>
                             {tab.count !== undefined && (
                                 <span className={`text-[11px] px-2 py-0.5 rounded-full font-black ${
-                                    isActive ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
+                                    isActive
+                                        ? 'bg-white/20 text-white'
+                                        : tab.isAlert
+                                        ? 'bg-amber-500 text-white shadow-xs animate-pulse'
+                                        : 'bg-gray-100 text-gray-700'
                                 }`}>
                                     {tab.count}
                                 </span>
@@ -659,6 +745,20 @@ export default function AdminTiffinManagement() {
             )}
 
             {/* ========================================================================= */}
+            {/* TAB: COD VERIFICATION REQUESTS */}
+            {/* ========================================================================= */}
+            {activeTab === 'cod-requests' && (
+                <CodRequestsSection
+                    requests={pendingCodRequests}
+                    onApprove={handleApproveCod}
+                    onReject={handleRejectCod}
+                    onView={setViewSubModal}
+                    loading={refreshing}
+                    onRefresh={handleRefresh}
+                />
+            )}
+
+            {/* ========================================================================= */}
             {/* TAB 3: CUSTOMER SUBSCRIPTIONS */}
             {/* ========================================================================= */}
             {activeTab === 'subscriptions' && (
@@ -676,19 +776,35 @@ export default function AdminTiffinManagement() {
                             />
                         </div>
 
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-gray-500">Status:</span>
-                            <select
-                                value={subFilterStatus}
-                                onChange={(e) => setSubFilterStatus(e.target.value)}
-                                className="text-xs font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 outline-none"
-                            >
-                                <option value="all">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="paused">Paused</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
-                            </select>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-gray-500">Status:</span>
+                                <select
+                                    value={subFilterStatus}
+                                    onChange={(e) => setSubFilterStatus(e.target.value)}
+                                    className="text-xs font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 outline-none"
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="paused">Paused</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-gray-500">Payment:</span>
+                                <select
+                                    value={subFilterPayment}
+                                    onChange={(e) => setSubFilterPayment(e.target.value)}
+                                    className="text-xs font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 outline-none"
+                                >
+                                    <option value="all">All Modes</option>
+                                    <option value="cod">COD</option>
+                                    <option value="online">Online</option>
+                                    <option value="wallet">Wallet</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -702,6 +818,7 @@ export default function AdminTiffinManagement() {
                                     <th className="p-3.5">Plan / Slot</th>
                                     <th className="p-3.5">Dates</th>
                                     <th className="p-3.5">Amount Paid</th>
+                                    <th className="p-3.5">Payment</th>
                                     <th className="p-3.5">Status</th>
                                     <th className="p-3.5 text-right">Actions</th>
                                 </tr>
@@ -709,7 +826,7 @@ export default function AdminTiffinManagement() {
                             <tbody className="divide-y divide-gray-100">
                                 {filteredSubscriptions.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" className="text-center py-10 text-gray-400 font-medium">
+                                        <td colSpan="8" className="text-center py-10 text-gray-400 font-medium">
                                             No active or recorded subscriptions found in the database.
                                         </td>
                                     </tr>
@@ -731,6 +848,9 @@ export default function AdminTiffinManagement() {
                                                 {new Date(sub.startDate).toLocaleDateString()} - {new Date(sub.endDate).toLocaleDateString()}
                                             </td>
                                             <td className="p-3.5 font-bold text-gray-900">₹{sub.amountPaid}</td>
+                                            <td className="p-3.5">
+                                                {renderPaymentBadge(getPaymentMethod(sub))}
+                                            </td>
                                             <td className="p-3.5">
                                                 <span className={`px-2.5 py-1 rounded-full font-bold text-[10px] uppercase tracking-wider ${
                                                     sub.status === 'active' ? 'bg-green-100 text-green-700' :
@@ -1198,6 +1318,34 @@ export default function AdminTiffinManagement() {
                                     <span className="text-[10px] font-bold text-gray-400 uppercase block">End Date</span>
                                     <span className="font-bold text-gray-900">{new Date(viewSubModal.endDate).toLocaleDateString()}</span>
                                 </div>
+                            </div>
+
+                            {/* Payment Information (COD, Online, Wallet) */}
+                            <div className="bg-gray-50 p-3.5 rounded-2xl space-y-2">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase block">Payment Details</span>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500 font-medium">Payment Mode</span>
+                                    <div>{renderPaymentBadge(getPaymentMethod(viewSubModal))}</div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500 font-medium">Payment Status</span>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                        viewSubModal.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' :
+                                        viewSubModal.paymentStatus === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-700'
+                                    }`}>
+                                        {viewSubModal.paymentStatus || 'paid'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500 font-medium">Total Paid</span>
+                                    <span className="font-black text-gray-900 text-sm">₹{viewSubModal.amountPaid}</span>
+                                </div>
+                                {viewSubModal.razorpayPaymentId && (
+                                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-gray-200/60">
+                                        <span className="text-gray-400">Transaction ID</span>
+                                        <span className="font-mono text-gray-700 font-semibold">{viewSubModal.razorpayPaymentId}</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

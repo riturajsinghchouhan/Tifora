@@ -140,7 +140,11 @@ export default function TiffinCheckout() {
                     }
                 });
             } else {
-                alert('Tiffin Subscription activated successfully!');
+                if (paymentMethod === 'cash') {
+                    alert('Your COD Subscription request has been submitted successfully! It will be activated after admin verification.');
+                } else {
+                    alert('Tiffin Subscription activated successfully!');
+                }
                 navigate('/food/user/tiffin/my-subscriptions');
             }
         } catch (err) {
@@ -333,7 +337,7 @@ export default function TiffinCheckout() {
                                     <Banknote className="w-5 h-5 text-amber-600" />
                                     <div>
                                         <p className="text-xs font-bold text-gray-900">Pay on Delivery (Cash)</p>
-                                        <p className="text-[10px] text-gray-500">Pay cash upon tiffin delivery start</p>
+                                        <p className="text-[10px] text-gray-500">Verified by admin before activation • Pay upon delivery</p>
                                     </div>
                                 </div>
                                 <input type="radio" checked={paymentMethod === 'cash'} onChange={() => {}} className="text-[#0cb884]" />
