@@ -119,7 +119,12 @@ export const getAdminTiffinOverview = async (req, res) => {
 export const getAllSubscriptions = async (req, res) => {
     try {
         const { status, search } = req.query;
-        let query = {};
+        let query = {
+            $or: [
+                { paymentStatus: 'paid' },
+                { paymentMethod: 'cod' }
+            ]
+        };
 
         if (status && status !== 'all') {
             query.status = status;
