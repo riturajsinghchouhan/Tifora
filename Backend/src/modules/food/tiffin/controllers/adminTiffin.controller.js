@@ -55,6 +55,13 @@ export const getAdminTiffinOverview = async (req, res) => {
                 },
                 {
                     $group: {
+                        _id: { userId: '$userId', type: '$type' },
+                        status: { $first: '$status' },
+                        type: { $first: '$type' }
+                    }
+                },
+                {
+                    $group: {
                         _id: null,
                         total: { $sum: 1 },
                         morning: { $sum: { $cond: [{ $eq: ['$type', 'Morning'] }, 1, 0] } },
@@ -419,10 +426,16 @@ export const getKitchenPartners = async (req, res) => {
         // Get plan count and subscriber count per kitchen
         const [planCounts, subCounts] = await Promise.all([
             TiffinPlan.aggregate([
+                { $match: { isActive: true } },
                 { $group: { _id: '$restaurantId', count: { $sum: 1 } } }
             ]),
             TiffinSubscription.aggregate([
-                { $match: { status: 'active' } },
+                { 
+                    $match: { 
+                        status: 'active',
+                        $or: [{ paymentStatus: 'paid' }, { paymentMethod: { $in: ['cod', 'cash'] } }]
+                    } 
+                },
                 { $group: { _id: '$restaurantId', count: { $sum: 1 } } }
             ])
         ]);
@@ -662,11 +675,20 @@ export const getTiffinCommissionSettings = async (req, res) => {
         // Get active subscription counts & revenue per kitchen
         const subAgg = await TiffinSubscription.aggregate([
             {
+                $match: {
+                    $or: [{ paymentStatus: 'paid' }, { paymentMethod: { $in: ['cod', 'cash'] } }]
+                }
+            },
+            {
                 $group: {
                     _id: '$restaurantId',
                     totalSubscriptions: { $sum: 1 },
                     activeSubscriptions: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } },
-                    totalRevenue: { $sum: '$amountPaid' }
+                    totalRevenue: { 
+                        $sum: { 
+                            $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$amountPaid', 0] 
+                        } 
+                    }
                 }
             }
         ]);
