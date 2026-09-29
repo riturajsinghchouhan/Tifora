@@ -1200,11 +1200,13 @@ function ScheduledOrders({ onSelectOrder, refreshToken }) {
   );
 }
 
-// Helper to calculate initial countdown based on popup display time (2 minutes window)
+const ORDER_ACCEPT_COUNTDOWN_SECONDS = 600; // 10 minutes window
+
+// Helper to calculate initial countdown based on popup display time (10 minutes window)
 const getInitialCountdown = (order) => {
-  // Always return 120 seconds (2 minutes) when the popup is shown, 
+  // Always return 600 seconds (10 minutes) when the popup is shown, 
   // so orders queued behind others don't run out of time in the background.
-  return 120;
+  return ORDER_ACCEPT_COUNTDOWN_SECONDS;
 }
 
 export default function OrdersMain() {
@@ -1249,7 +1251,7 @@ export default function OrdersMain() {
   const [popupOrder, setPopupOrder] = useState(null); // Store order for popup (from Socket.IO or API)
   const [isMuted, setIsMuted] = useState(() => !isOrderPopupSoundControlAllowed());
   const [prepTime, setPrepTime] = useState(11);
-  const [countdown, setCountdown] = useState(120); // 2 minutes in seconds
+  const [countdown, setCountdown] = useState(ORDER_ACCEPT_COUNTDOWN_SECONDS); // 10 minutes in seconds
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
   const [showRejectPopup, setShowRejectPopup] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -1740,7 +1742,7 @@ export default function OrdersMain() {
       setShowNewOrderPopup(false);
       setPopupOrder(null);
       clearNewOrder();
-      setCountdown(120);
+      setCountdown(ORDER_ACCEPT_COUNTDOWN_SECONDS);
       setPrepTime(11);
       requestOrdersRefresh();
     };
@@ -1983,7 +1985,7 @@ export default function OrdersMain() {
             setShowNewOrderPopup(false);
             setPopupOrder(null);
             clearNewOrder();
-            setCountdown(120);
+            setCountdown(ORDER_ACCEPT_COUNTDOWN_SECONDS);
           })
           .catch((err) => {
             debugError("Auto-reject failed:", err);
@@ -2163,7 +2165,7 @@ export default function OrdersMain() {
     setShowNewOrderPopup(false);
     setPopupOrder(null);
     clearNewOrder();
-    setCountdown(120);
+    setCountdown(ORDER_ACCEPT_COUNTDOWN_SECONDS);
     setPrepTime(11);
     setAcceptSwipeProgress(0);
     setIsAcceptingOrder(false);
@@ -2206,7 +2208,7 @@ export default function OrdersMain() {
     setPopupOrder(null);
     clearNewOrder();
     setRejectReason("");
-    setCountdown(120);
+    setCountdown(ORDER_ACCEPT_COUNTDOWN_SECONDS);
     setPrepTime(11);
   };
 
@@ -2216,7 +2218,7 @@ export default function OrdersMain() {
     setPopupOrder(null);
     clearNewOrder();
     setRejectReason("");
-    setCountdown(120);
+    setCountdown(ORDER_ACCEPT_COUNTDOWN_SECONDS);
   };
 
   // Handle cancel order (for preparing orders)
@@ -3290,7 +3292,7 @@ export default function OrdersMain() {
                           <motion.div
                             className="absolute inset-y-0 left-0 bg-blue-600"
                             initial={{ width: "100%" }}
-                            animate={{ width: `${(countdown / 120) * 100}%` }}
+                            animate={{ width: `${(countdown / ORDER_ACCEPT_COUNTDOWN_SECONDS) * 100}%` }}
                             transition={{ duration: 1, ease: "linear" }}
                           />
                           <div className="absolute inset-0 flex items-center justify-center px-16">
