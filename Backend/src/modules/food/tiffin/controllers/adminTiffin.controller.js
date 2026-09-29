@@ -350,7 +350,19 @@ export const getTodayDeliveries = async (req, res) => {
             .populate('assignedTo', 'name phone')
             .sort({ type: 1, createdAt: -1 });
 
-        res.status(200).json({ success: true, data: deliveries });
+        // Deduplicate deliveries per user per slot (Morning/Evening)
+        // This handles cases where older bugs created multiple active plans for the same user
+        const seen = new Set();
+        const deduplicatedDeliveries = deliveries.filter(d => {
+            const userId = d.userId?._id?.toString() || d.userId?.toString();
+            const slot = d.type;
+            const key = `${userId}-${slot}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+
+        res.status(200).json({ success: true, data: deduplicatedDeliveries });
     } catch (error) {
         console.error('Error fetching today deliveries:', error);
         res.status(500).json({ success: false, message: 'Server error fetching deliveries' });
