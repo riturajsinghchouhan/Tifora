@@ -31,10 +31,19 @@ export const getAdminTiffinOverview = async (req, res) => {
             allDeliveriesAgg,
             kitchensCount
         ] = await Promise.all([
-            TiffinSubscription.countDocuments({}),
-            TiffinSubscription.countDocuments({ status: 'active' }),
-            TiffinSubscription.countDocuments({ status: 'paused' }),
+            TiffinSubscription.countDocuments({
+                $or: [{ paymentStatus: 'paid' }, { paymentMethod: 'cod' }]
+            }),
+            TiffinSubscription.countDocuments({ 
+                status: 'active',
+                $or: [{ paymentStatus: 'paid' }, { paymentMethod: 'cod' }]
+            }),
+            TiffinSubscription.countDocuments({ 
+                status: 'paused',
+                $or: [{ paymentStatus: 'paid' }, { paymentMethod: 'cod' }]
+            }),
             TiffinSubscription.aggregate([
+                { $match: { paymentStatus: 'paid' } },
                 { $group: { _id: null, total: { $sum: '$amountPaid' } } }
             ]),
             TiffinPlan.countDocuments({}),
