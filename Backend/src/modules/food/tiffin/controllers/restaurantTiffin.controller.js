@@ -660,3 +660,66 @@ export const bulkMarkDeliveriesAsDelivered = async (req, res) => {
     }
 };
 
+/**
+ * Get Restaurant Delivery History (Delivered and Missed)
+ */
+export const getRestaurantDeliveryHistory = async (req, res) => {
+    try {
+        const restaurantId = getRestaurantId(req);
+        if (!restaurantId || !mongoose.isValidObjectId(restaurantId)) {
+            return res.status(401).json({ success: false, message: 'Unauthorized restaurant context' });
+        }
+
+        const { filter = 'today' } = req.query; // 'today', 'weekly', 'monthly'
+        
+        let startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+        let endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 1);
+
+        if (filter === 'weekly') {
+            startDate.setDate(startDate.getDate() - 7);
+        } else if (filter === 'monthly') {
+            startDate.setMonth(startDate.getMonth() - 1);
+        }
+
+        const deliveries = await TiffinDelivery.find({
+            restaurantId: new mongoose.Types.ObjectId(restaurantId),
+            date: { $gte: startDate, $lt: endDate },
+            status: { $nin: ['cancelled'] }
+        })
+        .populate('userId', 'name phone profileImage')
+        .populate({
+            path: 'subscriptionId',
+            populate: { path: 'planId', select: 'name mealType' }
+        })
+        .populate('assignedTo', 'name phone vehicleType')
+        .sort({ date: -1, createdAt: -1 })
+        .lean();
+
+        const now = new Date();
+        
+        const history = deliveries.map(d => {
+            let isMissed = false;
+            const deliveryDate = new Date(d.date);
+            deliveryDate.setHours(23, 59, 59, 999);
+            
+            if (!['delivered', 'delivered_unattended'].includes(d.status) && deliveryDate < now) {
+                isMissed = true;
+            }
+
+            return {
+                ...d,
+                isMissed
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            data: history
+        });
+    } catch (error) {
+        console.error('Error fetching restaurant delivery history:', error);
+        res.status(500).json({ success: false, message: 'Server error fetching delivery history' });
+    }
+};

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import api from '@food/api';
 import CodRequestsSection from './components/CodRequestsSection';
+import AdminDeliveryHistoryTab from './components/AdminDeliveryHistoryTab';
 
 const DEFAULT_ITEM_PRESETS = [
     { name: '4 Fresh Butter Rotis', quantity: '4 Pcs', image: '/food/tiffin/roti.png', description: 'Freshly puffed whole wheat rotis' },
@@ -474,6 +475,7 @@ export default function AdminTiffinManagement() {
                     { id: 'cod-requests', label: 'COD Requests', count: pendingCodRequests.length, icon: Clock, isAlert: pendingCodRequests.length > 0 },
                     { id: 'subscriptions', label: 'Customer Subscriptions', count: subscriptions.length, icon: Users },
                     { id: 'deliveries', label: 'Daily Meal Dispatch', count: deliveries.length, icon: Truck },
+                    { id: 'history', label: 'Delivery History', icon: Calendar },
                     { id: 'kitchens', label: 'Kitchen Partners', count: kitchens.length, icon: ChefHat },
                     { id: 'payouts', label: 'Rider Payouts', count: payouts.length, icon: DollarSign }
                 ].map(tab => {
@@ -756,6 +758,13 @@ export default function AdminTiffinManagement() {
                     loading={refreshing}
                     onRefresh={handleRefresh}
                 />
+            )}
+
+            {/* ========================================================================= */}
+            {/* TAB: DELIVERY HISTORY */}
+            {/* ========================================================================= */}
+            {activeTab === 'history' && (
+                <AdminDeliveryHistoryTab />
             )}
 
             {/* ========================================================================= */}

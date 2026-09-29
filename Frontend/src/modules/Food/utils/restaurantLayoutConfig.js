@@ -51,6 +51,7 @@ export const RESTAURANT_SIDEBAR_SECTIONS = [
     items: [
       { label: "Prep Dashboard", route: `${BASE}/tiffin-dashboard` },
       { label: "Dispatch Panel", route: `${BASE}/tiffin-dispatch` },
+      { label: "Delivery History", route: `${BASE}/tiffin-history` },
       { label: "Tiffin Plans", route: `${BASE}/tiffin-settings` },
     ],
   },

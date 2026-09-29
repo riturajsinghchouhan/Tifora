@@ -987,3 +987,85 @@ export const updateTiffinDeliveryPaySettings = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error updating pay settings' });
     }
 };
+
+/**
+ * Get Admin Delivery History (All deliveries with restaurant and status filters)
+ */
+export const getAdminDeliveryHistory = async (req, res) => {
+    try {
+        const { filter = 'today', restaurantId, status } = req.query;
+        
+        let startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+        let endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 1);
+
+        if (filter === 'weekly') {
+            startDate.setDate(startDate.getDate() - 7);
+        } else if (filter === 'monthly') {
+            startDate.setMonth(startDate.getMonth() - 1);
+        }
+
+        let query = {
+            date: { $gte: startDate, $lt: endDate },
+            status: { $nin: ['cancelled'] }
+        };
+
+        if (restaurantId && restaurantId !== 'all') {
+            query.restaurantId = new mongoose.Types.ObjectId(restaurantId);
+        }
+
+        const deliveries = await TiffinDelivery.find(query)
+            .populate('userId', 'name phone profileImage')
+            .populate('restaurantId', 'restaurantName name address phone')
+            .populate({
+                path: 'subscriptionId',
+                populate: { path: 'planId', select: 'name mealType' }
+            })
+            .populate('assignedTo', 'name phone vehicleType')
+            .sort({ date: -1, createdAt: -1 })
+            .lean();
+
+        const now = new Date();
+        
+        // Process them to determine if missed
+        const history = deliveries.map(d => {
+            let isMissed = false;
+            let currentStatus = d.status;
+
+            const deliveryDate = new Date(d.date);
+            deliveryDate.setHours(23, 59, 59, 999);
+            
+            if (!['delivered', 'delivered_unattended'].includes(currentStatus) && deliveryDate < now) {
+                isMissed = true;
+                currentStatus = 'missed'; // For filtering in frontend
+            }
+
+            return {
+                ...d,
+                isMissed,
+                derivedStatus: currentStatus
+            };
+        });
+
+        // Filter by status if requested
+        let filteredHistory = history;
+        if (status && status !== 'all') {
+            if (status === 'delivered') {
+                filteredHistory = history.filter(d => ['delivered', 'delivered_unattended'].includes(d.status));
+            } else if (status === 'pending') {
+                filteredHistory = history.filter(d => !d.isMissed && !['delivered', 'delivered_unattended'].includes(d.status));
+            } else if (status === 'missed') {
+                filteredHistory = history.filter(d => d.isMissed);
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            data: filteredHistory
+        });
+    } catch (error) {
+        console.error('Error fetching admin delivery history:', error);
+        res.status(500).json({ success: false, message: 'Server error fetching delivery history' });
+    }
+};

@@ -13,7 +13,8 @@ import {
     getDailyPrepDashboard,
     getUnassignedDeliveries,
     assignDeliveriesToPartner,
-    bulkMarkDeliveriesAsDelivered
+    bulkMarkDeliveriesAsDelivered,
+    getRestaurantDeliveryHistory
 } from '../controllers/restaurantTiffin.controller.js';
 
 // User Controllers
@@ -62,7 +63,8 @@ import {
     setKitchenCustomCommissionRate,
     getTiffinDeliverySalaries,
     disburseTiffinDeliverySalary,
-    updateTiffinDeliveryPaySettings
+    updateTiffinDeliveryPaySettings,
+    getAdminDeliveryHistory
 } from '../controllers/adminTiffin.controller.js';
 
 const router = express.Router();
@@ -135,6 +137,7 @@ router.get(['/restaurant/prep-dashboard', '/prep-dashboard'], restaurantAuth, ge
 router.get(['/restaurant/unassigned-deliveries', '/unassigned-deliveries'], restaurantAuth, getUnassignedDeliveries);
 router.post(['/restaurant/assign', '/assign'], restaurantAuth, assignDeliveriesToPartner);
 router.post(['/restaurant/bulk-mark-delivered', '/bulk-mark-delivered'], restaurantAuth, bulkMarkDeliveriesAsDelivered);
+router.get(['/restaurant/deliveries/history', '/deliveries-history'], restaurantAuth, getRestaurantDeliveryHistory);
 
 // --- User Tiffin Routes ---
 router.get('/user/plans/available', getAvailablePlans);
@@ -197,6 +200,7 @@ router.put(['/admin/plans/:planId', '/admin-plans/:planId'], adminAuth, upload.a
 router.delete(['/admin/plans/:planId', '/admin-plans/:planId'], adminAuth, adminDeletePlan);
 
 router.get(['/admin/deliveries/today', '/deliveries/today', '/deliveries-today'], adminAuth, getTodayDeliveries);
+router.get(['/admin/deliveries/history', '/admin-deliveries-history'], adminAuth, getAdminDeliveryHistory);
 router.get(['/admin/kitchen-partners', '/kitchen-partners'], adminAuth, getKitchenPartners);
 router.get(['/admin/payout-logs', '/payout-logs'], adminAuth, getDeliveryPayouts);
 
