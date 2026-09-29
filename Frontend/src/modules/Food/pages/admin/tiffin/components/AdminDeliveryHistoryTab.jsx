@@ -22,7 +22,8 @@ export default function AdminDeliveryHistoryTab() {
 
     const fetchKitchens = async () => {
         try {
-            const res = await api.get('/admin/tiffin/kitchen-partners', { contextModule: 'admin' }).catch(() => null);
+            const res = await api.get('/food/tiffin/admin/kitchen-partners', { contextModule: 'admin' }).catch(() => null)
+                || await api.get('/admin/tiffin/kitchen-partners', { contextModule: 'admin' }).catch(() => null);
             if (res?.data?.success) {
                 setKitchens(res.data.data);
             }
@@ -34,7 +35,8 @@ export default function AdminDeliveryHistoryTab() {
     const fetchHistory = async () => {
         try {
             setLoading(true);
-            const res = await api.get(`/admin/tiffin/deliveries/history?filter=${filter}&status=${statusFilter}&restaurantId=${restaurantFilter}`, { contextModule: 'admin' }).catch(() => null);
+            const res = await api.get(`/food/tiffin/admin/deliveries/history?filter=${filter}&status=${statusFilter}&restaurantId=${restaurantFilter}`, { contextModule: 'admin' }).catch(() => null)
+                || await api.get(`/admin/tiffin/deliveries/history?filter=${filter}&status=${statusFilter}&restaurantId=${restaurantFilter}`, { contextModule: 'admin' }).catch(() => null);
             if (res?.data?.success) {
                 setDeliveries(res.data.data);
             } else {
