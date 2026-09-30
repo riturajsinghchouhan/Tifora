@@ -242,6 +242,23 @@ export const getDailyPrepDashboard = async (req, res) => {
                 }
             },
             {
+                $lookup: {
+                    from: 'food_tiffin_subscriptions',
+                    localField: 'subscriptionId',
+                    foreignField: '_id',
+                    as: 'sub'
+                }
+            },
+            { $unwind: '$sub' },
+            {
+                $match: {
+                    $or: [
+                        { 'sub.paymentStatus': 'paid' },
+                        { 'sub.paymentMethod': { $in: ['cod', 'cash'] } }
+                    ]
+                }
+            },
+            {
                 $group: {
                     _id: '$type',
                     count: { $sum: 1 }
@@ -313,7 +330,7 @@ export const getUnassignedDeliveries = async (req, res) => {
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         // Find pending or unassigned deliveries
-        const deliveries = await TiffinDelivery.find({
+        const deliveriesRaw = await TiffinDelivery.find({
             restaurantId: new mongoose.Types.ObjectId(restaurantId),
             date: { $gte: today, $lt: tomorrow },
             status: { $in: ['pending', 'unassigned'] }
@@ -321,10 +338,25 @@ export const getUnassignedDeliveries = async (req, res) => {
         .populate('userId', 'name phone profileImage avatar')
         .populate({
             path: 'subscriptionId',
-            select: 'deliveryAddress planId',
+            select: 'deliveryAddress planId paymentStatus paymentMethod status',
             populate: { path: 'planId', select: 'name itemsDescription mealType isVegetarian price' }
         })
         .lean();
+
+        const seen = new Set();
+        const deliveries = deliveriesRaw.filter(d => {
+            const sub = d.subscriptionId;
+            if (!sub) return false;
+            const isPaid = sub.paymentStatus === 'paid' || ['cod', 'cash'].includes(sub.paymentMethod);
+            if (!isPaid) return false;
+            
+            const userId = d.userId?._id?.toString() || d.userId?.toString();
+            const slot = d.type;
+            const key = `${userId}-${slot}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
 
         // Also fetch active delivery partners in the restaurant's zone if available
         let partners = [];

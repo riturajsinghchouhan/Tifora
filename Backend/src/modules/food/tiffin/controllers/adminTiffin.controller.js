@@ -54,6 +54,23 @@ export const getAdminTiffinOverview = async (req, res) => {
                     }
                 },
                 {
+                    $lookup: {
+                        from: 'food_tiffin_subscriptions',
+                        localField: 'subscriptionId',
+                        foreignField: '_id',
+                        as: 'sub'
+                    }
+                },
+                { $unwind: '$sub' },
+                {
+                    $match: {
+                        $or: [
+                            { 'sub.paymentStatus': 'paid' },
+                            { 'sub.paymentMethod': { $in: ['cod', 'cash'] } }
+                        ]
+                    }
+                },
+                {
                     $group: {
                         _id: { userId: '$userId', type: '$type' },
                         status: { $first: '$status' },
@@ -355,12 +372,18 @@ export const getTodayDeliveries = async (req, res) => {
             .populate('userId', 'name phone')
             .populate('restaurantId', 'restaurantName name address phone')
             .populate('assignedTo', 'name phone')
+            .populate('subscriptionId', 'paymentStatus paymentMethod status')
             .sort({ type: 1, createdAt: -1 });
 
-        // Deduplicate deliveries per user per slot (Morning/Evening)
-        // This handles cases where older bugs created multiple active plans for the same user
+        // Filter out unpaid/fake orders and deduplicate deliveries per user per slot
         const seen = new Set();
         const deduplicatedDeliveries = deliveries.filter(d => {
+            // Check if subscription is valid and paid (or COD)
+            const sub = d.subscriptionId;
+            if (!sub) return false;
+            const isPaid = sub.paymentStatus === 'paid' || ['cod', 'cash'].includes(sub.paymentMethod);
+            if (!isPaid) return false;
+            
             const userId = d.userId?._id?.toString() || d.userId?.toString();
             const slot = d.type;
             const key = `${userId}-${slot}`;

@@ -181,6 +181,7 @@ export const generateDailyDeliveries = async (force = false) => {
         // Find all active subscriptions where today falls between startDate and endDate
         const activeSubscriptions = await TiffinSubscription.find({
             status: 'active',
+            $or: [{ paymentStatus: 'paid' }, { paymentMethod: { $in: ['cod', 'cash'] } }],
             startDate: { $lte: endOfToday },
             endDate: { $gte: today }
         }).populate('planId');
