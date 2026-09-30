@@ -699,7 +699,19 @@ export const getRestaurantDeliveryHistory = async (req, res) => {
 
         const now = new Date();
         
-        const history = deliveries.map(d => {
+        const historyMap = new Map();
+        
+        deliveries.forEach(d => {
+            const subId = d.subscriptionId?._id ? d.subscriptionId._id.toString() : (d.subscriptionId?.toString() || 'unknown');
+            const dateStr = d.date ? new Date(d.date).toISOString().slice(0, 10) : 'unknown';
+            const type = d.type || 'unknown';
+            
+            const dedupKey = `${subId}-${dateStr}-${type}`;
+            
+            if (historyMap.has(dedupKey)) {
+                return;
+            }
+
             let isMissed = false;
             const deliveryDate = new Date(d.date);
             deliveryDate.setHours(23, 59, 59, 999);
@@ -708,11 +720,13 @@ export const getRestaurantDeliveryHistory = async (req, res) => {
                 isMissed = true;
             }
 
-            return {
+            historyMap.set(dedupKey, {
                 ...d,
                 isMissed
-            };
+            });
         });
+
+        const history = Array.from(historyMap.values());
 
         res.status(200).json({
             success: true,

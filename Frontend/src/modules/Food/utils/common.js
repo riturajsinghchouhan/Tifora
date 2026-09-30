@@ -9,7 +9,8 @@ const DEFAULT_PUBLIC_MEDIA_ORIGIN =
     ? String(import.meta.env.VITE_PUBLIC_MEDIA_ORIGIN).trim().replace(/\/+$/, "")
     : "";
 
-const trimSlashes = (value = "") => String(value || "").trim().replace(/\/+$/, "");
+
+    const trimSlashes = (value = "") => String(value || "").trim().replace(/\/+$/, "");
 
 const isUploadPath = (value = "") => {
   const normalized = String(value || "").trim().replace(/\\/g, "/").replace(/^\/+/, "").toLowerCase();

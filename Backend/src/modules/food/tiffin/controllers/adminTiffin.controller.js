@@ -1077,7 +1077,21 @@ export const getAdminDeliveryHistory = async (req, res) => {
         const now = new Date();
         
         // Process them to determine if missed
-        const history = deliveries.map(d => {
+        const historyMap = new Map();
+        
+        deliveries.forEach(d => {
+            const subId = d.subscriptionId?._id ? d.subscriptionId._id.toString() : (d.subscriptionId?.toString() || 'unknown');
+            const dateStr = d.date ? new Date(d.date).toISOString().slice(0, 10) : 'unknown';
+            const type = d.type || 'unknown';
+            
+            // Unique key to prevent duplicates
+            const dedupKey = `${subId}-${dateStr}-${type}`;
+            
+            // If already seen this exact delivery slot, skip it to avoid duplicates
+            if (historyMap.has(dedupKey)) {
+                return;
+            }
+
             let isMissed = false;
             let currentStatus = d.status;
 
@@ -1089,12 +1103,14 @@ export const getAdminDeliveryHistory = async (req, res) => {
                 currentStatus = 'missed'; // For filtering in frontend
             }
 
-            return {
+            historyMap.set(dedupKey, {
                 ...d,
                 isMissed,
                 derivedStatus: currentStatus
-            };
+            });
         });
+
+        const history = Array.from(historyMap.values());
 
         // Filter by status if requested
         let filteredHistory = history;
