@@ -560,7 +560,10 @@ export async function tryAutoAssign(orderId, options = {}) {
     const { partners } = partnerSearch;
 
     // Re-broadcast to every rider in this radius each attempt, including previously offered riders.
-    const eligible = partners;
+    const rejectedPartnerIds = attempt > 1
+      ? new Set((order.dispatch?.offeredTo || []).filter(o => o.action === 'rejected').map(o => String(o.partnerId)))
+      : new Set();
+    const eligible = (partners || []).filter(p => !rejectedPartnerIds.has(String(p.partnerId)));
 
     if (eligible.length === 0) {
       logger.info(`[Dispatch] No eligible partners in ${maxKm}km for order ${order._id} (Attempt ${attempt}). Advancing to next tier.`);
@@ -570,7 +573,9 @@ export async function tryAutoAssign(orderId, options = {}) {
       order.dispatch.deliveryPartnerId = null;
       await order.save();
 
-      // Re-queue to check the next tier after a short delay (60s)
+      if (attempt < radiusTiers.length) {
+        return tryAutoAssign(order._id, { ...options, attempt: attempt + 1 });
+      } else {
       await addOrderJob({
         action: 'DISPATCH_TIMEOUT_CHECK',
         orderMongoId: order._id.toString(),
@@ -578,7 +583,8 @@ export async function tryAutoAssign(orderId, options = {}) {
         attempt: attempt + 1
       }, { delay: 60000 });
 
-      return order;
+        return order;
+      }
     }
 
     const io = getIO();

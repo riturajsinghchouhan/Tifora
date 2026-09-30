@@ -4209,10 +4209,18 @@ export async function getAvailableDeliveryPartners(query) {
         .populate('zoneId', 'name zoneName serviceLocation')
         .lean();
 
-    const busyPartners = await FoodOrder.distinct('dispatch.deliveryPartnerId', {
+    const busyQuery = {
         'dispatch.status': 'accepted',
         orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup', 'picked_up', 'reached_drop'] }
-    });
+    };
+    if (query?.orderId) {
+        busyQuery._id = { $ne: query.orderId };
+    }
+    const busyPartners = await FoodOrder.distinct('dispatch.deliveryPartnerId', busyQuery);
+
+
+
+
     const busyIds = busyPartners.map(id => String(id));
 
     const availablePartners = list.filter(p => !busyIds.includes(String(p._id)));

@@ -2560,17 +2560,18 @@ export async function assignDeliveryPartnerAdmin(
   if (!order) throw new NotFoundError("Order not found");
   order = await attachFinancialSnapshotToOrder(order);
   
-  if (order.dispatch?.deliveryPartnerId && order.dispatch?.status === "accepted") {
-    throw new ValidationError("Order already assigned to another partner");
-  }
-
   const cancellableStatuses = ['cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead', 'delivered'];
   if (cancellableStatuses.includes(order.orderStatus)) {
     throw new ValidationError("Order is cancelled or delivered, cannot assign delivery partner");
   }
 
+  const oldPartnerId = order.dispatch?.deliveryPartnerId ? String(order.dispatch.deliveryPartnerId) : null;
+  if (oldPartnerId && oldPartnerId === String(deliveryPartnerId)) {
+    throw new ValidationError("Order is already assigned to this delivery partner");
+  }
+
   const partner = await FoodDeliveryPartner.findById(deliveryPartnerId)
-    .select("status availabilityStatus zoneId")
+    .select("name phone status availabilityStatus zoneId")
     .lean();
   if (!partner || partner.status !== "approved" || partner.availabilityStatus !== "online")
     throw new ValidationError("Delivery partner is not available or offline");
@@ -2584,6 +2585,7 @@ export async function assignDeliveryPartnerAdmin(
   }
 
   const busyPartner = await FoodOrder.findOne({
+    _id: { $ne: order._id },
     'dispatch.deliveryPartnerId': new mongoose.Types.ObjectId(deliveryPartnerId),
     'dispatch.status': 'accepted',
     orderStatus: { $in: ['confirmed', 'preparing', 'ready_for_pickup', 'picked_up', 'reached_drop'] }
@@ -2608,10 +2610,45 @@ export async function assignDeliveryPartnerAdmin(
   order.dispatch.assignedAt = now;
   order.dispatch.acceptedAt = now;
   
-  pushStatusHistory(order, { byRole: 'ADMIN', byId: adminId, from: 'assigned', to: 'accepted', note: 'Manually assigned by admin' });
+  const noteMessage = oldPartnerId 
+    ? `Reassigned by admin to ${partner.name || 'new delivery partner'}`
+    : `Manually assigned by admin to ${partner.name || 'delivery partner'}`;
+
+  pushStatusHistory(order, { byRole: 'ADMIN', byId: adminId, from: 'assigned', to: 'accepted', note: noteMessage });
   await order.save();
 
-  // Call the same post-acceptance logic
+  // If there was an old partner assigned, notify them about reassignment
+  if (oldPartnerId) {
+      try {
+          const { getIO, rooms } = await import('../../../../config/socket.js');
+          const io = getIO();
+          if (io) {
+              const unassignPayload = { 
+                  orderMongoId: order._id.toString(), 
+                  orderId: order.orderId || order._id.toString(), 
+                  orderStatus: order.orderStatus, 
+                  dispatchStatus: 'cancelled',
+                  reassigned: true,
+                  message: `Order #${order.orderId || order._id} has been reassigned to another partner by Admin.`
+              };
+              io.to(rooms.delivery(oldPartnerId)).emit('order_unassigned', unassignPayload);
+              io.to(rooms.delivery(oldPartnerId)).emit('order_status_update', unassignPayload);
+          }
+
+          await notifyOwnerSafely(
+              { ownerType: 'DELIVERY_PARTNER', ownerId: oldPartnerId },
+              { 
+                  title: 'Order Reassigned ⚠️', 
+                  body: `Order #${order.orderId || order._id} has been reassigned to another partner by Admin.`, 
+                  data: { type: 'order_reassigned', orderId: order._id.toString() } 
+              }
+          );
+      } catch (e) {
+          console.error("Failed to notify previous delivery partner of reassignment", e);
+      }
+  }
+
+  // Call the same post-acceptance logic for new partner
   try {
       // Firebase update
       const restLoc = order.restaurantId ? (await FoodRestaurant.findById(order.restaurantId).select('location').lean())?.location?.coordinates : null;
@@ -2628,6 +2665,7 @@ export async function assignDeliveryPartnerAdmin(
                 restaurant_lat: restLoc[1], restaurant_lng: restLoc[0],
                 customer_lat: userLoc[1], customer_lng: userLoc[0],
                 status: 'accepted', last_updated: Date.now(),
+                deliveryPartnerId: deliveryPartnerId
              });
           }
       }
@@ -2635,17 +2673,17 @@ export async function assignDeliveryPartnerAdmin(
       const { getIO, rooms } = await import('../../../../config/socket.js');
       const io = getIO();
       if (io) {
-          const payload = { orderMongoId: order._id.toString(), orderId: order._id.toString(), orderStatus: order.orderStatus, dispatchStatus: order.dispatch?.status };
+          const payload = { orderMongoId: order._id.toString(), orderId: order._id.toString(), orderStatus: order.orderStatus, dispatchStatus: order.dispatch?.status, deliveryPartnerId };
           io.to(rooms.delivery(deliveryPartnerId)).emit('order_status_update', payload);
           io.to(rooms.restaurant(order.restaurantId)).emit('order_status_update', payload);
           io.to(rooms.user(order.userId)).emit('order_status_update', payload);
           io.to('all_delivery').emit('order_claimed', { orderId: order._id.toString(), claimedBy: deliveryPartnerId });
       }
 
-      // FCM Notify Partner
+      // FCM Notify New Partner
       await notifyOwnerSafely(
           { ownerType: 'DELIVERY_PARTNER', ownerId: deliveryPartnerId },
-          { title: 'New Order Assigned! 🚀', body: `Admin manually assigned order #${order._id.toString()} to you.`, data: { type: 'delivery_accepted', orderId: order._id.toString() } }
+          { title: oldPartnerId ? 'Order Reassigned To You! 🚀' : 'New Order Assigned! 🚀', body: `Admin assigned order #${order.orderId || order._id.toString()} to you.`, data: { type: 'delivery_accepted', orderId: order._id.toString() } }
       );
   } catch(e) {
       console.error("Post manual assignment logic failed", e);

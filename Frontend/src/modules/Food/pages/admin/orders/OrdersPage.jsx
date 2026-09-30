@@ -1069,6 +1069,8 @@ export default function OrdersPage({ statusKey = "all" }) {
           setSelectedOrderForAssign(null)
         }}
         orderId={selectedOrderForAssign?.id || selectedOrderForAssign?.orderId}
+        currentPartnerName={selectedOrderForAssign?.deliveryPartnerName || selectedOrderForAssign?.deliveryPartner?.name || selectedOrderForAssign?.dispatch?.deliveryPartnerId?.name}
+        currentPartnerPhone={selectedOrderForAssign?.deliveryPartnerPhone || selectedOrderForAssign?.deliveryPartner?.phone || selectedOrderForAssign?.dispatch?.deliveryPartnerId?.phone}
         onAssigned={() => {
           fetchOrders({ silent: true, withRingCheck: false })
           setIsViewOrderOpen(false)

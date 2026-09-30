@@ -22,7 +22,7 @@ import {
 import { fetchPolyline } from '../utils/googleMaps.js';
 import * as foodTransactionService from './foodTransaction.service.js';
 import * as dispatchService from './order-dispatch.service.js';
-import { clearDeliveryOffersForOrder } from './order-dispatch.firebase.js';
+import { clearDeliveryOffersForOrder, removeDeliveryOffersForPartners } from './order-dispatch.firebase.js';
 import {
   buildOrderIdentityFilter,
   emitDeliveryDropOtpToUser,
@@ -857,19 +857,38 @@ export async function rejectOrderDelivery(orderId, deliveryPartnerId, reason = '
 
   const order = await FoodOrder.findOne(identity).select('+deliveryOtp');
   if (!order) throw new NotFoundError('Order not found');
-  if (order.dispatch.deliveryPartnerId?.toString() !== deliveryPartnerId.toString()) {
+
+  const partnerIdStr = deliveryPartnerId.toString();
+  const isAssignedToThisRider = order.dispatch?.deliveryPartnerId?.toString() === partnerIdStr;
+  const isOfferedToThisRider = Array.isArray(order.dispatch?.offeredTo) && order.dispatch.offeredTo.some(
+    (item) => String(item.partnerId) === partnerIdStr
+  );
+
+  if (!isAssignedToThisRider && !isOfferedToThisRider) {
     throw new ForbiddenError('Not your order');
   }
 
-  const offer = order.dispatch.offeredTo.find(
-    (item) =>
-      String(item.partnerId) === String(deliveryPartnerId) &&
-      item.action === 'offered',
+  const offer = (order.dispatch?.offeredTo || []).find(
+    (item) => String(item.partnerId) === partnerIdStr
   );
-  if (offer) offer.action = 'rejected';
+  if (offer) {
+    offer.action = 'rejected';
+  } else {
+    order.dispatch.offeredTo.push({
+      partnerId: deliveryPartnerId,
+      action: 'rejected',
+      at: new Date()
+    });
+  }
 
-  // If the order is dead, we don't need to put it back in the unassigned pool. 
-  // We just want to record the rider's reason.
+  // Remove offer from Firebase RTDB for this rejecting partner
+  try {
+    await removeDeliveryOffersForPartners([partnerIdStr], order._id);
+  } catch (e) {
+    logger.warn(`Firebase offer removal on reject failed: ${e.message}`);
+  }
+
+  // If the order is dead, record reason
   if (order.orderStatus === 'dead') {
     pushStatusHistory(order, {
       byRole: 'DELIVERY_PARTNER',
@@ -902,9 +921,13 @@ export async function rejectOrderDelivery(orderId, deliveryPartnerId, reason = '
     deliveryPartnerId,
   });
 
+  const remainingActiveOffers = (order.dispatch?.offeredTo || []).filter(item => item.action === 'offered');
+  const currentAttempt = Math.max(1, Number(order.dispatch?.dispatchAttempt || 1));
+  const nextAttempt = remainingActiveOffers.length === 0 ? currentAttempt + 1 : currentAttempt;
+
   void dispatchService
     .tryAutoAssign(order._id, {
-      attempt: Math.max(1, Number(order.dispatch?.dispatchAttempt || 1)),
+      attempt: nextAttempt,
     })
     .catch((error) =>
       logger.error(`SmartDispatch: Auto-assign after reject failed: ${error.message}`),

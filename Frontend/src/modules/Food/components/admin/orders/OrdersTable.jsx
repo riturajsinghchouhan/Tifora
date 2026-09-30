@@ -468,12 +468,16 @@ export default function OrdersTable({
                           <span>Reject</span>
                         </button>
                       )}
-                      {/* Assign Delivery Partner Button */}
-                      {(!order.deliveryPartnerName && onAssignDelivery && ['Pending', 'Processing'].includes(order.orderStatus)) && (
+                      {/* Assign / Reassign Delivery Partner Button */}
+                      {(onAssignDelivery && !['delivered', 'cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead', 'Canceled', 'Delivered'].includes(order.orderStatus)) && (
                         <button
                           onClick={() => onAssignDelivery(order)}
-                          className="p-1.5 rounded text-orange-600 hover:bg-orange-50 transition-colors"
-                          title="Assign Delivery Partner"
+                          className={`p-1.5 rounded transition-colors ${
+                            order.deliveryPartnerName 
+                              ? 'text-blue-600 hover:bg-blue-50 bg-blue-50/50' 
+                              : 'text-orange-600 hover:bg-orange-50'
+                          }`}
+                          title={order.deliveryPartnerName ? `Reassign Delivery Partner (Currently: ${order.deliveryPartnerName})` : "Assign Delivery Partner"}
                         >
                           <Truck className="w-4 h-4" />
                         </button>

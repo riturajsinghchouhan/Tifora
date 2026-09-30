@@ -392,13 +392,17 @@ export default function ViewOrderDialog({ isOpen, onOpenChange, order, onAssignD
                 <Truck className="w-4 h-4" />
                 Delivery Partner
               </h3>
-              {(!order.deliveryPartnerName && onAssignDelivery && ['Pending', 'Processing'].includes(order.orderStatus)) && (
+              {(onAssignDelivery && !['delivered', 'cancelled_by_user', 'cancelled_by_restaurant', 'cancelled_by_admin', 'dead', 'Canceled', 'Delivered'].includes(order?.orderStatus)) && (
                 <button
                   onClick={() => onAssignDelivery(order)}
-                  className="px-3 py-1.5 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                    order?.deliveryPartnerName 
+                      ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
+                      : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                  }`}
                 >
                   <Truck className="w-3.5 h-3.5" />
-                  Assign Partner
+                  {order?.deliveryPartnerName ? 'Reassign Partner' : 'Assign Partner'}
                 </button>
               )}
             </div>
