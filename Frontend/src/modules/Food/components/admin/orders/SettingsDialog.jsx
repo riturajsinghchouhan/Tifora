@@ -14,6 +14,7 @@ export default function SettingsDialog({ isOpen, onOpenChange, visibleColumns, t
     orderOtp: "Order OTP",
     customer: "Customer Information",
     restaurant: "Restaurant",
+    deliveryPartner: "Delivery Partner",
     foodItems: "Food Items",
     itemPrice: "Price",
     deliveryCharge: "Delivery Charge",

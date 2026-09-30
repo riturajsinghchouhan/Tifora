@@ -160,6 +160,14 @@ export default function OrdersTable({
                   </div>
                 </th>
               )}
+              {visibleColumns.deliveryPartner && (
+                <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                  <div className="flex items-center gap-2">
+                    <span>Delivery Partner</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-400 cursor-pointer hover:text-slate-600" />
+                  </div>
+                </th>
+              )}
               {visibleColumns.foodItems && (
                 <th className="px-6 py-4 text-left text-[10px] font-bold text-slate-700 uppercase tracking-wider min-w-[200px]">
                   <div className="flex items-center gap-2">
@@ -270,6 +278,43 @@ export default function OrdersTable({
                 {visibleColumns.restaurant && (
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-medium text-slate-700">{formatRestaurantName(order.restaurant)}</span>
+                  </td>
+                )}
+                {visibleColumns.deliveryPartner && (
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-between gap-3 min-w-[200px]">
+                      <div>
+                        {order.deliveryPartnerName ? (
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                              <Truck className="w-3.5 h-3.5 text-blue-600" />
+                              {order.deliveryPartnerName}
+                            </span>
+                            {order.deliveryPartnerPhone && (
+                              <span className="text-xs text-slate-500">{order.deliveryPartnerPhone}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                            Unassigned
+                          </span>
+                        )}
+                      </div>
+                      {onAssignDelivery && !isTerminalOrder(order) && (
+                        <button
+                          onClick={() => onAssignDelivery(order)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 ${
+                            order.deliveryPartnerName
+                              ? 'bg-blue-600 text-white hover:bg-blue-700'
+                              : 'bg-orange-500 text-white hover:bg-orange-600'
+                          }`}
+                          title={order.deliveryPartnerName ? `Reassign Delivery Partner (Currently: ${order.deliveryPartnerName})` : 'Assign Delivery Partner'}
+                        >
+                          <Truck className="w-3.5 h-3.5" />
+                          <span>{order.deliveryPartnerName ? 'Reassign' : 'Assign'}</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )}
                 {visibleColumns.foodItems && (
