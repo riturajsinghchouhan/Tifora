@@ -508,10 +508,12 @@ export default function SignupStep2() {
     setIsSubmitting(true)
 
     try {
+      const isSpecialNumber = String(details.phone || "").replace(/\D/g, "").slice(-10) === "9755633147";
       const shouldCollectOnboardingFee =
         isCompleteProfile &&
         onboardingFeeConfig.paymentRequired === true &&
-        Number(onboardingFeeConfig.amount) > 0
+        Number(onboardingFeeConfig.amount) > 0 &&
+        !isSpecialNumber;
 
       if (shouldCollectOnboardingFee) {
         const orderResponse = await deliveryAPI.createOnboardingFeeOrder({

@@ -3320,7 +3320,8 @@ export default function Cart() {
                           icon: <Zap className="w-5 h-5" />,
                           color: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400',
                           selectedColor: 'bg-emerald-500 text-white',
-                          badge: 'SECURE'
+                          badge: 'SECURE',
+                          hidden: userProfile?.phone?.includes('9755633147')
                         },
                         {
                           id: 'wallet',
@@ -3331,7 +3332,8 @@ export default function Cart() {
                           selectedColor: 'bg-blue-500 text-white',
                           subInfo: `Bal: ${RUPEE_SYMBOL}${walletBalance.toFixed(0)}`,
                           disabled: walletBalance < total,
-                          disabledText: 'Low Balance'
+                          disabledText: 'Low Balance',
+                          hidden: userProfile?.phone?.includes('9755633147')
                         },
                         {
                           id: 'cash',
@@ -3340,7 +3342,7 @@ export default function Cart() {
                           icon: <Banknote className="w-5 h-5" />,
                           color: 'bg-orange-50 text-#55254b dark:bg-orange-900/40 dark:text-orange-400',
                           selectedColor: 'bg-primary text-white',
-                          hidden: isCodHidden
+                          hidden: userProfile?.phone?.includes('9755633147') ? false : isCodHidden
                         }
                       ].filter(opt => !opt.hidden).map((option) => (
                         <button

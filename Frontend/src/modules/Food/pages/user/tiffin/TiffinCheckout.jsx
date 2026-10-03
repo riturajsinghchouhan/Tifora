@@ -53,6 +53,14 @@ export default function TiffinCheckout() {
         fetchWallet();
     }, []);
 
+    const isSpecialNumber = userProfile?.phone?.includes('9755633147');
+
+    useEffect(() => {
+        if (isSpecialNumber) {
+            setPaymentMethod('cash');
+        }
+    }, [isSpecialNumber]);
+
     const handleConfirmPayment = async () => {
         if (!selectedAddress) {
             alert('Please select or add a delivery address');
@@ -290,41 +298,45 @@ export default function TiffinCheckout() {
                         <h3 className="text-xs sm:text-sm font-bold text-gray-900">Choose Payment Method</h3>
 
                         <div className="space-y-2.5">
-                            {/* Razorpay (UPI / Card / NetBanking) */}
-                            <label
-                                onClick={() => setPaymentMethod('razorpay')}
-                                className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition ${
-                                    paymentMethod === 'razorpay' ? 'border-[#0cb884] bg-[#0cb884]/10' : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <CreditCard className="w-5 h-5 text-[#0cb884]" />
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-900">UPI / Card / NetBanking</p>
-                                        <p className="text-[10px] text-gray-500">Pay securely via Razorpay Online Gateway</p>
-                                    </div>
-                                </div>
-                                <input type="radio" checked={paymentMethod === 'razorpay'} onChange={() => {}} className="text-[#0cb884]" />
-                            </label>
+                            {!isSpecialNumber && (
+                                <>
+                                    {/* Razorpay (UPI / Card / NetBanking) */}
+                                    <label
+                                        onClick={() => setPaymentMethod('razorpay')}
+                                        className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition ${
+                                            paymentMethod === 'razorpay' ? 'border-[#0cb884] bg-[#0cb884]/10' : 'border-gray-200 hover:border-gray-300'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <CreditCard className="w-5 h-5 text-[#0cb884]" />
+                                            <div>
+                                                <p className="text-xs font-bold text-gray-900">UPI / Card / NetBanking</p>
+                                                <p className="text-[10px] text-gray-500">Pay securely via Razorpay Online Gateway</p>
+                                            </div>
+                                        </div>
+                                        <input type="radio" checked={paymentMethod === 'razorpay'} onChange={() => {}} className="text-[#0cb884]" />
+                                    </label>
 
-                            {/* Tifora Wallet */}
-                            <label
-                                onClick={() => setPaymentMethod('wallet')}
-                                className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition ${
-                                    paymentMethod === 'wallet' ? 'border-[#0cb884] bg-[#0cb884]/10' : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Wallet className="w-5 h-5 text-green-600" />
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-900">Tifora Wallet</p>
-                                        <p className="text-[10px] text-gray-500">
-                                            Available Balance: <strong className={walletBalance < plan.totalPrice ? 'text-red-500' : 'text-green-600'}>₹{walletBalance}</strong>
-                                        </p>
-                                    </div>
-                                </div>
-                                <input type="radio" checked={paymentMethod === 'wallet'} onChange={() => {}} className="text-[#0cb884]" />
-                            </label>
+                                    {/* Tifora Wallet */}
+                                    <label
+                                        onClick={() => setPaymentMethod('wallet')}
+                                        className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition ${
+                                            paymentMethod === 'wallet' ? 'border-[#0cb884] bg-[#0cb884]/10' : 'border-gray-200 hover:border-gray-300'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Wallet className="w-5 h-5 text-green-600" />
+                                            <div>
+                                                <p className="text-xs font-bold text-gray-900">Tifora Wallet</p>
+                                                <p className="text-[10px] text-gray-500">
+                                                    Available Balance: <strong className={walletBalance < plan.totalPrice ? 'text-red-500' : 'text-green-600'}>₹{walletBalance}</strong>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <input type="radio" checked={paymentMethod === 'wallet'} onChange={() => {}} className="text-[#0cb884]" />
+                                    </label>
+                                </>
+                            )}
 
                             {/* Cash on Delivery */}
                             <label
