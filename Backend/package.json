@@ -5,8 +5,8 @@
   "description": "AppZeto Master Product Backend",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "node api.js && node server.js",
+    "dev": "node api.js && nodemon server.js",
     "seed:admin": "node src/scripts/seedAdmin.js",
     "seed:indore": "node src/scripts/seedIndoreRestaurantAndDelivery.js",
     "worker:otp": "node src/queues/workers/otp.worker.js",

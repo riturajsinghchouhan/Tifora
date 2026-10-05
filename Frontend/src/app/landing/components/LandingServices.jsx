@@ -57,7 +57,7 @@ export default function LandingServices({ activeServicesTab, setActiveServicesTa
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 max-w-5xl mx-auto">
           {/* Card 1: Tiffin Services */}
           <div
-            onClick={() => navigate("/food/tiffin/plans")}
+            onClick={() => window.open("https://play.google.com/store/apps/details?id=com.tifora.user", "_blank")}
             className="group relative rounded-2xl sm:rounded-[26px] overflow-hidden min-h-[185px] sm:min-h-[210px] p-5 sm:p-7 bg-gradient-to-r from-[#04281e] via-[#06382a] to-[#032017] border border-emerald-500/20 shadow-[0_12px_32px_rgba(3,40,30,0.35)] flex items-center justify-between cursor-pointer hover:shadow-[0_16px_40px_rgba(0,208,156,0.25)] hover:-translate-y-1 transition-all duration-300"
           >
             {/* Background Ambient Radial Glow */}
@@ -93,7 +93,7 @@ export default function LandingServices({ activeServicesTab, setActiveServicesTa
 
           {/* Card 2: Hotel Booking */}
           <div
-            onClick={() => navigate("/food")}
+            onClick={() => window.open("https://play.google.com/store/apps/details?id=com.tifora.user", "_blank")}
             className="group relative rounded-2xl sm:rounded-[26px] overflow-hidden min-h-[185px] sm:min-h-[210px] p-5 sm:p-7 bg-gradient-to-r from-[#17153a] via-[#211e53] to-[#12102f] border border-indigo-500/20 shadow-[0_12px_32px_rgba(23,21,58,0.4)] flex items-center justify-between cursor-pointer hover:shadow-[0_16px_40px_rgba(99,102,241,0.25)] hover:-translate-y-1 transition-all duration-300"
           >
             {/* Background Ambient Radial Glow */}
