@@ -142,7 +142,7 @@ export default function LandingPopularPicks({
                   </div>
 
                   <button
-                    onClick={() => navigate(item.link)}
+                    onClick={() => window.open("https://play.google.com/store/apps/details?id=com.tifora.user", "_blank")}
                     className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-[#00D09C] hover:bg-[#00b587] text-[#061211] transition-all flex items-center gap-1 shadow-sm shadow-[#00D09C]/25 hover:scale-105 active:scale-95"
                   >
                     <span>{activePicksTab === "tiffins" ? "Order" : "Book"}</span>
