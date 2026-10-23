@@ -35,7 +35,7 @@ const notificationSchema = new mongoose.Schema(
         },
         source: {
             type: String,
-            enum: ['ADMIN_BROADCAST', 'FSSAI_EXPIRY'],
+            enum: ['ADMIN_BROADCAST', 'FSSAI_EXPIRY', 'TIFFIN_RENEWAL'],
             default: 'ADMIN_BROADCAST',
             index: true
         },

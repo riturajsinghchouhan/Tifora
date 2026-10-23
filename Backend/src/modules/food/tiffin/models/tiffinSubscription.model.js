@@ -111,6 +111,14 @@ const tiffinSubscriptionSchema = new mongoose.Schema(
         razorpayPaymentId: {
             type: String,
             default: ''
+        },
+        assignedByAdmin: {
+            type: Boolean,
+            default: false
+        },
+        renewalNotifiedAt: {
+            type: Date,
+            default: null
         }
     },
     {

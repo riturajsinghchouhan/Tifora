@@ -7,7 +7,6 @@ import {
   LandingWhyTifora,
   LandingHowItWorks,
   LandingPopularPicks,
-  LandingTestimonials,
   LandingAppDownload,
   LandingFooter,
 } from "./landing/components";
@@ -31,7 +30,6 @@ export default function MasterLandingPage() {
     { id: "why-tifora", label: "Why Tifora" },
     { id: "how-it-works", label: "How It Works" },
     { id: "popular-picks", label: "Popular Picks" },
-    { id: "testimonials", label: "Reviews" },
     { id: "footer-section", label: "Contact" },
   ];
 
@@ -239,10 +237,7 @@ export default function MasterLandingPage() {
         setPicksIndex={setPicksIndex}
       />
 
-      {/* 8. TESTIMONIALS */}
-      <LandingTestimonials />
-
-      {/* 9. APP DOWNLOAD CTA */}
+      {/* 8. APP DOWNLOAD CTA */}
       <LandingAppDownload />
 
       {/* 10. FOOTER */}

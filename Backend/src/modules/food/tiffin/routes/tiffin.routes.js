@@ -64,7 +64,11 @@ import {
     getTiffinDeliverySalaries,
     disburseTiffinDeliverySalary,
     updateTiffinDeliveryPaySettings,
-    getAdminDeliveryHistory
+    getAdminDeliveryHistory,
+    lookupUserByPhone,
+    adminAssignSubscription,
+    getRenewalDueSubscriptions,
+    sendRenewalReminders
 } from '../controllers/adminTiffin.controller.js';
 
 const router = express.Router();
@@ -192,6 +196,10 @@ router.post(['/delivery/:deliveryId/send-otp', '/:deliveryId/send-otp'], deliver
 // --- Admin Tiffin Routes (Supports /admin/... and Direct Paths) ---
 router.get(['/admin/overview', '/overview'], adminAuth, getAdminTiffinOverview);
 router.get(['/admin/subscriptions', '/subscriptions'], adminAuth, getAllSubscriptions);
+router.get(['/admin/users/lookup', '/users/lookup'], adminAuth, lookupUserByPhone);
+router.post(['/admin/subscriptions/assign', '/subscriptions/assign'], adminAuth, adminAssignSubscription);
+router.get(['/admin/subscriptions/renewal-due', '/subscriptions/renewal-due'], adminAuth, getRenewalDueSubscriptions);
+router.post(['/admin/subscriptions/notify-renewal', '/subscriptions/notify-renewal'], adminAuth, sendRenewalReminders);
 router.patch(['/admin/subscriptions/:subscriptionId/status', '/subscriptions/:subscriptionId/status'], adminAuth, adminToggleSubscriptionStatus);
 
 router.get(['/admin/plans', '/admin-plans'], adminAuth, getAllTiffinPlans);

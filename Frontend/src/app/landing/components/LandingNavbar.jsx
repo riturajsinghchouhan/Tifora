@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   HelpCircle,
   Flame,
-  Star,
   Phone,
   ChevronRight,
   Download,
@@ -53,8 +52,6 @@ export default function LandingNavbar({
         return HelpCircle;
       case "popular-picks":
         return Flame;
-      case "testimonials":
-        return Star;
       case "footer-section":
         return Phone;
       default:

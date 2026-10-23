@@ -17,6 +17,7 @@ import {
     Calendar
 } from 'lucide-react';
 import api from '@/services/api';
+import AdminTiffinManagement from '../AdminTiffinManagement';
 
 const INR_SYMBOL = '\u20B9';
 
@@ -342,6 +343,9 @@ export default function TiffinAdminDashboardSection() {
                     </button>
                 </div>
             </div>
+
+            {/* Full Tiffin Management (tabs & tables) */}
+            <AdminTiffinManagement embedded />
         </div>
     );
 }

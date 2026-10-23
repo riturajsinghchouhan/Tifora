@@ -30,11 +30,15 @@ import {
     RefreshCw,
     Wallet,
     CreditCard,
-    Banknote
+    Banknote,
+    BellRing,
+    UserPlus
 } from 'lucide-react';
 import api from '@food/api';
 import CodRequestsSection from './components/CodRequestsSection';
 import AdminDeliveryHistoryTab from './components/AdminDeliveryHistoryTab';
+import AssignPlanModal from './components/AssignPlanModal';
+import RenewalRemindersTab from './components/RenewalRemindersTab';
 
 const DEFAULT_ITEM_PRESETS = [
     { name: '4 Fresh Butter Rotis', quantity: '4 Pcs', image: '/food/tiffin/roti.png', description: 'Freshly puffed whole wheat rotis' },
@@ -44,10 +48,12 @@ const DEFAULT_ITEM_PRESETS = [
     { name: 'Fresh Salad & Pickle', quantity: '1 Portion', image: '/food/tiffin/salad.png', description: 'Crisp cucumber, carrot, lemon & house pickle' }
 ];
 
-export default function AdminTiffinManagement() {
+export default function AdminTiffinManagement({ embedded = false }) {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
-    const activeTab = searchParams.get('tab') || 'overview';
+    // When embedded inside another page (e.g. /admin/food) keep the tab in local state so the page URL is untouched
+    const [localTab, setLocalTab] = useState('overview');
+    const activeTab = embedded ? localTab : (searchParams.get('tab') || 'overview');
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -79,6 +85,7 @@ export default function AdminTiffinManagement() {
     const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
     const [editingPlan, setEditingPlan] = useState(null);
     const [viewSubModal, setViewSubModal] = useState(null);
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
     // Plan Form State
     const [planForm, setPlanForm] = useState({
@@ -121,6 +128,10 @@ export default function AdminTiffinManagement() {
     };
 
     const setTab = (tab) => {
+        if (embedded) {
+            setLocalTab(tab);
+            return;
+        }
         setSearchParams({ tab });
     };
 
@@ -432,9 +443,9 @@ export default function AdminTiffinManagement() {
     });
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        <div className={embedded ? 'mt-5 space-y-6' : 'p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6'}>
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-gray-200 shadow-sm">
+            <div className={`${embedded ? 'hidden' : 'flex'} flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 sm:p-6 rounded-3xl border border-gray-200 shadow-sm`}>
                 <div>
                     <div className="flex items-center gap-2.5">
                         <span className="p-2 bg-rose-100/70 text-[#be123c] rounded-xl">
@@ -467,6 +478,32 @@ export default function AdminTiffinManagement() {
                 </div>
             </div>
 
+            {embedded && (
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-900">Tiffin Management</h3>
+                        <p className="text-xs text-gray-500">Plans, subscriptions, dispatches, kitchens & payouts</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleRefresh}
+                            disabled={refreshing}
+                            className="flex items-center gap-1.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-xl transition active:scale-95"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </button>
+                        <button
+                            onClick={() => handleOpenPlanModal()}
+                            className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#be123c] px-3.5 py-2 rounded-xl shadow-md shadow-[#be123c]/20 hover:opacity-95 active:scale-95 transition"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Add New Plan
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Navigation Tabs */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-gray-200 scrollbar-none">
                 {[
@@ -474,6 +511,7 @@ export default function AdminTiffinManagement() {
                     { id: 'plans', label: 'Subscription Plans', count: plans.length, icon: Package },
                     { id: 'cod-requests', label: 'COD Requests', count: pendingCodRequests.length, icon: Clock, isAlert: pendingCodRequests.length > 0 },
                     { id: 'subscriptions', label: 'Customer Subscriptions', count: subscriptions.length, icon: Users },
+                    { id: 'renewals', label: 'Renewal Reminders', icon: BellRing },
                     { id: 'deliveries', label: 'Daily Meal Dispatch', count: deliveries.length, icon: Truck },
                     { id: 'history', label: 'Delivery History', icon: Calendar },
                     { id: 'kitchens', label: 'Kitchen Partners', count: kitchens.length, icon: ChefHat },
@@ -786,6 +824,13 @@ export default function AdminTiffinManagement() {
                         </div>
 
                         <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                onClick={() => setIsAssignModalOpen(true)}
+                                className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#be123c] px-3.5 py-2 rounded-xl shadow-md shadow-[#be123c]/20 hover:opacity-95 active:scale-95 transition"
+                            >
+                                <UserPlus className="w-4 h-4" />
+                                Assign Plan to Customer
+                            </button>
                             <div className="flex items-center gap-1.5">
                                 <span className="text-xs font-bold text-gray-500">Status:</span>
                                 <select
@@ -897,6 +942,21 @@ export default function AdminTiffinManagement() {
                         </table>
                     </div>
                 </div>
+            )}
+
+            {activeTab === 'renewals' && <RenewalRemindersTab />}
+
+            {isAssignModalOpen && (
+                <AssignPlanModal
+                    plans={plans.filter(p => p.isActive !== false)}
+                    onClose={() => setIsAssignModalOpen(false)}
+                    onAssigned={() => {
+                        setIsAssignModalOpen(false);
+                        fetchSubscriptions();
+                        fetchOverview();
+                        fetchDeliveries();
+                    }}
+                />
             )}
 
             {/* ========================================================================= */}

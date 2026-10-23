@@ -5,7 +5,10 @@ import { TiffinPayout } from '../models/tiffinPayout.model.js';
 import { TiffinCommissionSetting } from '../models/tiffinCommission.model.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
-import { ensureTodayDeliveriesSync, generateDailyDeliveries } from '../scripts/tiffinScheduler.js';
+import { FoodUser } from '../../../../core/users/user.model.js';
+import { FoodNotification } from '../../../../core/notifications/models/notification.model.js';
+import { notifyOwnersSafely } from '../../../../core/notifications/firebase.service.js';
+import { ensureTodayDeliveriesSync, generateDailyDeliveries, ensureSubscriptionDeliveriesForDate } from '../scripts/tiffinScheduler.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import mongoose from 'mongoose';
 
@@ -1154,5 +1157,220 @@ export const getAdminDeliveryHistory = async (req, res) => {
     } catch (error) {
         console.error('Error fetching admin delivery history:', error);
         res.status(500).json({ success: false, message: 'Server error fetching delivery history' });
+    }
+};
+
+/**
+ * Manual assignment: look up a registered customer by phone number
+ */
+export const lookupUserByPhone = async (req, res) => {
+    try {
+        const digits = String(req.query.phone || '').replace(/\D/g, '').slice(-10);
+        if (digits.length < 10) {
+            return res.status(400).json({ success: false, message: 'Enter a valid 10 digit phone number' });
+        }
+        const user = await FoodUser.findOne({ phone: { $regex: `${digits}$` } })
+            .select('name phone email addresses isActive')
+            .lean();
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'No registered customer found with this number' });
+        }
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        console.error('Error looking up user:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+/**
+ * Manual assignment: admin assigns a plan to a registered customer
+ */
+export const adminAssignSubscription = async (req, res) => {
+    try {
+        const { userId, planId, startDate, paymentMethod, paymentStatus, deliveryAddress } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(String(userId || '')) || !mongoose.Types.ObjectId.isValid(String(planId || ''))) {
+            return res.status(400).json({ success: false, message: 'Valid customer and plan are required' });
+        }
+        if (!['online', 'cod'].includes(paymentMethod)) {
+            return res.status(400).json({ success: false, message: 'Payment method must be online or cod' });
+        }
+
+        const [user, plan] = await Promise.all([FoodUser.findById(userId), TiffinPlan.findById(planId)]);
+        if (!user) return res.status(404).json({ success: false, message: 'Customer not found' });
+        if (!plan || !plan.isActive) return res.status(400).json({ success: false, message: 'Invalid or inactive plan' });
+
+        let address = deliveryAddress && deliveryAddress.street ? deliveryAddress : null;
+        if (!address) {
+            const saved = (user.addresses || []).find((a) => a.isDefault) || (user.addresses || [])[0];
+            address = saved ? (typeof saved.toObject === 'function' ? saved.toObject() : saved) : null;
+        }
+        if (!address?.street || !address?.city || !address?.state) {
+            return res.status(400).json({ success: false, message: 'Customer has no saved address. Please enter delivery address.' });
+        }
+        if (!address.name && !address.fullName) address = { ...address, name: user.name || '' };
+        if (!address.phone) address = { ...address, phone: user.phone };
+        // Subscription address schema only accepts a Point location with 2 coordinates
+        if (!Array.isArray(address.location?.coordinates) || address.location.coordinates.length !== 2) {
+            const { location, ...rest } = address;
+            address = rest;
+        }
+
+        const start = new Date(startDate || Date.now());
+        if (Number.isNaN(start.getTime())) {
+            return res.status(400).json({ success: false, message: 'Invalid start date' });
+        }
+        const end = new Date(start);
+        end.setDate(end.getDate() + plan.durationDays);
+
+        // Online assignments are always recorded as paid; COD can stay pending until cash is collected.
+        const finalPaymentStatus = paymentMethod === 'online' ? 'paid' : (paymentStatus === 'pending' ? 'pending' : 'paid');
+
+        const subscription = await TiffinSubscription.create({
+            userId: user._id,
+            restaurantId: plan.restaurantId,
+            planId: plan._id,
+            startDate: start,
+            endDate: end,
+            deliveryAddress: address,
+            status: 'active',
+            paymentMethod,
+            paymentStatus: finalPaymentStatus,
+            amountPaid: Number(plan.price || plan.totalPrice || 0),
+            assignedByAdmin: true
+        });
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const startDay = new Date(start);
+        startDay.setHours(0, 0, 0, 0);
+        if (startDay.getTime() <= today.getTime()) {
+            try {
+                await ensureSubscriptionDeliveriesForDate(subscription, today, plan);
+            } catch (e) {
+                console.error('Failed to generate deliveries for assigned subscription:', e);
+            }
+        }
+
+        const populated = await TiffinSubscription.findById(subscription._id)
+            .populate('userId', 'name phone email')
+            .populate('restaurantId', 'restaurantName name address phone logo')
+            .populate('planId', 'name durationDays mealType price isVegetarian image');
+
+        res.status(201).json({ success: true, data: populated, message: 'Plan assigned to customer successfully' });
+    } catch (error) {
+        console.error('Error assigning subscription:', error);
+        res.status(500).json({ success: false, message: error.message || 'Server error' });
+    }
+};
+
+/**
+ * Renewal: subscriptions ended or ending within `days`, one row per customer
+ * (skipped when the customer already has a later subscription)
+ */
+export const getRenewalDueSubscriptions = async (req, res) => {
+    try {
+        const days = Math.max(0, Math.min(30, Number(req.query.days ?? 3) || 0));
+        const now = new Date();
+        const horizon = new Date(now);
+        horizon.setDate(horizon.getDate() + days);
+
+        const candidates = await TiffinSubscription.find({
+            status: { $in: ['active', 'expired'] },
+            endDate: { $lte: horizon },
+            $or: [{ paymentStatus: 'paid' }, { paymentMethod: 'cod' }]
+        })
+            .populate('userId', 'name phone')
+            .populate('planId', 'name')
+            .sort({ endDate: -1 })
+            .lean();
+
+        const latestByUser = new Map();
+        for (const sub of candidates) {
+            const key = String(sub.userId?._id || sub.userId);
+            if (!latestByUser.has(key)) latestByUser.set(key, sub);
+        }
+
+        const userIds = [...latestByUser.keys()].map((id) => new mongoose.Types.ObjectId(id));
+        const stillCovered = await TiffinSubscription.find({
+            userId: { $in: userIds },
+            status: { $in: ['active', 'paused', 'pending'] },
+            endDate: { $gt: horizon }
+        }).select('userId').lean();
+        const coveredSet = new Set(stillCovered.map((s) => String(s.userId)));
+
+        const rows = [...latestByUser.entries()]
+            .filter(([userId]) => !coveredSet.has(userId))
+            .map(([, sub]) => ({
+                _id: sub._id,
+                user: sub.userId,
+                plan: sub.planId,
+                endDate: sub.endDate,
+                status: sub.status,
+                daysLeft: Math.ceil((new Date(sub.endDate) - now) / 86400000),
+                renewalNotifiedAt: sub.renewalNotifiedAt || null
+            }))
+            .filter((row) => row.user)
+            .sort((a, b) => new Date(a.endDate) - new Date(b.endDate));
+
+        res.status(200).json({ success: true, data: rows });
+    } catch (error) {
+        console.error('Error fetching renewal due subscriptions:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+/**
+ * Renewal: send in-app + push reminder to the selected subscriptions' customers
+ */
+export const sendRenewalReminders = async (req, res) => {
+    try {
+        const ids = (Array.isArray(req.body.subscriptionIds) ? req.body.subscriptionIds : [])
+            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+        if (!ids.length) {
+            return res.status(400).json({ success: false, message: 'Select at least one customer' });
+        }
+
+        const subs = await TiffinSubscription.find({ _id: { $in: ids } })
+            .populate('planId', 'name')
+            .lean();
+        if (!subs.length) {
+            return res.status(404).json({ success: false, message: 'Subscriptions not found' });
+        }
+
+        const now = new Date();
+        const customMessage = String(req.body.message || '').trim();
+        const link = '/food/user/tiffin';
+        const title = 'Renew your tiffin plan';
+
+        const notifications = subs.map((sub) => {
+            const planName = sub.planId?.name || 'tiffin plan';
+            const ended = new Date(sub.endDate) < now;
+            const message = customMessage || (ended
+                ? `Your ${planName} has ended. Renew your plan to keep getting fresh tiffin at your door.`
+                : `Your ${planName} ends on ${new Date(sub.endDate).toLocaleDateString('en-IN')}. Renew now to continue without a break.`);
+            return {
+                ownerType: 'USER',
+                ownerId: sub.userId,
+                title,
+                message,
+                link,
+                category: 'tiffin_renewal',
+                source: 'TIFFIN_RENEWAL',
+                metadata: { subscriptionId: String(sub._id) }
+            };
+        });
+
+        await FoodNotification.insertMany(notifications);
+        await Promise.all(notifications.map((n) => notifyOwnersSafely(
+            [{ ownerType: 'USER', ownerId: String(n.ownerId) }],
+            { title: n.title, body: n.message, data: { type: 'tiffin_renewal', link } }
+        )));
+        await TiffinSubscription.updateMany({ _id: { $in: subs.map((s) => s._id) } }, { $set: { renewalNotifiedAt: now } });
+
+        res.status(200).json({ success: true, sent: notifications.length, message: `Renewal reminder sent to ${notifications.length} customer(s)` });
+    } catch (error) {
+        console.error('Error sending renewal reminders:', error);
+        res.status(500).json({ success: false, message: error.message || 'Server error' });
     }
 };
