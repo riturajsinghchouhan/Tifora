@@ -123,6 +123,19 @@ export const getAdminTiffinOverview = async (req, res) => {
         ]);
 
         const totalRevenue = revenueAgg[0]?.total || 0;
+
+        // Collected amounts by payment mode (only subscriptions actually paid)
+        const collectedAgg = await TiffinSubscription.aggregate([
+            { $match: { paymentStatus: 'paid' } },
+            {
+                $group: {
+                    _id: { $cond: [{ $in: ['$paymentMethod', ['cod', 'cash']] }, 'cod', 'online'] },
+                    total: { $sum: '$amountPaid' },
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+        const collected = Object.fromEntries(collectedAgg.map((row) => [row._id, row]));
         const todayStats = todayDeliveriesAgg[0] || {
             total: 0,
             morning: 0,
@@ -138,6 +151,10 @@ export const getAdminTiffinOverview = async (req, res) => {
                 activeSubscriptions: activeSubs || 0,
                 pausedSubscriptions: pausedSubs || 0,
                 totalRevenue,
+                codCollected: collected.cod?.total || 0,
+                codCollectedCount: collected.cod?.count || 0,
+                onlineCollected: collected.online?.total || 0,
+                onlineCollectedCount: collected.online?.count || 0,
                 totalPlans: totalPlans || 0,
                 activeKitchens: kitchensCount || 0,
                 todayDeliveries: todayStats
