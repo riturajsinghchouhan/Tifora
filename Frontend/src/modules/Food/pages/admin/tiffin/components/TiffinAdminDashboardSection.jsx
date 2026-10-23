@@ -11,6 +11,7 @@ import {
     Users,
     ChevronRight,
     CreditCard,
+    Banknote,
     Sun,
     Moon,
     CheckCircle2,
@@ -36,6 +37,10 @@ export default function TiffinAdminDashboardSection() {
         activeSubscriptions: 0,
         pausedSubscriptions: 0,
         totalRevenue: 0,
+        codCollected: 0,
+        codCollectedCount: 0,
+        onlineCollected: 0,
+        onlineCollectedCount: 0,
         activeKitchens: 0,
         todayDeliveries: { total: 0, morning: 0, evening: 0, delivered: 0, pending: 0 }
     });
@@ -109,8 +114,6 @@ export default function TiffinAdminDashboardSection() {
 
     // Real dynamic financial calculations from actual database state
     const grossRevenue = Number(overviewData.totalRevenue || 0);
-    const adminCommissionProfit = Number(commissionData.totalCommission || 0);
-    const adminNetProfit = Number(commissionData.netAdminEarnings || (adminCommissionProfit + Number(commissionData.totalGst || 0)));
 
     return (
         <div className="rounded-2xl border border-neutral-200/90 bg-white p-5 shadow-xs transition-all">
@@ -157,7 +160,7 @@ export default function TiffinAdminDashboardSection() {
             </div>
 
             {/* 4 Financial Metrics Cards with Light Color Tints */}
-            <div className="grid grid-cols-1 gap-3.5 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3.5 pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 {/* 1. Tiffin Gross Revenue */}
                 <div
                     onClick={() => navigate('/admin/food/tiffin-management?tab=subscriptions')}
@@ -190,34 +193,66 @@ export default function TiffinAdminDashboardSection() {
                     </div>
                 </div>
 
-                {/* 2. Admin Net Profit */}
+                {/* 2. COD Amount Collected */}
                 <div
-                    onClick={() => navigate('/admin/food/tiffin-restaurant-commission')}
+                    onClick={() => navigate('/admin/food/tiffin-management?tab=subscriptions')}
                     className="group relative overflow-hidden rounded-xl border border-emerald-200/60 bg-emerald-50/40 p-4 transition-all duration-200 hover:bg-emerald-50/70 hover:border-emerald-300 hover:shadow-sm cursor-pointer"
                 >
                     <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0 mr-2">
                             <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800">
-                                Admin Tiffin Profit
+                                COD Collected
                             </span>
                             <h3 className="text-xl font-bold text-neutral-900 mt-1">
-                                {formatCurrency(adminNetProfit)}
+                                {formatCurrency(overviewData.codCollected)}
                             </h3>
                             <div className="flex items-center gap-1.5 text-[11px] text-neutral-600 mt-1">
-                                <TrendingUp className="h-3.5 w-3.5 text-emerald-700" />
-                                <span className="truncate">Comm: {formatCurrency(adminCommissionProfit)} + GST</span>
+                                <Banknote className="h-3.5 w-3.5 text-emerald-700" />
+                                <span className="truncate">{overviewData.codCollectedCount} paid subscriptions</span>
                             </div>
                         </div>
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 ring-1 ring-emerald-200/80 shadow-2xs group-hover:scale-105 transition-transform">
-                            <TrendingUp className="h-4 w-4" />
+                            <Banknote className="h-4 w-4" />
                         </div>
                     </div>
                     <div className="mt-3 pt-2 border-t border-emerald-200/50 flex items-center justify-between text-[11px]">
                         <span className="font-medium text-emerald-900 bg-emerald-100/70 px-2 py-0.5 rounded">
-                            {commissionData.globalCommissionPercentage}% Global Rate
+                            Cash on delivery
                         </span>
                         <span className="text-neutral-500 group-hover:text-emerald-800 inline-flex items-center gap-0.5 font-medium transition-colors">
-                            Rates <ArrowUpRight className="h-3 w-3" />
+                            Details <ArrowUpRight className="h-3 w-3" />
+                        </span>
+                    </div>
+                </div>
+
+                {/* 2b. Online Amount Collected */}
+                <div
+                    onClick={() => navigate('/admin/food/tiffin-management?tab=subscriptions')}
+                    className="group relative overflow-hidden rounded-xl border border-teal-200/60 bg-teal-50/40 p-4 transition-all duration-200 hover:bg-teal-50/70 hover:border-teal-300 hover:shadow-sm cursor-pointer"
+                >
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0 mr-2">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-teal-800">
+                                Online Collected
+                            </span>
+                            <h3 className="text-xl font-bold text-neutral-900 mt-1">
+                                {formatCurrency(overviewData.onlineCollected)}
+                            </h3>
+                            <div className="flex items-center gap-1.5 text-[11px] text-neutral-600 mt-1">
+                                <CreditCard className="h-3.5 w-3.5 text-teal-700" />
+                                <span className="truncate">{overviewData.onlineCollectedCount} paid subscriptions</span>
+                            </div>
+                        </div>
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-teal-700 ring-1 ring-teal-200/80 shadow-2xs group-hover:scale-105 transition-transform">
+                            <CreditCard className="h-4 w-4" />
+                        </div>
+                    </div>
+                    <div className="mt-3 pt-2 border-t border-teal-200/50 flex items-center justify-between text-[11px]">
+                        <span className="font-medium text-teal-900 bg-teal-100/70 px-2 py-0.5 rounded">
+                            Online / wallet
+                        </span>
+                        <span className="text-neutral-500 group-hover:text-teal-800 inline-flex items-center gap-0.5 font-medium transition-colors">
+                            Details <ArrowUpRight className="h-3 w-3" />
                         </span>
                     </div>
                 </div>
