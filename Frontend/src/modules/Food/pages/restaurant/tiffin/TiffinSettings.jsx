@@ -51,6 +51,8 @@ export default function TiffinSettings() {
         durationDays: 30,
         mealType: 'Morning',
         price: '',
+        steelBoxPrice: 0,
+        disposableBoxPrice: 0,
         itemsDescription: '',
         isVegetarian: true,
         isActive: true,
@@ -92,6 +94,8 @@ export default function TiffinSettings() {
             durationDays: 30,
             mealType: 'Morning',
             price: '',
+            steelBoxPrice: 0,
+            disposableBoxPrice: 0,
             itemsDescription: '',
             isVegetarian: true,
             isActive: true,
@@ -108,6 +112,8 @@ export default function TiffinSettings() {
             durationDays: plan.durationDays || 30,
             mealType: plan.mealType || 'Morning',
             price: plan.price || '',
+            steelBoxPrice: plan.steelBoxPrice || 0,
+            disposableBoxPrice: plan.disposableBoxPrice || 0,
             itemsDescription: plan.itemsDescription || '',
             isVegetarian: plan.isVegetarian !== undefined ? plan.isVegetarian : true,
             isActive: plan.isActive !== undefined ? plan.isActive : true,
@@ -119,7 +125,13 @@ export default function TiffinSettings() {
 
     const handleApplyTemplate = (template) => {
         setEditingPlan(null);
-        setFormData(template);
+        setFormData({
+            steelBoxPrice: 0,
+            disposableBoxPrice: 0,
+            imageFile: null,
+            items: [],
+            ...template
+        });
         setShowModal(true);
     };
 
@@ -145,6 +157,8 @@ export default function TiffinSettings() {
             submitData.append('durationDays', Number(formData.durationDays));
             submitData.append('mealType', formData.mealType);
             submitData.append('price', Number(formData.price));
+            submitData.append('steelBoxPrice', Number(formData.steelBoxPrice) || 0);
+            submitData.append('disposableBoxPrice', Number(formData.disposableBoxPrice) || 0);
             submitData.append('itemsDescription', formData.itemsDescription.trim());
             submitData.append('isVegetarian', Boolean(formData.isVegetarian));
             submitData.append('isActive', Boolean(formData.isActive));
@@ -643,6 +657,46 @@ export default function TiffinSettings() {
                                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                                         className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition font-semibold"
                                     />
+                                </div>
+                            </div>
+
+                            {/* Tiffin Box Charges */}
+                            <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1">
+                                    Tiffin Box Charges
+                                </label>
+                                <p className="text-xs text-gray-500 mb-3">
+                                    The customer picks one box at checkout and it is added on top of the plan price. Keep 0 to offer it free.
+                                </p>
+                                <div className="grid sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">Steel Box</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-base">₹</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder="0"
+                                                value={formData.steelBoxPrice}
+                                                onChange={(e) => setFormData({ ...formData, steelBoxPrice: e.target.value })}
+                                                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition font-semibold"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">Use &amp; Throw Box</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-base">₹</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder="0"
+                                                value={formData.disposableBoxPrice}
+                                                onChange={(e) => setFormData({ ...formData, disposableBoxPrice: e.target.value })}
+                                                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition font-semibold"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

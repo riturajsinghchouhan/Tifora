@@ -28,6 +28,17 @@ const tiffinPlanSchema = new mongoose.Schema(
             required: true,
             min: 0
         },
+        // Tiffin box charges, added on top of the plan price at purchase/renewal time
+        steelBoxPrice: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        disposableBoxPrice: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
         itemsDescription: {
             type: String,
             default: '',

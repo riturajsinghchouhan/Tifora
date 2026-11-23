@@ -86,7 +86,7 @@ export const createTiffinPlan = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized: Restaurant ID not found' });
         }
 
-        let { name, durationDays, mealType, price, itemsDescription, isVegetarian, image, items } = req.body;
+        let { name, durationDays, mealType, price, steelBoxPrice, disposableBoxPrice, itemsDescription, isVegetarian, image, items } = req.body;
 
         if (!name || !durationDays || !price) {
             return res.status(400).json({ success: false, message: 'Name, duration, and price are required' });
@@ -127,6 +127,8 @@ export const createTiffinPlan = async (req, res) => {
             durationDays: Number(durationDays),
             mealType: mealType || 'Morning',
             price: Number(price),
+            steelBoxPrice: Math.max(0, Number(steelBoxPrice) || 0),
+            disposableBoxPrice: Math.max(0, Number(disposableBoxPrice) || 0),
             itemsDescription: itemsDescription || '',
             image: image || '',
             items: parsedItems,
@@ -159,6 +161,13 @@ export const updateTiffinPlan = async (req, res) => {
         const { planId } = req.params;
 
         let updateData = { ...req.body };
+
+        // Box prices arrive as strings from FormData and may be left blank (= free)
+        for (const field of ['steelBoxPrice', 'disposableBoxPrice']) {
+            if (updateData[field] !== undefined) {
+                updateData[field] = Math.max(0, Number(updateData[field]) || 0);
+            }
+        }
 
         // Parse items if sent as string
         if (typeof updateData.items === 'string') {

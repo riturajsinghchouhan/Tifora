@@ -98,6 +98,24 @@ const tiffinSubscriptionSchema = new mongoose.Schema(
             required: true,
             min: 0
         },
+        // Tiffin box the customer picked for this purchase/renewal.
+        // Mandatory on new purchases (enforced in the controllers); legacy
+        // subscriptions created before box selection existed have none.
+        boxType: {
+            type: String,
+            enum: ['steel', 'disposable'],
+            default: undefined
+        },
+        boxCharge: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
+        planPrice: {
+            type: Number,
+            default: 0,
+            min: 0
+        },
         paymentMethod: {
             type: String,
             enum: ['cod', 'online', 'wallet'],

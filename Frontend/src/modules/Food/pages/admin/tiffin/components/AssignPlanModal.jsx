@@ -15,6 +15,7 @@ export default function AssignPlanModal({ plans = [], onClose, onAssigned }) {
     const [planId, setPlanId] = useState('');
     const [startDate, setStartDate] = useState(todayStr());
     const [paymentMethod, setPaymentMethod] = useState('online');
+    const [boxType, setBoxType] = useState('');
     const [paymentStatus, setPaymentStatus] = useState('paid');
     const [address, setAddress] = useState({ street: '', city: '', state: '' });
     const [submitting, setSubmitting] = useState(false);
@@ -22,6 +23,14 @@ export default function AssignPlanModal({ plans = [], onClose, onAssigned }) {
 
     const selectedPlan = plans.find((p) => p._id === planId);
     const hasSavedAddress = (customer?.addresses || []).length > 0;
+
+    // Box choice is mandatory and its charge is added to the plan price
+    const boxOptions = [
+        { value: 'steel', label: 'Steel Box', price: Number(selectedPlan?.steelBoxPrice) || 0 },
+        { value: 'disposable', label: 'Use & Throw', price: Number(selectedPlan?.disposableBoxPrice) || 0 }
+    ];
+    const boxCharge = boxOptions.find((opt) => opt.value === boxType)?.price || 0;
+    const totalAmount = selectedPlan ? (Number(selectedPlan.price) || 0) + boxCharge : null;
 
     const handleLookup = async (e) => {
         e?.preventDefault();
@@ -45,12 +54,17 @@ export default function AssignPlanModal({ plans = [], onClose, onAssigned }) {
             setError('Select a customer and a plan');
             return;
         }
+        if (!boxType) {
+            setError('Select a tiffin box type');
+            return;
+        }
         setSubmitting(true);
         try {
             const body = {
                 userId: customer._id,
                 planId,
                 startDate,
+                boxType,
                 paymentMethod,
                 paymentStatus: paymentMethod === 'cod' ? paymentStatus : 'paid'
             };
@@ -140,7 +154,37 @@ export default function AssignPlanModal({ plans = [], onClose, onAssigned }) {
                             </div>
                             <div>
                                 <label className="text-xs font-bold text-gray-700 block mb-1">Amount</label>
-                                <div className={`${inputCls} bg-gray-50`}>₹{selectedPlan?.price ?? '—'}</div>
+                                <div className={`${inputCls} bg-gray-50`}>
+                                    {totalAmount === null ? '—' : `₹${totalAmount}`}
+                                    {boxCharge > 0 && (
+                                        <span className="text-[10px] font-normal text-gray-500"> (incl. ₹{boxCharge} box)</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-gray-700 block mb-1">
+                                Tiffin Box <span className="text-[#be123c]">*</span>
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {boxOptions.map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setBoxType(opt.value)}
+                                        className={`text-xs font-bold py-2.5 rounded-xl border transition ${
+                                            boxType === opt.value
+                                                ? 'bg-rose-50 border-[#be123c] text-[#be123c]'
+                                                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                        <span className="block text-[10px] font-semibold text-gray-400">
+                                            {opt.price > 0 ? `+₹${opt.price}` : 'Free'}
+                                        </span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
 

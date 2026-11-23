@@ -32,8 +32,10 @@ import {
     CreditCard,
     Banknote,
     BellRing,
-    UserPlus
+    UserPlus,
+    Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import api from '@food/api';
 import CodRequestsSection from './components/CodRequestsSection';
 import AdminDeliveryHistoryTab from './components/AdminDeliveryHistoryTab';
@@ -93,6 +95,8 @@ export default function AdminTiffinManagement({ embedded = false }) {
         durationDays: 30,
         mealType: 'Both',
         price: 4500,
+        steelBoxPrice: 0,
+        disposableBoxPrice: 0,
         itemsDescription: '',
         image: '/food/tiffin/tiffin_box_default.png',
         isVegetarian: true,
@@ -285,6 +289,8 @@ export default function AdminTiffinManagement({ embedded = false }) {
                 durationDays: plan.durationDays || 30,
                 mealType: plan.mealType || 'Both',
                 price: plan.price || 0,
+                steelBoxPrice: plan.steelBoxPrice || 0,
+                disposableBoxPrice: plan.disposableBoxPrice || 0,
                 itemsDescription: plan.itemsDescription || '',
                 image: plan.image || '/food/tiffin/tiffin_box_default.png',
                 imageFile: null,
@@ -299,6 +305,8 @@ export default function AdminTiffinManagement({ embedded = false }) {
                 durationDays: 30,
                 mealType: 'Both',
                 price: 4500,
+                steelBoxPrice: 0,
+                disposableBoxPrice: 0,
                 itemsDescription: '4 Fresh Rotis, Dal, Sabzi, Rice & Salad',
                 image: '/food/tiffin/tiffin_box_default.png',
                 imageFile: null,
@@ -318,6 +326,8 @@ export default function AdminTiffinManagement({ embedded = false }) {
             submitData.append('durationDays', Number(planForm.durationDays));
             submitData.append('mealType', planForm.mealType);
             submitData.append('price', Number(planForm.price));
+            submitData.append('steelBoxPrice', Number(planForm.steelBoxPrice) || 0);
+            submitData.append('disposableBoxPrice', Number(planForm.disposableBoxPrice) || 0);
             submitData.append('itemsDescription', planForm.itemsDescription);
             submitData.append('isVegetarian', Boolean(planForm.isVegetarian));
             submitData.append('isActive', Boolean(planForm.isActive));
@@ -433,7 +443,74 @@ export default function AdminTiffinManagement({ embedded = false }) {
         return matchesStatus && matchesPayment && matchesSearch;
     });
 
-    const pendingCodRequests = subscriptions.filter(sub => 
+    // Active vs inactive plan counts across all customer subscriptions
+    const activeSubsCount = subscriptions.filter(sub => sub.status === 'active').length;
+    const inactiveSubsCount = subscriptions.length - activeSubsCount;
+
+    const joinAddressParts = (parts) =>
+        parts.map(part => (part || '').toString().trim()).filter(Boolean).join(', ');
+
+    const formatAddress = (addr) => {
+        if (!addr) return '';
+        return joinAddressParts([addr.street, addr.area, addr.landmark, addr.city, addr.state, addr.zipCode]);
+    };
+
+    // Kitchens keep their address either as flat fields or inside `location`
+    const formatKitchenAddress = (restaurant) => {
+        if (!restaurant) return '';
+        const loc = restaurant.location || {};
+        return joinAddressParts([
+            restaurant.addressLine1 || loc.addressLine1 || loc.address,
+            restaurant.addressLine2 || loc.addressLine2,
+            restaurant.area || loc.area,
+            restaurant.landmark || loc.landmark,
+            restaurant.city || loc.city,
+            restaurant.state || loc.state,
+            restaurant.pincode || loc.pincode
+        ]);
+    };
+
+    const handleExportSubscriptions = () => {
+        const rows = filteredSubscriptions.map(sub => ({
+            'Subscription ID': sub._id || '',
+            'Customer Name': sub.userId?.name || '',
+            'Customer Phone': sub.userId?.phone || '',
+            'Customer Email': sub.userId?.email || '',
+            'Delivery Address': formatAddress(sub.deliveryAddress),
+            'Address Label': sub.deliveryAddress?.label || '',
+            'Address Phone': sub.deliveryAddress?.phone || '',
+            'Zone': sub.deliveryAddress?.zone || '',
+            'Kitchen / Store': sub.restaurantId?.restaurantName || sub.restaurantId?.name || '',
+            'Kitchen Phone': sub.restaurantId?.phone || '',
+            'Kitchen Address': formatKitchenAddress(sub.restaurantId),
+            'Plan': sub.planId?.name || '',
+            'Duration (Days)': sub.planId?.durationDays ?? '',
+            'Meal Slot': sub.planId?.mealType || '',
+            'Tiffin Box': sub.boxType === 'steel' ? 'Steel Box' : sub.boxType === 'disposable' ? 'Use & Throw' : '',
+            'Box Charge': sub.boxCharge ?? '',
+            'Amount Paid': sub.amountPaid ?? '',
+            'Payment Mode': getPaymentMethod(sub),
+            'Payment Status': sub.paymentStatus || '',
+            'Status': sub.status || '',
+            'Start Date': sub.startDate ? new Date(sub.startDate).toLocaleDateString('en-IN') : '',
+            'End Date': sub.endDate ? new Date(sub.endDate).toLocaleDateString('en-IN') : ''
+        }));
+
+        if (rows.length === 0) {
+            alert('There are no subscriptions to export for the current filters.');
+            return;
+        }
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        ws['!cols'] = Object.keys(rows[0]).map(key => ({
+            wch: Math.min(40, Math.max(14, key.length + 2))
+        }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Subscriptions');
+        XLSX.writeFile(wb, `tifora_tiffin_subscriptions_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
+    const pendingCodRequests = subscriptions.filter(sub =>
         getPaymentMethod(sub) === 'cod' && sub.status === 'pending'
     );
 
@@ -809,6 +886,36 @@ export default function AdminTiffinManagement({ embedded = false }) {
             {/* TAB 3: CUSTOMER SUBSCRIPTIONS */}
             {/* ========================================================================= */}
             {activeTab === 'subscriptions' && (
+                <div className="space-y-5">
+                    {/* Active / Inactive plan summary */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Total Active Plans</p>
+                                <p className="text-2xl sm:text-3xl font-black text-green-600 mt-1">{activeSubsCount}</p>
+                                <span className="text-[11px] text-gray-400 font-semibold mt-1 inline-block">
+                                    Currently running subscriptions
+                                </span>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center border border-green-100">
+                                <PlayCircle className="w-6 h-6" />
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Total Inactive Plans</p>
+                                <p className="text-2xl sm:text-3xl font-black text-gray-500 mt-1">{inactiveSubsCount}</p>
+                                <span className="text-[11px] text-gray-400 font-semibold mt-1 inline-block">
+                                    Paused, pending, cancelled or expired
+                                </span>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-500 flex items-center justify-center border border-gray-200">
+                                <PauseCircle className="w-6 h-6" />
+                            </div>
+                        </div>
+                    </div>
+
                 <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden space-y-4 p-5">
                     {/* Filters & Search */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -830,6 +937,14 @@ export default function AdminTiffinManagement({ embedded = false }) {
                             >
                                 <UserPlus className="w-4 h-4" />
                                 Assign Plan to Customer
+                            </button>
+                            <button
+                                onClick={handleExportSubscriptions}
+                                className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl hover:bg-emerald-100 active:scale-95 transition"
+                                title="Download customer, address and kitchen details as Excel"
+                            >
+                                <Download className="w-4 h-4" />
+                                Download Excel
                             </button>
                             <div className="flex items-center gap-1.5">
                                 <span className="text-xs font-bold text-gray-500">Status:</span>
@@ -941,6 +1056,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
                             </tbody>
                         </table>
                     </div>
+                </div>
                 </div>
             )}
 
@@ -1219,6 +1335,35 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                         <option value="veg">🟢 Pure Vegetarian</option>
                                         <option value="non-veg">🔴 Non-Vegetarian</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-gray-50 border border-gray-200">
+                                <p className="text-xs font-bold text-gray-700 mb-1">Tiffin Box Charges (₹)</p>
+                                <p className="text-[10px] font-medium text-gray-400 mb-2">
+                                    Customer picks one at checkout and it is added on top of the plan price. Keep 0 to offer it free.
+                                </p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[11px] font-bold text-gray-600 block mb-1">Steel Box</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={planForm.steelBoxPrice}
+                                            onChange={(e) => setPlanForm({ ...planForm, steelBoxPrice: e.target.value })}
+                                            className="w-full text-xs font-semibold p-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[11px] font-bold text-gray-600 block mb-1">Use &amp; Throw Box</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={planForm.disposableBoxPrice}
+                                            onChange={(e) => setPlanForm({ ...planForm, disposableBoxPrice: e.target.value })}
+                                            className="w-full text-xs font-semibold p-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 

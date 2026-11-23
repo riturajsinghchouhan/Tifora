@@ -25,6 +25,16 @@ export default function TiffinCheckout() {
 
     const [startDate, setStartDate] = useState(minDateStr);
     const [paymentMethod, setPaymentMethod] = useState('razorpay');
+
+    // Tiffin box choice is mandatory; its charge is added on top of the plan price
+    const [boxType, setBoxType] = useState('');
+    const planPrice = Number(plan.totalPrice ?? plan.price ?? 0);
+    const boxOptions = [
+        { value: 'steel', label: 'Steel Box', hint: 'Reusable, collected back after delivery', price: Number(plan.steelBoxPrice) || 0 },
+        { value: 'disposable', label: 'Use & Throw Box', hint: 'Disposable box, nothing to return', price: Number(plan.disposableBoxPrice) || 0 }
+    ];
+    const boxCharge = boxOptions.find((opt) => opt.value === boxType)?.price || 0;
+    const payableAmount = planPrice + boxCharge;
     const { userProfile, getDefaultAddress, addresses, addAddress } = useProfile();
     const getAddressId = (addr) => addr?.id || addr?._id || "";
     
@@ -67,8 +77,13 @@ export default function TiffinCheckout() {
             return;
         }
 
-        if (paymentMethod === 'wallet' && walletBalance < plan.totalPrice) {
-            alert(`Insufficient wallet balance. Available: ₹${walletBalance}, Required: ₹${plan.totalPrice}`);
+        if (!boxType) {
+            alert('Please select a tiffin box type to continue');
+            return;
+        }
+
+        if (paymentMethod === 'wallet' && walletBalance < payableAmount) {
+            alert(`Insufficient wallet balance. Available: ₹${walletBalance}, Required: ₹${payableAmount}`);
             return;
         }
 
@@ -79,7 +94,8 @@ export default function TiffinCheckout() {
                 restaurantId: plan.restaurantId || '651234567890123456789012',
                 startDate,
                 deliveryAddress: selectedAddress,
-                amountPaid: plan.totalPrice,
+                amountPaid: payableAmount,
+                boxType,
                 paymentMethod
             };
 
@@ -188,7 +204,7 @@ export default function TiffinCheckout() {
                                 <p className="text-xs text-gray-500 mt-0.5">{plan.restaurantName || 'Featured Kitchen'}</p>
                             </div>
                             <div className="text-right">
-                                <span className="text-xl font-black text-gray-900">₹{plan.totalPrice}</span>
+                                <span className="text-xl font-black text-gray-900">₹{payableAmount}</span>
                                 <p className="text-[10px] text-gray-500">for {plan.durationDays} Days</p>
                             </div>
                         </div>
@@ -329,7 +345,7 @@ export default function TiffinCheckout() {
                                             <div>
                                                 <p className="text-xs font-bold text-gray-900">Tifora Wallet</p>
                                                 <p className="text-[10px] text-gray-500">
-                                                    Available Balance: <strong className={walletBalance < plan.totalPrice ? 'text-red-500' : 'text-green-600'}>₹{walletBalance}</strong>
+                                                    Available Balance: <strong className={walletBalance < payableAmount ? 'text-red-500' : 'text-green-600'}>₹{walletBalance}</strong>
                                                 </p>
                                             </div>
                                         </div>
@@ -357,6 +373,43 @@ export default function TiffinCheckout() {
                         </div>
                     </div>
 
+                    {/* Tiffin Box Selection (mandatory) */}
+                    <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+                        <div className="flex items-start justify-between gap-3 mb-1">
+                            <h3 className="font-bold text-gray-900 text-sm">Choose your tiffin box</h3>
+                            <span className="text-[10px] font-bold text-[#be123c] bg-[#be123c]/10 px-2 py-0.5 rounded-lg shrink-0">Required</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-3">Box charge is added on top of the plan price, once per plan purchase.</p>
+                        <div className="space-y-2.5">
+                            {boxOptions.map((opt) => (
+                                <label
+                                    key={opt.value}
+                                    className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
+                                        boxType === opt.value
+                                            ? 'border-[#0cb884] bg-[#0cb884]/5'
+                                            : 'border-gray-200 hover:border-gray-300'
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="boxType"
+                                        value={opt.value}
+                                        checked={boxType === opt.value}
+                                        onChange={() => setBoxType(opt.value)}
+                                        className="w-4 h-4 accent-[#0cb884]"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-gray-900">{opt.label}</p>
+                                        <p className="text-[11px] text-gray-500">{opt.hint}</p>
+                                    </div>
+                                    <span className={`text-sm font-black shrink-0 ${opt.price > 0 ? 'text-gray-900' : 'text-green-600'}`}>
+                                        {opt.price > 0 ? `+₹${opt.price}` : 'FREE'}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Pricing Breakdown */}
                     <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-2 text-xs">
                         <h3 className="font-bold text-gray-900 mb-2">Price Breakdown</h3>
@@ -372,9 +425,30 @@ export default function TiffinCheckout() {
                             <span>Daily Delivery Fee</span>
                             <span className="font-bold text-green-600">FREE</span>
                         </div>
+                        <div className="flex justify-between text-gray-600">
+                            <span>Plan Price</span>
+                            <span className="font-bold text-gray-900">₹{planPrice}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-600">
+                            <span>
+                                Tiffin Box
+                                {boxType && (
+                                    <span className="text-gray-400">
+                                        {' '}({boxOptions.find((opt) => opt.value === boxType)?.label})
+                                    </span>
+                                )}
+                            </span>
+                            {boxType ? (
+                                <span className={`font-bold ${boxCharge > 0 ? 'text-gray-900' : 'text-green-600'}`}>
+                                    {boxCharge > 0 ? `₹${boxCharge}` : 'FREE'}
+                                </span>
+                            ) : (
+                                <span className="font-bold text-[#be123c]">Not selected</span>
+                            )}
+                        </div>
                         <div className="pt-2 border-t border-gray-100 flex justify-between text-sm font-black text-gray-900">
                             <span>Total Upfront Amount</span>
-                            <span className="text-[#0cb884]">₹{plan.totalPrice}</span>
+                            <span className="text-[#0cb884]">₹{payableAmount}</span>
                         </div>
                     </div>
                 </div>
@@ -385,10 +459,14 @@ export default function TiffinCheckout() {
                 <div className="max-w-lg mx-auto">
                     <button
                         onClick={handleConfirmPayment}
-                        disabled={submitting}
+                        disabled={submitting || !boxType}
                         className="w-full bg-gradient-to-r from-[#088c64] via-[#0cb884] to-[#20d49f] text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-[#0cb884]/25 hover:opacity-95 active:scale-95 transition flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        {submitting ? 'Processing...' : `Pay ₹${plan.totalPrice} & Activate Plan`}
+                        {submitting
+                            ? 'Processing...'
+                            : !boxType
+                                ? 'Select a tiffin box to continue'
+                                : `Pay ₹${payableAmount} & Activate Plan`}
                     </button>
                 </div>
             </div>

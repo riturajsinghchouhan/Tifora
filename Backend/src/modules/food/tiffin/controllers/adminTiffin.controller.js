@@ -10,6 +10,7 @@ import { FoodNotification } from '../../../../core/notifications/models/notifica
 import { notifyOwnersSafely } from '../../../../core/notifications/firebase.service.js';
 import { ensureTodayDeliveriesSync, generateDailyDeliveries, ensureSubscriptionDeliveriesForDate } from '../scripts/tiffinScheduler.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
+import { resolveBoxCharge, resolvePlanTotal } from '../helpers/tiffinBox.helper.js';
 import mongoose from 'mongoose';
 
 /**
@@ -185,7 +186,7 @@ export const getAllSubscriptions = async (req, res) => {
 
         const subscriptions = await TiffinSubscription.find(query)
             .populate('userId', 'name phone email')
-            .populate('restaurantId', 'restaurantName name address phone logo')
+            .populate('restaurantId', 'restaurantName name phone logo addressLine1 addressLine2 area city state pincode landmark location')
             .populate('planId', 'name durationDays mealType price isVegetarian image')
             .sort({ createdAt: -1 });
 
@@ -235,6 +236,8 @@ export const adminCreatePlan = async (req, res) => {
             durationDays,
             mealType,
             price,
+            steelBoxPrice,
+            disposableBoxPrice,
             itemsDescription,
             image,
             items,
@@ -287,6 +290,8 @@ export const adminCreatePlan = async (req, res) => {
             durationDays: Number(durationDays) || 30,
             mealType: mealType || 'Both',
             price: Number(price) || 0,
+            steelBoxPrice: Math.max(0, Number(steelBoxPrice) || 0),
+            disposableBoxPrice: Math.max(0, Number(disposableBoxPrice) || 0),
             itemsDescription: itemsDescription || '',
             image: image || '/food/tiffin/tiffin_box_default.png',
             items: parsedItems,
@@ -311,6 +316,13 @@ export const adminUpdatePlan = async (req, res) => {
     try {
         const { planId } = req.params;
         let updates = req.body;
+
+        // Box prices arrive as strings from FormData and may be left blank (= free)
+        for (const field of ['steelBoxPrice', 'disposableBoxPrice']) {
+            if (updates[field] !== undefined) {
+                updates[field] = Math.max(0, Number(updates[field]) || 0);
+            }
+        }
 
         // Parse items if sent as string
         if (typeof updates.items === 'string') {
@@ -1204,7 +1216,7 @@ export const lookupUserByPhone = async (req, res) => {
  */
 export const adminAssignSubscription = async (req, res) => {
     try {
-        const { userId, planId, startDate, paymentMethod, paymentStatus, deliveryAddress } = req.body;
+        const { userId, planId, startDate, paymentMethod, paymentStatus, deliveryAddress, boxType } = req.body;
 
         if (!mongoose.Types.ObjectId.isValid(String(userId || '')) || !mongoose.Types.ObjectId.isValid(String(planId || ''))) {
             return res.status(400).json({ success: false, message: 'Valid customer and plan are required' });
@@ -1216,6 +1228,10 @@ export const adminAssignSubscription = async (req, res) => {
         const [user, plan] = await Promise.all([FoodUser.findById(userId), TiffinPlan.findById(planId)]);
         if (!user) return res.status(404).json({ success: false, message: 'Customer not found' });
         if (!plan || !plan.isActive) return res.status(400).json({ success: false, message: 'Invalid or inactive plan' });
+
+        const box = resolveBoxCharge(plan, boxType);
+        if (box.error) return res.status(400).json({ success: false, message: box.error });
+        const planTotal = resolvePlanTotal(plan, box.boxCharge);
 
         let address = deliveryAddress && deliveryAddress.street ? deliveryAddress : null;
         if (!address) {
@@ -1253,7 +1269,10 @@ export const adminAssignSubscription = async (req, res) => {
             status: 'active',
             paymentMethod,
             paymentStatus: finalPaymentStatus,
-            amountPaid: Number(plan.price || plan.totalPrice || 0),
+            amountPaid: planTotal.total,
+            boxType: box.boxType,
+            boxCharge: box.boxCharge,
+            planPrice: planTotal.planPrice,
             assignedByAdmin: true
         });
 

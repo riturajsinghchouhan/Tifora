@@ -37,6 +37,7 @@ export const getPlanById = async (req, res) => {
 };
 
 import { createRazorpayOrder, getRazorpayKeyId, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
+import { resolveBoxCharge, resolvePlanTotal } from '../helpers/tiffinBox.helper.js';
 import { getUserWallet, deductWalletBalance } from '../../user/services/userWallet.service.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 
@@ -62,18 +63,25 @@ export const purchaseSubscription = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized: User not authenticated' });
         }
 
-        const { planId, startDate, deliveryAddress, paymentId, paymentMethod } = req.body;
+        const { planId, startDate, deliveryAddress, paymentId, paymentMethod, boxType } = req.body;
 
         const plan = await TiffinPlan.findById(planId);
         if (!plan || !plan.isActive) {
             return res.status(400).json({ success: false, message: 'Invalid or inactive Tiffin Plan' });
         }
 
+        // Box selection is mandatory and always priced from the plan, not the client
+        const box = resolveBoxCharge(plan, boxType);
+        if (box.error) {
+            return res.status(400).json({ success: false, message: box.error });
+        }
+
         const start = new Date(startDate || Date.now());
         const end = new Date(start);
         end.setDate(end.getDate() + plan.durationDays);
 
-        const amountToPay = Number(plan.price || plan.totalPrice || 0);
+        const { planPrice, total: amountToPay } = resolvePlanTotal(plan, box.boxCharge);
+        const boxFields = { boxType: box.boxType, boxCharge: box.boxCharge, planPrice };
         const normalizedAddress = normalizeAddressCoords(deliveryAddress);
 
         // If Razorpay, create order and return key + order info to frontend
@@ -93,6 +101,7 @@ export const purchaseSubscription = async (req, res) => {
                 status: 'pending',
                 paymentMethod: 'online',
                 amountPaid: amountToPay,
+                ...boxFields,
                 razorpayOrderId: rzOrder.id
             });
             await pendingSubscription.save();
@@ -135,7 +144,8 @@ export const purchaseSubscription = async (req, res) => {
             paymentStatus: isCash ? 'pending' : 'paid',
             status: isCash ? 'pending' : 'active',
             paymentMethod: normalizedPaymentMethod,
-            amountPaid: amountToPay
+            amountPaid: amountToPay,
+            ...boxFields
         });
 
         await newSubscription.save();
