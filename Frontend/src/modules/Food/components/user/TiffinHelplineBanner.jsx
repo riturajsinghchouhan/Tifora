@@ -1,0 +1,45 @@
+import React from 'react';
+import { Phone, Headphones } from 'lucide-react';
+
+export const TIFFIN_HELPLINE_NUMBERS = ['8770800718', '8878873202'];
+
+/**
+ * Highlighted helpline strip shown on the tiffin checkout and subscription pages
+ * so customers always have a number to call about their meal plan.
+ */
+export default function TiffinHelplineBanner({ className = '' }) {
+    return (
+        <div
+            className={`rounded-2xl border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-800 p-3.5 sm:p-4 ${className}`}
+        >
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                        <Headphones className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                            Helpline Number
+                        </p>
+                        <p className="text-[11px] font-medium text-emerald-700/80 dark:text-emerald-400/80">
+                            Any issue with your tiffin? Call us anytime.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+                    {TIFFIN_HELPLINE_NUMBERS.map((number) => (
+                        <a
+                            key={number}
+                            href={`tel:+91${number}`}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-700 text-sm font-black text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100 dark:hover:bg-emerald-900/70 active:scale-95 transition"
+                        >
+                            <Phone className="w-3.5 h-3.5" />
+                            {number}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+}

@@ -5,6 +5,7 @@ import api, { userAPI } from '@food/api';
 import { initRazorpayPayment } from '@food/utils/razorpay';
 import { useProfile } from '@food/context/ProfileContext';
 import TiffinAddressModal from './components/TiffinAddressModal';
+import TiffinHelplineBanner from '@food/components/user/TiffinHelplineBanner';
 
 export default function TiffinCheckout() {
     const location = useLocation();
@@ -193,6 +194,9 @@ export default function TiffinCheckout() {
                 </div>
 
                 <div className="p-4 sm:p-6 space-y-4 max-w-lg mx-auto">
+                    {/* Support Helpline */}
+                    <TiffinHelplineBanner />
+
                     {/* Plan Summary Card */}
                     <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
                         <div className="flex justify-between items-start">

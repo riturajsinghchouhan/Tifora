@@ -13,6 +13,7 @@ import api from '@food/api';
 import { toast } from 'sonner';
 import { loadGoogleMaps, isGoogleMapsLoaded } from '@food/utils/googleMapsLoader.js';
 import { getGoogleMapsApiKey } from '@food/utils/googleMapsApiKey.js';
+import TiffinHelplineBanner from '@food/components/user/TiffinHelplineBanner';
 
 export default function MySubscriptions() {
     const navigate = useNavigate();
@@ -910,6 +911,9 @@ export default function MySubscriptions() {
             </nav>
 
             <main className="max-w-5xl mx-auto px-4 sm:px-8 pt-6 space-y-6">
+
+                {/* Support Helpline */}
+                <TiffinHelplineBanner />
 
                 {/* Subscriptions Tab Pills (If user has multiple subscriptions) */}
                 {subscriptions.length > 1 && (
