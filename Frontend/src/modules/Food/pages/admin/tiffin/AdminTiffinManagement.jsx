@@ -428,9 +428,21 @@ export default function AdminTiffinManagement({ embedded = false }) {
         );
     };
 
+    // Active vs inactive plan counts across all customer subscriptions
+    const activeSubsCount = subscriptions.filter(sub => sub.status === 'active').length;
+    const inactiveSubsCount = subscriptions.length - activeSubsCount;
+
+    // The three subscription tabs share one table, scoped by status
+    const isSubscriptionTab = ['subscriptions', 'active-plans', 'inactive-plans'].includes(activeTab);
+    const scopedSubscriptions = activeTab === 'active-plans'
+        ? subscriptions.filter(sub => sub.status === 'active')
+        : activeTab === 'inactive-plans'
+            ? subscriptions.filter(sub => sub.status !== 'active')
+            : subscriptions;
+
     // Filtered lists
-    const filteredSubscriptions = subscriptions.filter(sub => {
-        const matchesStatus = subFilterStatus === 'all' || sub.status === subFilterStatus;
+    const filteredSubscriptions = scopedSubscriptions.filter(sub => {
+        const matchesStatus = activeTab !== 'subscriptions' || subFilterStatus === 'all' || sub.status === subFilterStatus;
         const currentMethod = getPaymentMethod(sub);
         const matchesPayment = subFilterPayment === 'all' || currentMethod === subFilterPayment;
         const q = subSearchQuery.toLowerCase();
@@ -442,10 +454,6 @@ export default function AdminTiffinManagement({ embedded = false }) {
             sub.restaurantId?.name?.toLowerCase().includes(q);
         return matchesStatus && matchesPayment && matchesSearch;
     });
-
-    // Active vs inactive plan counts across all customer subscriptions
-    const activeSubsCount = subscriptions.filter(sub => sub.status === 'active').length;
-    const inactiveSubsCount = subscriptions.length - activeSubsCount;
 
     const joinAddressParts = (parts) =>
         parts.map(part => (part || '').toString().trim()).filter(Boolean).join(', ');
@@ -506,8 +514,13 @@ export default function AdminTiffinManagement({ embedded = false }) {
             wch: Math.min(40, Math.max(14, key.length + 2))
         }));
         const wb = XLSX.utils.book_new();
+        const scopeName = activeTab === 'active-plans'
+            ? 'active_plans'
+            : activeTab === 'inactive-plans'
+                ? 'inactive_plans'
+                : 'subscriptions';
         XLSX.utils.book_append_sheet(wb, ws, 'Subscriptions');
-        XLSX.writeFile(wb, `tifora_tiffin_subscriptions_${new Date().toISOString().split('T')[0]}.xlsx`);
+        XLSX.writeFile(wb, `tifora_tiffin_${scopeName}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const pendingCodRequests = subscriptions.filter(sub =>
@@ -582,12 +595,14 @@ export default function AdminTiffinManagement({ embedded = false }) {
             )}
 
             {/* Navigation Tabs */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-gray-200 scrollbar-none">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 pb-3 border-b border-gray-200">
                 {[
                     { id: 'overview', label: 'Overview & Stats', icon: LayoutDashboard },
                     { id: 'plans', label: 'Subscription Plans', count: plans.length, icon: Package },
                     { id: 'cod-requests', label: 'COD Requests', count: pendingCodRequests.length, icon: Clock, isAlert: pendingCodRequests.length > 0 },
                     { id: 'subscriptions', label: 'Customer Subscriptions', count: subscriptions.length, icon: Users },
+                    { id: 'active-plans', label: 'Total Active Plans', count: activeSubsCount, icon: PlayCircle },
+                    { id: 'inactive-plans', label: 'Total Inactive Plans', count: inactiveSubsCount, icon: PauseCircle },
                     { id: 'renewals', label: 'Renewal Reminders', icon: BellRing },
                     { id: 'deliveries', label: 'Daily Meal Dispatch', count: deliveries.length, icon: Truck },
                     { id: 'history', label: 'Delivery History', icon: Calendar },
@@ -600,7 +615,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
                         <button
                             key={tab.id}
                             onClick={() => setTab(tab.id)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all ${
+                            className={`w-full min-w-0 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-[11px] sm:text-xs transition-all ${
                                 isActive
                                     ? 'bg-[#be123c] text-white shadow-md shadow-[#be123c]/20'
                                     : tab.isAlert
@@ -608,10 +623,10 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 bg-white border border-gray-200'
                             }`}
                         >
-                            <Icon className={`w-4 h-4 ${tab.isAlert && !isActive ? 'text-amber-600' : ''}`} />
-                            <span>{tab.label}</span>
+                            <Icon className={`w-4 h-4 shrink-0 ${tab.isAlert && !isActive ? 'text-amber-600' : ''}`} />
+                            <span className="truncate">{tab.label}</span>
                             {tab.count !== undefined && (
-                                <span className={`text-[11px] px-2 py-0.5 rounded-full font-black ${
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black shrink-0 ${
                                     isActive
                                         ? 'bg-white/20 text-white'
                                         : tab.isAlert
@@ -885,37 +900,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
             {/* ========================================================================= */}
             {/* TAB 3: CUSTOMER SUBSCRIPTIONS */}
             {/* ========================================================================= */}
-            {activeTab === 'subscriptions' && (
-                <div className="space-y-5">
-                    {/* Active / Inactive plan summary */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Total Active Plans</p>
-                                <p className="text-2xl sm:text-3xl font-black text-green-600 mt-1">{activeSubsCount}</p>
-                                <span className="text-[11px] text-gray-400 font-semibold mt-1 inline-block">
-                                    Currently running subscriptions
-                                </span>
-                            </div>
-                            <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center border border-green-100">
-                                <PlayCircle className="w-6 h-6" />
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Total Inactive Plans</p>
-                                <p className="text-2xl sm:text-3xl font-black text-gray-500 mt-1">{inactiveSubsCount}</p>
-                                <span className="text-[11px] text-gray-400 font-semibold mt-1 inline-block">
-                                    Paused, pending, cancelled or expired
-                                </span>
-                            </div>
-                            <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-500 flex items-center justify-center border border-gray-200">
-                                <PauseCircle className="w-6 h-6" />
-                            </div>
-                        </div>
-                    </div>
-
+            {isSubscriptionTab && (
                 <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden space-y-4 p-5">
                     {/* Filters & Search */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -946,20 +931,22 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                 <Download className="w-4 h-4" />
                                 Download Excel
                             </button>
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-gray-500">Status:</span>
-                                <select
-                                    value={subFilterStatus}
-                                    onChange={(e) => setSubFilterStatus(e.target.value)}
-                                    className="text-xs font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 outline-none"
-                                >
-                                    <option value="all">All Status</option>
-                                    <option value="active">Active</option>
-                                    <option value="paused">Paused</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="cancelled">Cancelled</option>
-                                </select>
-                            </div>
+                            {activeTab === 'subscriptions' && (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-bold text-gray-500">Status:</span>
+                                    <select
+                                        value={subFilterStatus}
+                                        onChange={(e) => setSubFilterStatus(e.target.value)}
+                                        className="text-xs font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 outline-none"
+                                    >
+                                        <option value="all">All Status</option>
+                                        <option value="active">Active</option>
+                                        <option value="paused">Paused</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                            )}
 
                             <div className="flex items-center gap-1.5">
                                 <span className="text-xs font-bold text-gray-500">Payment:</span>
@@ -1056,7 +1043,6 @@ export default function AdminTiffinManagement({ embedded = false }) {
                             </tbody>
                         </table>
                     </div>
-                </div>
                 </div>
             )}
 
