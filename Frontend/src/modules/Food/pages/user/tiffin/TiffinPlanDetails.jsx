@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock, Calendar, ShieldCheck, UtensilsCrossed } from 'lucide-react';
 import api from '@food/api';
+import { getMaxSkipDays } from '@food/utils/tiffinPause';
 
 const DEFAULT_TIFFIN_ITEMS = [
     {
@@ -88,6 +89,7 @@ export default function TiffinPlanDetails() {
     const selectedDuration = plan.durationDays || 30;
     const selectedTiming = plan.mealType || 'Both';
     const totalPrice = plan.price || 0;
+    const maxSkipDays = getMaxSkipDays(plan);
 
     useEffect(() => {
         if (id) {
@@ -304,7 +306,10 @@ export default function TiffinPlanDetails() {
                     {/* Assurance Card */}
                     <div className="flex items-center gap-3 p-4 bg-green-50 rounded-2xl border border-green-200 text-green-900 text-xs">
                         <ShieldCheck className="w-5 h-5 text-green-600 shrink-0" />
-                        <span><strong>Pause anytime</strong> with 1-click in your account if you go out of town. Unused meals stay credited.</span>
+                        <span>
+                            <strong>Pause up to {maxSkipDays} {maxSkipDays === 1 ? 'day' : 'days'}</strong> on this {selectedDuration}-day plan
+                            with 1-click in your account if you go out of town. Every paused day extends your plan by a day, so no meal is wasted.
+                        </span>
                     </div>
                 </div>
             </div>

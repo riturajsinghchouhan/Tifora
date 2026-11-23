@@ -6,6 +6,8 @@ import { initRazorpayPayment } from '@food/utils/razorpay';
 import { useProfile } from '@food/context/ProfileContext';
 import TiffinAddressModal from './components/TiffinAddressModal';
 import TiffinHelplineBanner from '@food/components/user/TiffinHelplineBanner';
+import TiffinPlanTerms from './components/TiffinPlanTerms';
+import { getMaxSkipDays } from '@food/utils/tiffinPause';
 
 export default function TiffinCheckout() {
     const location = useLocation();
@@ -455,6 +457,13 @@ export default function TiffinCheckout() {
                             <span className="text-[#0cb884]">₹{payableAmount}</span>
                         </div>
                     </div>
+
+                    {/* Plan Policies */}
+                    <TiffinPlanTerms
+                        durationDays={plan.durationDays}
+                        maxPauseDays={getMaxSkipDays(plan)}
+                        steelBoxPrice={boxType === 'steel' ? boxCharge : plan.steelBoxPrice}
+                    />
                 </div>
             </div>
 

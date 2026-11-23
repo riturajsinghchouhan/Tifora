@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import api from '@food/api';
 import { toast } from 'sonner';
+import { suggestMaxPauseDays } from '@food/utils/tiffinPause';
 
 const DURATION_PRESETS = [
     { label: '7 Days (Weekly)', days: 7 },
@@ -51,6 +52,7 @@ export default function TiffinSettings() {
         durationDays: 30,
         mealType: 'Morning',
         price: '',
+        maxPauseDays: suggestMaxPauseDays(30),
         steelBoxPrice: 0,
         disposableBoxPrice: 0,
         itemsDescription: '',
@@ -94,6 +96,7 @@ export default function TiffinSettings() {
             durationDays: 30,
             mealType: 'Morning',
             price: '',
+            maxPauseDays: suggestMaxPauseDays(30),
             steelBoxPrice: 0,
             disposableBoxPrice: 0,
             itemsDescription: '',
@@ -112,6 +115,7 @@ export default function TiffinSettings() {
             durationDays: plan.durationDays || 30,
             mealType: plan.mealType || 'Morning',
             price: plan.price || '',
+            maxPauseDays: plan.maxPauseDays ?? suggestMaxPauseDays(plan.durationDays || 30),
             steelBoxPrice: plan.steelBoxPrice || 0,
             disposableBoxPrice: plan.disposableBoxPrice || 0,
             itemsDescription: plan.itemsDescription || '',
@@ -126,6 +130,7 @@ export default function TiffinSettings() {
     const handleApplyTemplate = (template) => {
         setEditingPlan(null);
         setFormData({
+            maxPauseDays: suggestMaxPauseDays(template.durationDays || 30),
             steelBoxPrice: 0,
             disposableBoxPrice: 0,
             imageFile: null,
@@ -157,6 +162,7 @@ export default function TiffinSettings() {
             submitData.append('durationDays', Number(formData.durationDays));
             submitData.append('mealType', formData.mealType);
             submitData.append('price', Number(formData.price));
+            submitData.append('maxPauseDays', Math.max(0, Number(formData.maxPauseDays) || 0));
             submitData.append('steelBoxPrice', Number(formData.steelBoxPrice) || 0);
             submitData.append('disposableBoxPrice', Number(formData.disposableBoxPrice) || 0);
             submitData.append('itemsDescription', formData.itemsDescription.trim());
@@ -658,6 +664,25 @@ export default function TiffinSettings() {
                                         className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition font-semibold"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Pause / Off-Days */}
+                            <div>
+                                <label className="block text-xs font-bold uppercase tracking-wider text-gray-700 mb-1.5">
+                                    Pause / Off-Days Allowed
+                                </label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max={formData.durationDays}
+                                    placeholder="e.g. 10"
+                                    value={formData.maxPauseDays}
+                                    onChange={(e) => setFormData({ ...formData, maxPauseDays: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition font-semibold"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                    Maximum days a customer can pause on this {formData.durationDays}-day plan. Each paused day extends the plan by a day. Set 0 to disable pausing.
+                                </p>
                             </div>
 
                             {/* Tiffin Box Charges */}
