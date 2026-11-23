@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { loadGoogleMaps, isGoogleMapsLoaded } from '@food/utils/googleMapsLoader.js';
 import { getGoogleMapsApiKey } from '@food/utils/googleMapsApiKey.js';
 import TiffinHelplineBanner from '@food/components/user/TiffinHelplineBanner';
+import { getMaxSkipDays } from '@food/utils/tiffinPause';
 
 export default function MySubscriptions() {
     const navigate = useNavigate();
@@ -606,11 +607,23 @@ export default function MySubscriptions() {
         setSkipReason('Out of town / Personal schedule');
     };
 
+    // Off-days allowed on the selected subscription's plan
+    const skipQuota = useMemo(() => {
+        const durationDays = selectedSubForSkip?.planId?.durationDays || 0;
+        const max = getMaxSkipDays(selectedSubForSkip?.planId);
+        const used = selectedSubForSkip?.skippedDates?.length || 0;
+        return { durationDays, max, used, remaining: Math.max(0, max - used) };
+    }, [selectedSubForSkip]);
+
     // Skip Day Submit (Auto-Extension)
     const handleSkipDaySubmit = async (e) => {
         e.preventDefault();
         if (!skipDate) {
             toast.error('Please select a date');
+            return;
+        }
+        if (skipQuota.max && skipQuota.remaining <= 0) {
+            toast.error(`You have used all ${skipQuota.max} off-days on this ${skipQuota.durationDays}-day plan.`);
             return;
         }
 
@@ -1343,7 +1356,7 @@ export default function MySubscriptions() {
                                     <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
                                         <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                                             <CalendarX className="w-3.5 h-3.5 text-amber-600" />
-                                            Active Off-Days ({currentSub.skippedDates.length} Days Rolled Over)
+                                            Active Off-Days ({currentSub.skippedDates.length} of {getMaxSkipDays(currentSub.planId)} Used)
                                         </span>
                                         <div className="flex flex-wrap gap-2">
                                             {currentSub.skippedDates.map((sk) => (
@@ -1776,6 +1789,26 @@ export default function MySubscriptions() {
                                 </button>
                             </div>
 
+                            {/* Off-day allowance */}
+                            <div className={`rounded-xl p-3.5 flex items-start gap-3 border ${
+                                skipQuota.remaining > 0
+                                    ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800'
+                                    : 'bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-800'
+                            }`}>
+                                <CalendarX className={`w-5 h-5 shrink-0 mt-0.5 ${
+                                    skipQuota.remaining > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+                                }`} />
+                                <div className="text-xs text-slate-700 dark:text-slate-300">
+                                    <strong className="block text-slate-900 dark:text-white font-semibold">
+                                        {skipQuota.remaining} of {skipQuota.max} off-days left
+                                    </strong>
+                                    <span>
+                                        Your {skipQuota.durationDays}-day plan allows {skipQuota.max} paused days in total.
+                                        {skipQuota.used > 0 ? ` You have used ${skipQuota.used} so far.` : ''}
+                                    </span>
+                                </div>
+                            </div>
+
                             {/* Extension Guarantee Note */}
                             <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 rounded-xl p-3.5 flex items-start gap-3">
                                 <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
@@ -1853,10 +1886,14 @@ export default function MySubscriptions() {
                                     </button>
                                     <button
                                         type="submit"
-                                        disabled={actionLoading}
-                                        className="flex-1 h-11 rounded-xl font-semibold text-xs bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white transition-all shadow-xs"
+                                        disabled={actionLoading || (skipQuota.max > 0 && skipQuota.remaining <= 0)}
+                                        className="flex-1 h-11 rounded-xl font-semibold text-xs bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        {actionLoading ? 'Scheduling...' : 'Confirm Off-Day (+1 Day Extension)'}
+                                        {actionLoading
+                                            ? 'Scheduling...'
+                                            : skipQuota.max > 0 && skipQuota.remaining <= 0
+                                                ? 'No Off-Days Left'
+                                                : 'Confirm Off-Day (+1 Day Extension)'}
                                     </button>
                                 </div>
                             </form>

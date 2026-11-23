@@ -44,6 +44,7 @@ export default function BusinessSetup() {
     supportEmail: "",
     supportPhone: "",
     supportHours: "",
+    tiffinHelplineNumbers: "",
     fssai: "",
     gstin: "",
   });
@@ -72,6 +73,7 @@ export default function BusinessSetup() {
           supportEmail: settings.supportEmail || "",
           supportPhone: settings.supportPhone || "",
           supportHours: settings.supportHours || "",
+          tiffinHelplineNumbers: (settings.tiffinHelplineNumbers || []).join(", "),
           fssai: settings.fssai || "",
           gstin: settings.gstin || "",
         });
@@ -190,6 +192,10 @@ export default function BusinessSetup() {
         supportEmail: formData.supportEmail?.trim(),
         supportPhone: formData.supportPhone?.trim(),
         supportHours: formData.supportHours?.trim(),
+        tiffinHelplineNumbers: (formData.tiffinHelplineNumbers || "")
+          .split(",")
+          .map((n) => n.trim())
+          .filter(Boolean),
         fssai: formData.fssai?.trim(),
         gstin: formData.gstin?.trim(),
       };
@@ -492,6 +498,20 @@ export default function BusinessSetup() {
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="md:col-span-2 border-t pt-4 mt-2">
+                <h4 className="text-sm font-bold text-slate-800 mb-1">Tiffin Helpline Numbers</h4>
+                <p className="text-xs text-slate-500 mb-3">
+                  Shown to customers on the tiffin checkout and subscription pages. Same for every plan. Separate multiple numbers with commas.
+                </p>
+                <input
+                  type="text"
+                  placeholder="e.g. 8770800718, 8878873202"
+                  value={formData.tiffinHelplineNumbers || ""}
+                  onChange={(e) => handleInputChange("tiffinHelplineNumbers", e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
             </div>
 

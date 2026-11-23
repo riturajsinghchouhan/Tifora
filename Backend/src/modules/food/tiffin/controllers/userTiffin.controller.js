@@ -38,6 +38,7 @@ export const getPlanById = async (req, res) => {
 
 import { createRazorpayOrder, getRazorpayKeyId, verifyPaymentSignature } from '../../orders/helpers/razorpay.helper.js';
 import { resolveBoxCharge, resolvePlanTotal } from '../helpers/tiffinBox.helper.js';
+import { getMaxSkipDays } from '../helpers/tiffinPause.helper.js';
 import { getUserWallet, deductWalletBalance } from '../../user/services/userWallet.service.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 
@@ -262,7 +263,7 @@ export const getMySubscriptions = async (req, res) => {
 
         const subscriptions = await TiffinSubscription.find({ userId })
             .populate('restaurantId', 'name address phone image logo')
-            .populate('planId', 'name mealType durationDays price itemsDescription isVegetarian')
+            .populate('planId', 'name mealType durationDays price itemsDescription isVegetarian maxPauseDays')
             .sort({ createdAt: -1 });
 
         res.status(200).json({ success: true, data: subscriptions });
@@ -487,6 +488,22 @@ export const skipSubscriptionDay = async (req, res) => {
             return res.status(400).json({ success: false, message: `Date ${date} is already marked as off/skipped` });
         }
 
+        // Off-days are capped by the allowance configured on the plan
+        const plan = await TiffinPlan.findById(subscription.planId).select('durationDays maxPauseDays');
+        const maxSkipDays = getMaxSkipDays(plan);
+        if (maxSkipDays <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'This plan does not allow off-days. Please contact support for help.'
+            });
+        }
+        if (subscription.skippedDates.length >= maxSkipDays) {
+            return res.status(400).json({
+                success: false,
+                message: `You have used all ${maxSkipDays} off-days available on this ${plan?.durationDays}-day plan.`
+            });
+        }
+
         // Add to skipped dates
         subscription.skippedDates.push({
             date,
@@ -514,10 +531,13 @@ export const skipSubscriptionDay = async (req, res) => {
             status: 'pending'
         });
 
-        res.status(200).json({ 
-            success: true, 
-            data: subscription, 
-            message: `Meal marked OFF for ${date}! Your subscription has been automatically extended by 1 day to ${currentEndDate.toLocaleDateString()}.` 
+        const remainingSkips = Math.max(0, maxSkipDays - subscription.skippedDates.length);
+        res.status(200).json({
+            success: true,
+            data: subscription,
+            maxSkipDays,
+            remainingSkips,
+            message: `Meal marked OFF for ${date}! Your subscription has been automatically extended by 1 day to ${currentEndDate.toLocaleDateString()}. ${remainingSkips} of ${maxSkipDays} off-days left.`
         });
     } catch (error) {
         console.error('Error skipping subscription day:', error);

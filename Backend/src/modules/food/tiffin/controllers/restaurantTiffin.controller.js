@@ -5,6 +5,7 @@ import { buildTiffinDeliveryAddressSnapshot, generateDailyDeliveries } from '../
 import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model.js';
 import { FoodZone } from '../../admin/models/zone.model.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
+import { suggestMaxPauseDays } from '../helpers/tiffinPause.helper.js';
 import mongoose from 'mongoose';
 
 const getRestaurantId = (req) => {
@@ -86,7 +87,7 @@ export const createTiffinPlan = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Unauthorized: Restaurant ID not found' });
         }
 
-        let { name, durationDays, mealType, price, steelBoxPrice, disposableBoxPrice, itemsDescription, isVegetarian, image, items } = req.body;
+        let { name, durationDays, mealType, price, maxPauseDays, steelBoxPrice, disposableBoxPrice, itemsDescription, isVegetarian, image, items } = req.body;
 
         if (!name || !durationDays || !price) {
             return res.status(400).json({ success: false, message: 'Name, duration, and price are required' });
@@ -127,6 +128,9 @@ export const createTiffinPlan = async (req, res) => {
             durationDays: Number(durationDays),
             mealType: mealType || 'Morning',
             price: Number(price),
+            maxPauseDays: maxPauseDays === undefined || maxPauseDays === ''
+                ? suggestMaxPauseDays(durationDays)
+                : Math.max(0, Number(maxPauseDays) || 0),
             steelBoxPrice: Math.max(0, Number(steelBoxPrice) || 0),
             disposableBoxPrice: Math.max(0, Number(disposableBoxPrice) || 0),
             itemsDescription: itemsDescription || '',
@@ -162,8 +166,8 @@ export const updateTiffinPlan = async (req, res) => {
 
         let updateData = { ...req.body };
 
-        // Box prices arrive as strings from FormData and may be left blank (= free)
-        for (const field of ['steelBoxPrice', 'disposableBoxPrice']) {
+        // Numeric settings arrive as strings from FormData and may be left blank
+        for (const field of ['steelBoxPrice', 'disposableBoxPrice', 'maxPauseDays']) {
             if (updateData[field] !== undefined) {
                 updateData[field] = Math.max(0, Number(updateData[field]) || 0);
             }

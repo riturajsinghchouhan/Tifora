@@ -28,6 +28,14 @@ const tiffinPlanSchema = new mongoose.Schema(
             required: true,
             min: 0
         },
+        // How many days the customer may mark off on this plan. Set per plan by
+        // admin/kitchen; plans created before this existed fall back to a third
+        // of the duration (see helpers/tiffinPause.helper.js).
+        maxPauseDays: {
+            type: Number,
+            min: 0,
+            default: undefined
+        },
         // Tiffin box charges, added on top of the plan price at purchase/renewal time
         steelBoxPrice: {
             type: Number,

@@ -25,6 +25,8 @@ const businessSettingsSchema = new mongoose.Schema(
         supportEmail: { type: String, default: 'support@tifora.com' },
         supportPhone: { type: String, default: '+91 1234567890' },
         supportHours: { type: String, default: '24/7 Availability' },
+        // Shown to customers on tiffin checkout and subscription pages
+        tiffinHelplineNumbers: { type: [String], default: [] },
         termsAndConditionsPdf: {
             url: { type: String, default: '' },
             publicId: { type: String, default: '' }

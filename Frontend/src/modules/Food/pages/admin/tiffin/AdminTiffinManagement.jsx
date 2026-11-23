@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import api from '@food/api';
+import { suggestMaxPauseDays } from '@food/utils/tiffinPause';
 import CodRequestsSection from './components/CodRequestsSection';
 import AdminDeliveryHistoryTab from './components/AdminDeliveryHistoryTab';
 import AssignPlanModal from './components/AssignPlanModal';
@@ -95,6 +96,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
         durationDays: 30,
         mealType: 'Both',
         price: 4500,
+        maxPauseDays: suggestMaxPauseDays(30),
         steelBoxPrice: 0,
         disposableBoxPrice: 0,
         itemsDescription: '',
@@ -289,6 +291,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
                 durationDays: plan.durationDays || 30,
                 mealType: plan.mealType || 'Both',
                 price: plan.price || 0,
+                maxPauseDays: plan.maxPauseDays ?? suggestMaxPauseDays(plan.durationDays || 30),
                 steelBoxPrice: plan.steelBoxPrice || 0,
                 disposableBoxPrice: plan.disposableBoxPrice || 0,
                 itemsDescription: plan.itemsDescription || '',
@@ -305,6 +308,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
                 durationDays: 30,
                 mealType: 'Both',
                 price: 4500,
+                maxPauseDays: suggestMaxPauseDays(30),
                 steelBoxPrice: 0,
                 disposableBoxPrice: 0,
                 itemsDescription: '4 Fresh Rotis, Dal, Sabzi, Rice & Salad',
@@ -326,6 +330,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
             submitData.append('durationDays', Number(planForm.durationDays));
             submitData.append('mealType', planForm.mealType);
             submitData.append('price', Number(planForm.price));
+            submitData.append('maxPauseDays', Math.max(0, Number(planForm.maxPauseDays) || 0));
             submitData.append('steelBoxPrice', Number(planForm.steelBoxPrice) || 0);
             submitData.append('disposableBoxPrice', Number(planForm.disposableBoxPrice) || 0);
             submitData.append('itemsDescription', planForm.itemsDescription);
@@ -1278,7 +1283,16 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                     <label className="text-xs font-bold text-gray-700 block mb-1">Duration (Days)</label>
                                     <select
                                         value={planForm.durationDays}
-                                        onChange={(e) => setPlanForm({ ...planForm, durationDays: Number(e.target.value) })}
+                                        onChange={(e) => {
+                                            const nextDuration = Number(e.target.value);
+                                            // Keep the suggestion in sync until the admin overrides it
+                                            const untouched = Number(planForm.maxPauseDays) === suggestMaxPauseDays(planForm.durationDays);
+                                            setPlanForm({
+                                                ...planForm,
+                                                durationDays: nextDuration,
+                                                ...(untouched && { maxPauseDays: suggestMaxPauseDays(nextDuration) })
+                                            });
+                                        }}
                                         className="w-full text-xs font-semibold p-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
                                     >
                                         <option value={7}>7 Days (1 Week)</option>
@@ -1325,6 +1339,23 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                         <option value="non-veg">🔴 Non-Vegetarian</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-700 block mb-1">
+                                    Pause / Off-Days Allowed
+                                </label>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={planForm.durationDays}
+                                    value={planForm.maxPauseDays}
+                                    onChange={(e) => setPlanForm({ ...planForm, maxPauseDays: e.target.value })}
+                                    className="w-full text-xs font-semibold p-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
+                                />
+                                <p className="text-[10px] font-medium text-gray-400 mt-1">
+                                    Maximum days a customer can pause on this {planForm.durationDays}-day plan. Each paused day extends the plan by a day. Set 0 to disable pausing.
+                                </p>
                             </div>
 
                             <div className="p-3 rounded-xl bg-gray-50 border border-gray-200">

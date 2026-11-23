@@ -11,6 +11,7 @@ import { notifyOwnersSafely } from '../../../../core/notifications/firebase.serv
 import { ensureTodayDeliveriesSync, generateDailyDeliveries, ensureSubscriptionDeliveriesForDate } from '../scripts/tiffinScheduler.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { resolveBoxCharge, resolvePlanTotal } from '../helpers/tiffinBox.helper.js';
+import { suggestMaxPauseDays } from '../helpers/tiffinPause.helper.js';
 import mongoose from 'mongoose';
 
 /**
@@ -236,6 +237,7 @@ export const adminCreatePlan = async (req, res) => {
             durationDays,
             mealType,
             price,
+            maxPauseDays,
             steelBoxPrice,
             disposableBoxPrice,
             itemsDescription,
@@ -290,6 +292,9 @@ export const adminCreatePlan = async (req, res) => {
             durationDays: Number(durationDays) || 30,
             mealType: mealType || 'Both',
             price: Number(price) || 0,
+            maxPauseDays: maxPauseDays === undefined || maxPauseDays === ''
+                ? suggestMaxPauseDays(durationDays)
+                : Math.max(0, Number(maxPauseDays) || 0),
             steelBoxPrice: Math.max(0, Number(steelBoxPrice) || 0),
             disposableBoxPrice: Math.max(0, Number(disposableBoxPrice) || 0),
             itemsDescription: itemsDescription || '',
@@ -317,8 +322,8 @@ export const adminUpdatePlan = async (req, res) => {
         const { planId } = req.params;
         let updates = req.body;
 
-        // Box prices arrive as strings from FormData and may be left blank (= free)
-        for (const field of ['steelBoxPrice', 'disposableBoxPrice']) {
+        // Numeric settings arrive as strings from FormData and may be left blank
+        for (const field of ['steelBoxPrice', 'disposableBoxPrice', 'maxPauseDays']) {
             if (updates[field] !== undefined) {
                 updates[field] = Math.max(0, Number(updates[field]) || 0);
             }

@@ -34,7 +34,7 @@ export async function updateBusinessSettings(req, res, next) {
 
         const { 
             companyName, email, phoneCountryCode, phoneNumber, address, state, pincode, region,
-            supportEmail, supportPhone, supportHours, fssai, gstin, onlinePaymentOnly, maxCodAmount,
+            supportEmail, supportPhone, supportHours, tiffinHelplineNumbers, fssai, gstin, onlinePaymentOnly, maxCodAmount,
             maintenanceMode, customerRegistration, restaurantRegistration, deliveryRegistration
         } = data;
 
@@ -95,6 +95,20 @@ export async function updateBusinessSettings(req, res, next) {
         if (supportEmail !== undefined) settings.supportEmail = s_supportEmail;
         if (supportPhone !== undefined) settings.supportPhone = s_supportPhone;
         if (supportHours !== undefined) settings.supportHours = s_supportHours;
+        if (tiffinHelplineNumbers !== undefined) {
+            // Accepts an array or a comma/newline separated string
+            const rawNumbers = Array.isArray(tiffinHelplineNumbers)
+                ? tiffinHelplineNumbers
+                : String(tiffinHelplineNumbers || '').split(/[,\n]/);
+            const cleaned = rawNumbers
+                .map((n) => String(n || '').trim())
+                .filter(Boolean);
+            const invalid = cleaned.find((n) => !/^[+\d][\d\s-]{6,19}$/.test(n));
+            if (invalid) {
+                return res.status(400).json({ success: false, message: `Invalid helpline number: ${invalid}` });
+            }
+            settings.tiffinHelplineNumbers = cleaned;
+        }
         if (fssai !== undefined) settings.fssai = s_fssai;
         if (gstin !== undefined) settings.gstin = s_gstin;
         
