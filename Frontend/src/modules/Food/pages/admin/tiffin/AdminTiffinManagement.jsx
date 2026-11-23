@@ -1243,9 +1243,9 @@ export default function AdminTiffinManagement({ embedded = false }) {
             {/* PLAN CREATION / EDIT MODAL */}
             {/* ========================================================================= */}
             {isPlanModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 my-8 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-                        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] lg:aspect-square lg:h-[min(90vh,900px)] lg:w-auto lg:max-w-[min(95vw,900px)] p-6 shadow-2xl border border-gray-100 flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                        <div className="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
                             <div>
                                 <h3 className="font-black text-gray-900 text-base">
                                     {editingPlan ? 'Edit Tiffin Plan' : 'Create New Tiffin Plan'}
@@ -1257,7 +1257,10 @@ export default function AdminTiffinManagement({ embedded = false }) {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSavePlan} className="space-y-4">
+                        <form onSubmit={handleSavePlan} className="flex-1 min-h-0 flex flex-col pt-4">
+                          <div className="flex-1 min-h-0 overflow-y-auto pr-1 grid lg:grid-cols-2 gap-x-5 gap-y-4 content-start">
+                            {/* Left column: plan details */}
+                            <div className="space-y-4">
                             <div>
                                 <label className="text-xs font-bold text-gray-700 block mb-1">Plan Name</label>
                                 <input
@@ -1330,26 +1333,33 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                     Customer picks one at checkout and it is added on top of the plan price. Keep 0 to offer it free.
                                 </p>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="text-[11px] font-bold text-gray-600 block mb-1">Steel Box</label>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={planForm.steelBoxPrice}
-                                            onChange={(e) => setPlanForm({ ...planForm, steelBoxPrice: e.target.value })}
-                                            className="w-full text-xs font-semibold p-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[11px] font-bold text-gray-600 block mb-1">Use &amp; Throw Box</label>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            value={planForm.disposableBoxPrice}
-                                            onChange={(e) => setPlanForm({ ...planForm, disposableBoxPrice: e.target.value })}
-                                            className="w-full text-xs font-semibold p-3 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
-                                        />
-                                    </div>
+                                    {[
+                                        { key: 'steelBoxPrice', label: 'Steel Box', hint: 'Reusable, collected back' },
+                                        { key: 'disposableBoxPrice', label: 'Use & Throw Box', hint: 'Disposable, nothing returns' }
+                                    ].map(({ key, label, hint }) => (
+                                        <div
+                                            key={key}
+                                            className="aspect-square w-full max-w-[170px] mx-auto bg-white rounded-2xl border border-gray-200 p-3 flex flex-col items-center justify-center text-center gap-1.5"
+                                        >
+                                            <div className="w-9 h-9 rounded-xl bg-rose-50 text-[#be123c] flex items-center justify-center border border-rose-100">
+                                                <Package className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-bold text-gray-700 leading-tight">{label}</p>
+                                                <p className="text-[9px] font-medium text-gray-400 leading-tight">{hint}</p>
+                                            </div>
+                                            <div className="relative w-full">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">₹</span>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={planForm[key]}
+                                                    onChange={(e) => setPlanForm({ ...planForm, [key]: e.target.value })}
+                                                    className="w-full text-xs font-semibold text-center pl-7 pr-2 py-2.5 rounded-xl border border-gray-200 outline-none focus:border-[#be123c]"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
@@ -1387,8 +1397,10 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                 </div>
                             </div>
 
-                            {/* Dynamic Items Array */}
-                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 mt-4">
+                            </div>
+
+                            {/* Right column: meal items */}
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 self-start w-full">
                                 <div className="flex items-center justify-between mb-3">
                                     <label className="text-xs font-bold text-gray-700">Individual Meal Items (Dynamic)</label>
                                     <button
@@ -1454,8 +1466,9 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                     ))}
                                 </div>
                             </div>
+                          </div>
 
-                            <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-3">
+                            <div className="pt-3 mt-3 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setIsPlanModalOpen(false)}

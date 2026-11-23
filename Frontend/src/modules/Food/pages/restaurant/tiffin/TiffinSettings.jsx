@@ -668,35 +668,35 @@ export default function TiffinSettings() {
                                 <p className="text-xs text-gray-500 mb-3">
                                     The customer picks one box at checkout and it is added on top of the plan price. Keep 0 to offer it free.
                                 </p>
-                                <div className="grid sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">Steel Box</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-base">₹</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                placeholder="0"
-                                                value={formData.steelBoxPrice}
-                                                onChange={(e) => setFormData({ ...formData, steelBoxPrice: e.target.value })}
-                                                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition font-semibold"
-                                            />
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[
+                                        { key: 'steelBoxPrice', label: 'Steel Box', hint: 'Reusable, collected back' },
+                                        { key: 'disposableBoxPrice', label: 'Use & Throw Box', hint: 'Disposable, nothing returns' }
+                                    ].map(({ key, label, hint }) => (
+                                        <div
+                                            key={key}
+                                            className="aspect-square w-full max-w-[170px] mx-auto bg-white rounded-2xl border border-gray-200 p-3 flex flex-col items-center justify-center text-center gap-1.5"
+                                        >
+                                            <div className="w-9 h-9 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100">
+                                                <Package className="w-4 h-4" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] font-bold text-gray-700 leading-tight">{label}</p>
+                                                <p className="text-[9px] font-medium text-gray-400 leading-tight">{hint}</p>
+                                            </div>
+                                            <div className="relative w-full">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">₹</span>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    placeholder="0"
+                                                    value={formData[key]}
+                                                    onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                                                    className="w-full pl-7 pr-2 py-2.5 rounded-xl border border-gray-300 text-xs text-center focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition font-semibold"
+                                                />
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 mb-1.5">Use &amp; Throw Box</label>
-                                        <div className="relative">
-                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-base">₹</span>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                placeholder="0"
-                                                value={formData.disposableBoxPrice}
-                                                onChange={(e) => setFormData({ ...formData, disposableBoxPrice: e.target.value })}
-                                                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-300 text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition font-semibold"
-                                            />
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
 
