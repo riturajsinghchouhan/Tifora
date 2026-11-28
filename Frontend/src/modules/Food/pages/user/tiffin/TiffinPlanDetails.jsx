@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock, Calendar, ShieldCheck, UtensilsCrossed } from 'lucide-react';
 import api from '@food/api';
 import { getMaxSkipDays } from '@food/utils/tiffinPause';
+import { useLocationContext } from '@food/context/locationContext';
 
 const DEFAULT_TIFFIN_ITEMS = [
     {
@@ -65,6 +66,16 @@ export default function TiffinPlanDetails() {
 
     const getKitchenName = (p) => p?.restaurantId?.restaurantName || p?.restaurantId?.name || p?.restaurantName || '';
 
+    // The plan stays fully readable out of zone (deep links, shared links); only
+    // checkout is blocked. The backend re-checks on purchase regardless.
+    const locationCtx = useLocationContext();
+    // Two separate reasons a plan can be unorderable: the user is outside every
+    // tiffin zone, or they are inside one this plan's kitchen was not added to.
+    // The second only the backend knows, so it reports it per plan.
+    const [planServesZone, setPlanServesZone] = useState(true);
+    const isOutOfTiffinZone =
+        locationCtx?.isTiffinOutOfZone === true || planServesZone === false;
+
     const [plan, setPlan] = useState(() => {
         const initial = location.state?.plan;
         if (initial) {
@@ -102,6 +113,12 @@ export default function TiffinPlanDetails() {
                             ...fetched,
                             restaurantName: kName
                         });
+                        const zoneInfo = res.data.tiffinZone;
+                        // Only trust an explicit "not serviceable" from an enforcing
+                        // backend; anything else leaves the plan orderable.
+                        setPlanServesZone(
+                            zoneInfo?.enforced === true ? zoneInfo.serviceable !== false : true
+                        );
                     }
                 })
                 .catch(() => {});
@@ -149,6 +166,7 @@ export default function TiffinPlanDetails() {
     const mealItems = getParsedItems();
 
     const handleProceedToCheckout = () => {
+        if (isOutOfTiffinZone) return;
         navigate('/food/user/tiffin/checkout', {
             state: {
                 plan: {
@@ -314,6 +332,17 @@ export default function TiffinPlanDetails() {
                 </div>
             </div>
 
+            {isOutOfTiffinZone && (
+                <div className="mx-4 mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-amber-900">
+                        Currently tiffin service is not available in your zone.
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-amber-700">
+                        Change your delivery location to a serviceable area to subscribe to this plan.
+                    </p>
+                </div>
+            )}
+
             {/* Bottom Fixed Sticky Bar */}
             <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-200 p-4 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
                 <div className="max-w-2xl mx-auto flex items-center justify-between gap-4">
@@ -326,9 +355,14 @@ export default function TiffinPlanDetails() {
                     </div>
                     <button
                         onClick={handleProceedToCheckout}
-                        className="flex-1 max-w-xs bg-gradient-to-r from-[#088c64] via-[#0cb884] to-[#20d49f] text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-[#0cb884]/25 hover:opacity-95 active:scale-95 transition text-center"
+                        disabled={isOutOfTiffinZone}
+                        className={`flex-1 max-w-xs font-bold py-3.5 px-6 rounded-2xl text-center transition ${
+                            isOutOfTiffinZone
+                                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-[#088c64] via-[#0cb884] to-[#20d49f] text-white shadow-lg shadow-[#0cb884]/25 hover:opacity-95 active:scale-95'
+                        }`}
                     >
-                        Proceed to Checkout
+                        {isOutOfTiffinZone ? 'Not available in your zone' : 'Proceed to Checkout'}
                     </button>
                 </div>
             </div>

@@ -1,6 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocationEngine } from '@food/hooks/useLocation';
 import { useZone } from '@food/hooks/useZone';
+import { useTiffinZone } from '@food/hooks/useTiffinZone';
 import { userAPI } from '@food/api';
 import { LocationContext } from './locationContext';
 import {
@@ -47,6 +48,21 @@ export function LocationProvider({ children }) {
     isOutOfService,
     refreshZone,
   } = useZone(location);
+
+  // Tiffin zones are a separate polygon set. Resolved here so the detected id
+  // lands in localStorage for the axios X-Tiffin-Zone-Id header, and so tiffin
+  // screens can read it from context. Deliberately kept out of the shared
+  // `loading`/`error` values below so it can never gate the rest of the app.
+  const {
+    tiffinZoneId,
+    tiffinZone,
+    tiffinZoneStatus,
+    isTiffinZoningEnforced,
+    loading: tiffinZoneLoading,
+    isTiffinServiceable,
+    isTiffinOutOfZone,
+    refreshTiffinZone,
+  } = useTiffinZone(location);
 
   useEffect(() => {
     const onMode = (e) => {
@@ -129,6 +145,14 @@ export function LocationProvider({ children }) {
     zoneStatus,
     isInService,
     isOutOfService,
+    tiffinZoneId,
+    tiffinZone,
+    tiffinZoneStatus,
+    tiffinZoneLoading,
+    isTiffinZoningEnforced,
+    isTiffinServiceable,
+    isTiffinOutOfZone,
+    refreshTiffinZone,
     isLocationResolved: Boolean(location?.latitude && !loading),
     address: location?.address || location?.formattedAddress || '',
     requestLocation,
@@ -151,6 +175,14 @@ export function LocationProvider({ children }) {
     zoneStatus,
     isInService,
     isOutOfService,
+    tiffinZoneId,
+    tiffinZone,
+    tiffinZoneStatus,
+    tiffinZoneLoading,
+    isTiffinZoningEnforced,
+    isTiffinServiceable,
+    isTiffinOutOfZone,
+    refreshTiffinZone,
     requestLocation,
     setSavedLocation,
     setDeliveryAddressMode,

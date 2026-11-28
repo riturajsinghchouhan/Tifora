@@ -160,6 +160,11 @@ function createModuleClient(moduleName) {
         if (zoneId) {
           config.headers["X-Zone-Id"] = zoneId;
         }
+        // Tiffin zones are a separate polygon set, hence a separate header.
+        const tiffinZoneId = localStorage.getItem("userTiffinZoneId");
+        if (tiffinZoneId) {
+          config.headers["X-Tiffin-Zone-Id"] = tiffinZoneId;
+        }
         if (lat && lng) {
           config.headers["X-User-Lat"] = lat;
           config.headers["X-User-Lng"] = lng;
@@ -294,6 +299,11 @@ apiClient.interceptors.request.use(
       const lng = localStorage.getItem("userLng");
       if (zoneId) {
         config.headers["X-Zone-Id"] = zoneId;
+      }
+      // Tiffin zones are a separate polygon set, hence a separate header.
+      const tiffinZoneId = localStorage.getItem("userTiffinZoneId");
+      if (tiffinZoneId) {
+        config.headers["X-Tiffin-Zone-Id"] = tiffinZoneId;
       }
       if (lat && lng) {
         config.headers["X-User-Lat"] = lat;

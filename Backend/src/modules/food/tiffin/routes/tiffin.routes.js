@@ -71,6 +71,21 @@ import {
     sendRenewalReminders
 } from '../controllers/adminTiffin.controller.js';
 
+// Tiffin Zone Controllers (separate polygon set from restaurant delivery zones)
+import {
+    getTiffinZones,
+    getTiffinZoneById,
+    createTiffinZone,
+    updateTiffinZone,
+    deleteTiffinZone,
+    detectTiffinZone,
+    listPublicTiffinZones,
+    getTiffinZoneKitchens,
+    getAssignableKitchens,
+    addKitchensToTiffinZone,
+    removeKitchenFromTiffinZone
+} from '../controllers/tiffinZone.controller.js';
+
 const router = express.Router();
 
 // Robust Admin Auth Middleware
@@ -131,6 +146,57 @@ const restaurantAuth = (req, res, next) => {
 
     return res.status(403).json({ success: false, message: 'Restaurant access required' });
 };
+
+/**
+ * Strict admin auth for the tiffin zone endpoints.
+ *
+ * `adminAuth` above intentionally falls through to a synthetic ADMIN user when
+ * no token is sent (`|| !token`), which is fine for the read-only metrics it was
+ * written for but would leave these zone writes open in production. These
+ * routes therefore require a real admin token whenever NODE_ENV === production,
+ * and keep the permissive dev behaviour otherwise.
+ */
+const tiffinZoneAdminAuth = (req, res, next) => {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
+    if (token) {
+        try {
+            const decoded = verifyAccessToken(token);
+            if (['ADMIN', 'SUPER_ADMIN', 'SUB_ADMIN'].includes(decoded.role)) {
+                req.user = { userId: decoded.userId, role: decoded.role };
+                return next();
+            }
+        } catch (e) {
+            // token invalid or expired
+        }
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        req.user = req.user || { role: 'ADMIN', userId: 'admin_dev' };
+        return next();
+    }
+
+    return res.status(403).json({ success: false, message: 'Admin access required' });
+};
+
+// --- Tiffin Zone Routes ---
+// Registered before the plan/subscription routes so the literal `/zones/...`
+// paths win over the `/:subscriptionId` style params further down.
+router.get('/zones/detect', detectTiffinZone);
+router.get('/zones/public', listPublicTiffinZones);
+router.get(['/admin/zones', '/zones'], tiffinZoneAdminAuth, getTiffinZones);
+router.post(['/admin/zones', '/zones'], tiffinZoneAdminAuth, createTiffinZone);
+// Kitchen membership - registered before `/zones/:id` so these literal
+// sub-paths are not swallowed by the id param.
+router.get(['/admin/zones/:id/kitchens', '/zones/:id/kitchens'], tiffinZoneAdminAuth, getTiffinZoneKitchens);
+router.post(['/admin/zones/:id/kitchens', '/zones/:id/kitchens'], tiffinZoneAdminAuth, addKitchensToTiffinZone);
+router.get(['/admin/zones/:id/assignable-kitchens', '/zones/:id/assignable-kitchens'], tiffinZoneAdminAuth, getAssignableKitchens);
+router.delete(['/admin/zones/:id/kitchens/:restaurantId', '/zones/:id/kitchens/:restaurantId'], tiffinZoneAdminAuth, removeKitchenFromTiffinZone);
+
+router.get(['/admin/zones/:id', '/zones/:id'], tiffinZoneAdminAuth, getTiffinZoneById);
+router.patch(['/admin/zones/:id', '/zones/:id'], tiffinZoneAdminAuth, updateTiffinZone);
+router.delete(['/admin/zones/:id', '/zones/:id'], tiffinZoneAdminAuth, deleteTiffinZone);
 
 // --- Restaurant Tiffin Routes ---
 router.post(['/restaurant/plans', '/plans'], restaurantAuth, upload.any(), createTiffinPlan);

@@ -10,6 +10,7 @@ import {
   Bike,
 } from "lucide-react";
 import api from "@food/api";
+import { useLocationContext } from "@food/context/locationContext";
 
 const THEME_ACCENTS = [
   // 1. Saffron & Sunset Gold
@@ -63,8 +64,19 @@ export default function HomeTiffinPlansMarquee() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState({});
+  const locationCtx = useLocationContext();
+  const tiffinZoneId = locationCtx?.tiffinZoneId || null;
+  // Out of the tiffin zone there is nothing orderable, so skip the call and let
+  // the empty-plans guard below hide the whole section.
+  const isOutOfTiffinZone = locationCtx?.isTiffinOutOfZone === true;
 
   useEffect(() => {
+    if (isOutOfTiffinZone) {
+      setPlans([]);
+      setLoading(false);
+      return undefined;
+    }
+
     let isMounted = true;
     const fetchTiffinPlans = async () => {
       try {
@@ -95,7 +107,7 @@ export default function HomeTiffinPlansMarquee() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isOutOfTiffinZone, tiffinZoneId]);
 
   const toggleFavorite = (e, planId) => {
     e.stopPropagation();

@@ -34,6 +34,24 @@ export default function AddZone() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEditMode = !!id && !window.location.pathname.includes('/view/')
+  // Same drawing UI, two independent polygon sets: restaurant delivery zones
+  // (/zone-setup/...) and tiffin service zones (/zone-setup/tiffin/...).
+  const isTiffin = window.location.pathname.includes('/zone-setup/tiffin')
+  const listPath = isTiffin ? '/admin/food/zone-setup?tab=tiffin' : '/admin/food/zone-setup'
+  const zoneLabel = isTiffin ? 'Tiffin zone' : 'Zone'
+  const zoneApi = isTiffin
+    ? {
+        list: (params) => adminAPI.getTiffinZones(params),
+        getById: (zoneId) => adminAPI.getTiffinZoneById(zoneId),
+        create: (body) => adminAPI.createTiffinZone(body),
+        update: (zoneId, body) => adminAPI.updateTiffinZone(zoneId, body),
+      }
+    : {
+        list: (params) => adminAPI.getZones(params),
+        getById: (zoneId) => adminAPI.getZoneById(zoneId),
+        create: (body) => adminAPI.createZone(body),
+        update: (zoneId, body) => adminAPI.updateZone(zoneId, body),
+      }
   
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
@@ -107,7 +125,7 @@ export default function AddZone() {
 
   const fetchExistingZones = async () => {
     try {
-      const response = await adminAPI.getZones({ limit: 1000 })
+      const response = await zoneApi.list({ limit: 1000 })
       if (response.data?.success && response.data.data?.zones) {
         const zones = isEditMode && id 
           ? response.data.data.zones.filter(zone => zone._id !== id)
@@ -122,7 +140,7 @@ export default function AddZone() {
   const fetchZone = async () => {
     try {
       setLoading(true)
-      const response = await adminAPI.getZoneById(id)
+      const response = await zoneApi.getById(id)
       if (response.data?.success && response.data.data?.zone) {
         const zoneData = response.data.data.zone
         setFormData({
@@ -135,8 +153,8 @@ export default function AddZone() {
         }
       }
     } catch (error) {
-      alert("Failed to load zone")
-      navigate("/admin/food/zone-setup")
+      alert(`Failed to load ${zoneLabel.toLowerCase()}`)
+      navigate(listPath)
     } finally {
       setLoading(false)
     }
@@ -416,15 +434,15 @@ export default function AddZone() {
       }
 
       if (isEditMode && id) {
-        await adminAPI.updateZone(id, zoneData)
-        alert("Zone updated successfully!")
+        await zoneApi.update(id, zoneData)
+        alert(`${zoneLabel} updated successfully!`)
       } else {
-        await adminAPI.createZone(zoneData)
-        alert("Zone created successfully!")
+        await zoneApi.create(zoneData)
+        alert(`${zoneLabel} created successfully!`)
       }
-      navigate("/admin/food/zone-setup")
+      navigate(listPath)
     } catch (error) {
-      let errorMessage = "Failed to create zone. Please try again."
+      let errorMessage = `Failed to create ${zoneLabel.toLowerCase()}. Please try again.`
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error' || !error.response) {
         errorMessage = "Cannot connect to server."
       } else if (error.response) {
@@ -442,7 +460,7 @@ export default function AddZone() {
     <div className="min-h-screen bg-slate-50">
       <div className="p-4 lg:p-6 max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
-          <button onClick={() => navigate("/admin/food/zone-setup")} className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
+          <button onClick={() => navigate(listPath)} className="p-2 hover:bg-slate-200 rounded-lg transition-colors">
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </button>
           <div className="flex items-center gap-3">
@@ -450,8 +468,16 @@ export default function AddZone() {
               <MapPin className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">{isEditMode ? "Edit Zone" : "Add New Zone"}</h1>
-              <p className="text-sm text-slate-600">{isEditMode ? "Update delivery zone for customer" : "Create a delivery zone for customer"}</p>
+              <h1 className="text-2xl font-bold text-slate-900">
+                {isTiffin
+                  ? (isEditMode ? "Edit Tiffin Zone" : "Add New Tiffin Zone")
+                  : (isEditMode ? "Edit Zone" : "Add New Zone")}
+              </h1>
+              <p className="text-sm text-slate-600">
+                {isTiffin
+                  ? (isEditMode ? "Update tiffin service zone" : "Create a tiffin service zone")
+                  : (isEditMode ? "Update delivery zone for customer" : "Create a delivery zone for customer")}
+              </p>
             </div>
           </div>
         </div>
@@ -469,7 +495,7 @@ export default function AddZone() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">Create Zone name <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">{isTiffin ? "Tiffin zone name" : "Create Zone name"} <span className="text-red-500">*</span></label>
                     <input type="text" value={formData.zoneName} onChange={(e) => handleInputChange("zoneName", e.target.value)} placeholder="Enter zone name" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
                   </div>
                   <div>
@@ -542,7 +568,7 @@ export default function AddZone() {
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
-            <button type="button" onClick={() => navigate("/admin/food/zone-setup")} className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
+            <button type="button" onClick={() => navigate(listPath)} className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
             <button type="submit" disabled={loading || coordinates.length < MIN_POINTS || !formData.zoneName || !formData.country || isDrawing} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               {loading ? (
                 <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div><span>Saving...</span></>

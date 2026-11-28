@@ -207,6 +207,10 @@ export default function AdminRouter() {
             <Route path="zone-setup/add" element={<AddZone />} />
             <Route path="zone-setup/edit/:id" element={<AddZone />} />
             <Route path="zone-setup/view/:id" element={<ViewZone />} />
+            {/* Tiffin service zones - same screens, separate polygon set */}
+            <Route path="zone-setup/tiffin/add" element={<AddZone />} />
+            <Route path="zone-setup/tiffin/edit/:id" element={<AddZone />} />
+            <Route path="zone-setup/tiffin/view/:id" element={<ViewZone />} />
             <Route path="food-approval" element={<FoodApproval />} />
             <Route path="restaurants" element={<RestaurantsList />} />
             <Route path="restaurants/add" element={<AddRestaurant />} />

@@ -543,6 +543,34 @@ export const adminAPI = {
   deleteZone: (id) =>
     adminClient.delete(`/food/admin/zones/${id}`),
 
+  /**
+   * Tiffin service zones - a separate polygon set from the restaurant delivery
+   * zones above, managed from the "Tiffin Zone" tab in admin > Zone Setup.
+   */
+  getTiffinZones: (params = {}) =>
+    adminClient.get("/food/admin/tiffin/zones", { params: { limit: 1000, ...params } }),
+  getTiffinZoneById: (id) =>
+    adminClient.get(`/food/admin/tiffin/zones/${id}`),
+  createTiffinZone: (body) =>
+    adminClient.post("/food/admin/tiffin/zones", body ?? {}),
+  updateTiffinZone: (id, body) =>
+    adminClient.patch(`/food/admin/tiffin/zones/${id}`, body ?? {}),
+  deleteTiffinZone: (id) =>
+    adminClient.delete(`/food/admin/tiffin/zones/${id}`),
+  /** Restaurants an admin has added to a tiffin zone. */
+  getTiffinZoneKitchens: (id) =>
+    adminClient.get(`/food/admin/tiffin/zones/${id}/kitchens`),
+  /** Restaurants not yet in this tiffin zone. Query: search, limit */
+  getAssignableTiffinKitchens: (id, params = {}) =>
+    adminClient.get(`/food/admin/tiffin/zones/${id}/assignable-kitchens`, { params }),
+  /** Add restaurants to a tiffin zone. Body: { restaurantIds: [] } */
+  addTiffinZoneKitchens: (id, restaurantIds) =>
+    adminClient.post(`/food/admin/tiffin/zones/${id}/kitchens`, {
+      restaurantIds: Array.isArray(restaurantIds) ? restaurantIds : [restaurantIds],
+    }),
+  removeTiffinZoneKitchen: (id, restaurantId) =>
+    adminClient.delete(`/food/admin/tiffin/zones/${id}/kitchens/${restaurantId}`),
+
   /** Business Settings */
   getBusinessSettings: () =>
     adminClient.get("/food/admin/business-settings"),
@@ -1985,6 +2013,17 @@ export const zoneAPI = {
   /** Public: list active zones (for onboarding dropdowns). */
   getPublicZones: (params = {}, config = {}) =>
     userClient.get("/food/zones/public", { params: params ?? {}, ...config }),
+};
+
+export const tiffinZoneAPI = {
+  /** Public: detect active tiffin service zone for a lat/lng point. */
+  detectTiffinZone: (lat, lng) =>
+    userClient.get("/food/tiffin/zones/detect", {
+      params: { lat, lng },
+    }),
+  /** Public: list active tiffin zones. */
+  getPublicTiffinZones: (params = {}, config = {}) =>
+    userClient.get("/food/tiffin/zones/public", { params: params ?? {}, ...config }),
 };
 export const uploadAPI = {
   /**

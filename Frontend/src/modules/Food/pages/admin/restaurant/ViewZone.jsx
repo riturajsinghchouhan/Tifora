@@ -4,6 +4,7 @@ import { MapPin, ArrowLeft } from "lucide-react"
 import { adminAPI } from "@food/api"
 import { getGoogleMapsApiKey } from "@food/utils/googleMapsApiKey"
 import { Loader } from "@googlemaps/js-api-loader"
+import TiffinZoneKitchens from "@food/components/admin/zones/TiffinZoneKitchens"
 const debugLog = (...args) => {}
 const debugWarn = (...args) => {}
 const debugError = (...args) => {}
@@ -12,6 +13,9 @@ const debugError = (...args) => {}
 export default function ViewZone() {
   const navigate = useNavigate()
   const { id } = useParams()
+  // Restaurant delivery zones and tiffin service zones share this viewer.
+  const isTiffin = window.location.pathname.includes('/zone-setup/tiffin')
+  const listPath = isTiffin ? '/admin/food/zone-setup?tab=tiffin' : '/admin/food/zone-setup'
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const polygonRef = useRef(null)
@@ -46,14 +50,14 @@ const coordinatesLength = useMemo(() => zone?.coordinates?.length || 0, [zone?.c
   const fetchZone = async () => {
     try {
       setLoading(true)
-      const response = await adminAPI.getZoneById(id)
+      const response = isTiffin ? await adminAPI.getTiffinZoneById(id) : await adminAPI.getZoneById(id)
       if (response.data?.success && response.data.data?.zone) {
         setZone(response.data.data.zone)
       }
     } catch (error) {
       debugError("Error fetching zone:", error)
-      alert("Failed to load zone")
-      navigate("/admin/food/zone-setup")
+      alert(isTiffin ? "Failed to load tiffin zone" : "Failed to load zone")
+      navigate(listPath)
     } finally {
       setLoading(false)
     }
@@ -329,7 +333,7 @@ const coordinatesLength = useMemo(() => zone?.coordinates?.length || 0, [zone?.c
         <div className="text-center">
           <p className="text-slate-600">Zone not found</p>
           <button
-            onClick={() => navigate("/admin/food/zone-setup")}
+            onClick={() => navigate(listPath)}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Back to Zones
@@ -345,7 +349,7 @@ const coordinatesLength = useMemo(() => zone?.coordinates?.length || 0, [zone?.c
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <button
-            onClick={() => navigate("/admin/food/zone-setup")}
+            onClick={() => navigate(listPath)}
             className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-slate-600" />
@@ -355,7 +359,7 @@ const coordinatesLength = useMemo(() => zone?.coordinates?.length || 0, [zone?.c
               <MapPin className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">View Zone</h1>
+              <h1 className="text-2xl font-bold text-slate-900">{isTiffin ? "View Tiffin Zone" : "View Zone"}</h1>
               <p className="text-sm text-slate-600">{zone.name || zone.serviceLocation}</p>
             </div>
           </div>
@@ -441,6 +445,13 @@ const coordinatesLength = useMemo(() => zone?.coordinates?.length || 0, [zone?.c
             </div>
           </div>
         </div>
+
+        {/* Tiffin zones decide which restaurants may sell tiffin here. */}
+        {isTiffin && id && (
+          <div className="mt-6">
+            <TiffinZoneKitchens zoneId={id} />
+          </div>
+        )}
       </div>
     </div>
   )

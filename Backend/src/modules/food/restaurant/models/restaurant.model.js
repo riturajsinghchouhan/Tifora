@@ -208,6 +208,23 @@ const restaurantSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "FoodZone",
     },
+    /**
+     * Tiffin service zones this kitchen has been added to by an admin.
+     * Separate from `zoneId` above: tiffin zones are their own polygon set (see
+     * tiffinZone.model.js), and membership is explicit - sitting inside a tiffin
+     * polygon does NOT make a restaurant orderable for tiffin. Empty array means
+     * this restaurant serves no tiffin zone. A kitchen may serve several.
+     */
+    tiffinZoneIds: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "TiffinZone",
+        },
+      ],
+      default: [],
+      index: true,
+    },
     businessModel: {
       type: String,
       trim: true,

@@ -790,6 +790,17 @@ export const updateRestaurantProfile = async (restaurantId, body = {}) => {
         }
     }
 
+    // Tiffin service zones. Independent of zoneId above and explicit: an empty
+    // array means this restaurant is not offered for tiffin anywhere. Normally
+    // maintained from admin > Zone Setup > Tiffin Zone, not from here.
+    if (body.tiffinZoneIds !== undefined) {
+        const raw = Array.isArray(body.tiffinZoneIds) ? body.tiffinZoneIds : [body.tiffinZoneIds];
+        const ids = raw
+            .map((id) => String(id || '').trim())
+            .filter((id) => mongoose.Types.ObjectId.isValid(id));
+        update.tiffinZoneIds = [...new Set(ids)].map((id) => new mongoose.Types.ObjectId(id));
+    }
+
     // Bank + UPI fields (Explore -> Update Bank Details page)
     if (body.accountHolderName !== undefined) {
         update.accountHolderName = String(body.accountHolderName || '').trim();
