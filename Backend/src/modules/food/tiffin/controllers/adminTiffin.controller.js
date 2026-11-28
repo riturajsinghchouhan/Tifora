@@ -8,7 +8,7 @@ import { FoodDeliveryPartner } from '../../delivery/models/deliveryPartner.model
 import { FoodUser } from '../../../../core/users/user.model.js';
 import { FoodNotification } from '../../../../core/notifications/models/notification.model.js';
 import { notifyOwnersSafely } from '../../../../core/notifications/firebase.service.js';
-import { ensureTodayDeliveriesSync, generateDailyDeliveries, ensureSubscriptionDeliveriesForDate } from '../scripts/tiffinScheduler.js';
+import { ensureTodayDeliveriesSync, generateDailyDeliveries, ensureSubscriptionDeliveriesForDate, expireEndedSubscriptions } from '../scripts/tiffinScheduler.js';
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { resolveBoxCharge, resolvePlanTotal } from '../helpers/tiffinBox.helper.js';
 import { suggestMaxPauseDays } from '../helpers/tiffinPause.helper.js';
@@ -21,6 +21,7 @@ import mongoose from 'mongoose';
 export const getAdminTiffinOverview = async (req, res) => {
     try {
         await ensureTodayDeliveriesSync();
+        await expireEndedSubscriptions();
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -175,6 +176,7 @@ export const getAdminTiffinOverview = async (req, res) => {
 export const getAllSubscriptions = async (req, res) => {
     try {
         const { status, search } = req.query;
+        await expireEndedSubscriptions();
         let query = {
             $or: [
                 { paymentStatus: 'paid' },

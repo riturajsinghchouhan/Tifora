@@ -947,7 +947,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                         <option value="all">All Status</option>
                                         <option value="active">Active</option>
                                         <option value="paused">Paused</option>
-                                        <option value="completed">Completed</option>
+                                        <option value="expired">Completed</option>
                                         <option value="cancelled">Cancelled</option>
                                     </select>
                                 </div>
@@ -1029,6 +1029,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                                     >
                                                         <Eye className="w-4 h-4" />
                                                     </button>
+                                                    {['active', 'paused'].includes(sub.status) && (
                                                     <button
                                                         onClick={() => handleToggleSubStatus(sub._id, sub.status)}
                                                         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
@@ -1040,6 +1041,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                                         {sub.status === 'active' ? <PauseCircle className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
                                                         {sub.status === 'active' ? 'Pause' : 'Resume'}
                                                     </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

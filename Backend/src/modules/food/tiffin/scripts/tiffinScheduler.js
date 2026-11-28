@@ -155,6 +155,23 @@ export const ensureSubscriptionDeliveriesForDate = async (subscription, targetDa
 };
 
 /**
+ * Marks subscriptions whose endDate has passed as 'expired'.
+ * Nothing else flips the status, so without this a finished plan stays
+ * 'active' (or 'paused') forever and shows up as active everywhere.
+ */
+export const expireEndedSubscriptions = async () => {
+    const today = normalizeToStartOfDay();
+    const result = await TiffinSubscription.updateMany(
+        { status: { $in: ['active', 'paused'] }, endDate: { $lt: today } },
+        { $set: { status: 'expired' } }
+    );
+    if (result.modifiedCount > 0) {
+        console.log(`[Tiffin Sync Engine] Marked ${result.modifiedCount} ended subscription(s) as expired.`);
+    }
+    return result.modifiedCount;
+};
+
+/**
  * Core Delivery Generator (Idempotent & Safe)
  * Generates today's missing deliveries for all active subscriptions.
  */
@@ -177,6 +194,8 @@ export const generateDailyDeliveries = async (force = false) => {
         const today = normalizeToStartOfDay();
         const endOfToday = new Date(today);
         endOfToday.setHours(23, 59, 59, 999);
+
+        await expireEndedSubscriptions();
 
         // Find all active subscriptions where today falls between startDate and endDate
         const activeSubscriptions = await TiffinSubscription.find({
