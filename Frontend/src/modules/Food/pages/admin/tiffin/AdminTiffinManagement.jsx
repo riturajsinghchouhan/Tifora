@@ -81,6 +81,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
     // Filters & Search
     const [subFilterStatus, setSubFilterStatus] = useState('all');
     const [subFilterPayment, setSubFilterPayment] = useState('all');
+    const [subFilterMeal, setSubFilterMeal] = useState('all');
     const [subSearchQuery, setSubSearchQuery] = useState('');
     const [planMealFilter, setPlanMealFilter] = useState('all');
 
@@ -450,6 +451,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
         const matchesStatus = activeTab !== 'subscriptions' || subFilterStatus === 'all' || sub.status === subFilterStatus;
         const currentMethod = getPaymentMethod(sub);
         const matchesPayment = subFilterPayment === 'all' || currentMethod === subFilterPayment;
+        const matchesMeal = subFilterMeal === 'all' || sub.planId?.mealType === subFilterMeal;
         const q = subSearchQuery.toLowerCase();
         const matchesSearch = !q ||
             sub.userId?.name?.toLowerCase().includes(q) ||
@@ -457,7 +459,7 @@ export default function AdminTiffinManagement({ embedded = false }) {
             sub._id?.toLowerCase().includes(q) ||
             currentMethod.includes(q) ||
             sub.restaurantId?.name?.toLowerCase().includes(q);
-        return matchesStatus && matchesPayment && matchesSearch;
+        return matchesStatus && matchesPayment && matchesMeal && matchesSearch;
     });
 
     const joinAddressParts = (parts) =>
@@ -964,6 +966,20 @@ export default function AdminTiffinManagement({ embedded = false }) {
                                     <option value="cod">COD</option>
                                     <option value="online">Online</option>
                                     <option value="wallet">Wallet</option>
+                                </select>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-gray-500">Meal:</span>
+                                <select
+                                    value={subFilterMeal}
+                                    onChange={(e) => setSubFilterMeal(e.target.value)}
+                                    className="text-xs font-semibold border border-gray-200 rounded-xl px-3 py-2 bg-gray-50 outline-none"
+                                >
+                                    <option value="all">All Meal Slots</option>
+                                    <option value="Morning">Morning (Lunch Only)</option>
+                                    <option value="Evening">Evening (Dinner Only)</option>
+                                    <option value="Both">Morning + Evening (Both)</option>
                                 </select>
                             </div>
                         </div>
