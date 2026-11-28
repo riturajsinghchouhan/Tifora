@@ -12,6 +12,7 @@ import { ensureTodayDeliveriesSync, generateDailyDeliveries, ensureSubscriptionD
 import { uploadImageBuffer } from '../../../../services/upload.service.js';
 import { resolveBoxCharge, resolvePlanTotal } from '../helpers/tiffinBox.helper.js';
 import { suggestMaxPauseDays } from '../helpers/tiffinPause.helper.js';
+import { notifyTiffinPurchaseOnWhatsapp, sendTiffinRenewalWhatsapp } from '../helpers/tiffinWhatsapp.helper.js';
 import mongoose from 'mongoose';
 
 /**
@@ -1293,6 +1294,8 @@ export const adminAssignSubscription = async (req, res) => {
             }
         }
 
+        notifyTiffinPurchaseOnWhatsapp(subscription._id);
+
         const populated = await TiffinSubscription.findById(subscription._id)
             .populate('userId', 'name phone email')
             .populate('restaurantId', 'restaurantName name address phone logo')
@@ -1408,6 +1411,8 @@ export const sendRenewalReminders = async (req, res) => {
             { title: n.title, body: n.message, data: { type: 'tiffin_renewal', link } }
         )));
         await TiffinSubscription.updateMany({ _id: { $in: subs.map((s) => s._id) } }, { $set: { renewalNotifiedAt: now } });
+        // WhatsApp copy uses the approved template text, not the custom in-app message
+        sendTiffinRenewalWhatsapp(subs.map((s) => s._id));
 
         res.status(200).json({ success: true, sent: notifications.length, message: `Renewal reminder sent to ${notifications.length} customer(s)` });
     } catch (error) {

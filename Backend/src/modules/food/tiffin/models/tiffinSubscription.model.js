@@ -137,6 +137,16 @@ const tiffinSubscriptionSchema = new mongoose.Schema(
         renewalNotifiedAt: {
             type: Date,
             default: null
+        },
+        // WhatsApp send markers, claimed atomically so a purchase confirmation
+        // or renewal reminder goes out once even when several paths fire.
+        purchaseWhatsappSentAt: {
+            type: Date,
+            default: null
+        },
+        renewalWhatsappSentAt: {
+            type: Date,
+            default: null
         }
     },
     {

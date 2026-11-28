@@ -96,6 +96,7 @@ import { resolveBoxCharge, resolvePlanTotal } from '../helpers/tiffinBox.helper.
 import { getMaxSkipDays } from '../helpers/tiffinPause.helper.js';
 import { getUserWallet, deductWalletBalance } from '../../user/services/userWallet.service.js';
 import { getIO, rooms } from '../../../../config/socket.js';
+import { notifyTiffinPurchaseOnWhatsapp } from '../helpers/tiffinWhatsapp.helper.js';
 
 const normalizeAddressCoords = (addr) => {
     if (!addr) return addr;
@@ -251,6 +252,7 @@ export const purchaseSubscription = async (req, res) => {
             const createdDeliveries = await generateInitialDeliveries(newSubscription, plan, start);
             await emitRestaurantSubscriptionUpdate(newSubscription, createdDeliveries);
         }
+        notifyTiffinPurchaseOnWhatsapp(newSubscription._id);
 
         const successMessage = isCash
             ? 'COD Subscription request submitted successfully. It will be activated after admin verification.'
@@ -299,6 +301,7 @@ export const verifyTiffinPayment = async (req, res) => {
         await subscription.save();
         const createdDeliveries = await generateInitialDeliveries(subscription, plan, new Date(subscription.startDate));
         await emitRestaurantSubscriptionUpdate(subscription, createdDeliveries);
+        notifyTiffinPurchaseOnWhatsapp(subscription._id);
 
         res.status(200).json({ success: true, message: 'Payment verified and subscription activated', data: subscription });
     } catch (error) {

@@ -21,6 +21,7 @@ import { captureRazorpayPayment } from '../../../modules/food/orders/helpers/raz
 import { TiffinSubscription } from '../../../modules/food/tiffin/models/tiffinSubscription.model.js';
 import { TiffinPlan } from '../../../modules/food/tiffin/models/tiffinPlan.model.js';
 import { ensureSubscriptionDeliveriesForDate } from '../../../modules/food/tiffin/scripts/tiffinScheduler.js';
+import { notifyTiffinPurchaseOnWhatsapp } from '../../../modules/food/tiffin/helpers/tiffinWhatsapp.helper.js';
 import { getIO, rooms } from '../../../config/socket.js';
 
 function extractWebhookRefs(event, payload) {
@@ -304,6 +305,7 @@ export const handleRazorpayWebhook = async (req, res) => {
                 // Mirrors what finalizeCapturedPayment does in the normal verifyPayment path.
                 if (isNewCapture && capturedOrder) {
                     if (isTiffin) {
+                        notifyTiffinPurchaseOnWhatsapp(capturedOrder._id);
                         try {
                             const plan = await TiffinPlan.findById(capturedOrder.planId);
                             let createdDeliveries = 0;

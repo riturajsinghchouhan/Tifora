@@ -4,6 +4,8 @@ import { logger } from './src/utils/logger.js';
 import { expireExpiredOffers } from './src/modules/food/admin/services/admin.service.js';
 import { syncExpiredFssaiNotifications } from './src/modules/food/restaurant/services/fssaiExpiry.service.js';
 import { config } from './src/config/env.js';
+import cron from 'node-cron';
+import { runTiffinRenewalWhatsappReminders } from './src/modules/food/tiffin/helpers/tiffinWhatsapp.helper.js';
 
 const startScheduler = async () => {
     try {
@@ -42,6 +44,18 @@ const startScheduler = async () => {
         };
         runFssaiExpirySync();
         setInterval(runFssaiExpirySync, 60 * 60 * 1000);
+
+        // WhatsApp renewal reminders for tiffin plans ending within 5 days.
+        // Runs twice a day in IST so a restart or outage during the morning run
+        // is caught in the evening; each subscription is reminded only once.
+        const runTiffinRenewalReminders = async () => {
+            try {
+                await runTiffinRenewalWhatsappReminders();
+            } catch (err) {
+                logger.error(`Tiffin renewal WhatsApp error: ${err.message}`);
+            }
+        };
+        cron.schedule('0 10,18 * * *', runTiffinRenewalReminders, { timezone: 'Asia/Kolkata' });
         
         // Create a simple HTTP server for health checks
         const http = await import('http');
