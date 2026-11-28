@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import { TiffinZone } from '../models/tiffinZone.model.js';
-import { markTiffinZoningEnforced } from '../helpers/tiffinZone.helper.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 
 /**
@@ -78,7 +77,6 @@ export async function createTiffinZone(body = {}) {
         isActive: body.isActive !== false
     });
     await zone.save();
-    await markTiffinZoningEnforced();
     return { zone: zone.toObject() };
 }
 

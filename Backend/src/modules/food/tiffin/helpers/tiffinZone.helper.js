@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import { TiffinZone } from '../models/tiffinZone.model.js';
-import { TiffinZoneSettings } from '../models/tiffinZoneSettings.model.js';
 
 export const toFiniteNumber = (v) => {
     const n = typeof v === 'number' ? v : parseFloat(String(v));
@@ -23,35 +22,6 @@ export const isPointInPolygon = (lat, lng, polygon) => {
     }
     return inside;
 };
-
-/**
- * Whether tiffin zoning is live at all.
- *
- * Off only for a deployment where no admin has ever created a tiffin zone, so
- * existing plans keep working until the first zone is drawn. Once on it stays
- * on: deleting or deactivating every zone then means "tiffin is available
- * nowhere", not "zoning was never set up".
- */
-export const isTiffinZoningEnabled = async () => {
-    const settings = await TiffinZoneSettings.findOne({ key: 'default' }).select('enforced').lean();
-    if (settings?.enforced) return true;
-
-    // Deployments that created zones before this flag existed, or zones added
-    // by a script: self-heal the flag the first time we see any zone.
-    const anyZone = await TiffinZone.exists({});
-    if (anyZone) {
-        await markTiffinZoningEnforced();
-        return true;
-    }
-    return false;
-};
-
-export const markTiffinZoningEnforced = () =>
-    TiffinZoneSettings.updateOne(
-        { key: 'default' },
-        { $set: { enforced: true } },
-        { upsert: true }
-    );
 
 export const getActiveTiffinZones = () =>
     TiffinZone.find({ isActive: true })

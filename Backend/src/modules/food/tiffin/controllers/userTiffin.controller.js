@@ -5,7 +5,6 @@ import {
     extractAddressCoords,
     findTiffinZoneForPoint,
     getKitchenIdsForTiffinZone,
-    isTiffinZoningEnabled,
     resolveRequestTiffinZoneId
 } from '../helpers/tiffinZone.helper.js';
 import mongoose from 'mongoose';
@@ -19,34 +18,30 @@ export const getAvailablePlans = async (req, res) => {
         const { restaurantId } = req.params;
         const filter = restaurantId ? { restaurantId, isActive: true } : { isActive: true };
 
-        // Scope plans to the caller's tiffin zone. Skipped entirely while no
-        // active tiffin zone exists, so listings behave as they did before
-        // tiffin zoning was introduced.
-        let tiffinZone = { enforced: false, zoneId: null, inService: true };
-        if (await isTiffinZoningEnabled()) {
-            const zoneId = await resolveRequestTiffinZoneId(req);
-            tiffinZone = { enforced: true, zoneId, inService: Boolean(zoneId) };
+        // Scope plans to the caller's tiffin zone. No matching zone (including
+        // when no tiffin zone exists at all) means no plans.
+        const zoneId = await resolveRequestTiffinZoneId(req);
+        const tiffinZone = { enforced: true, zoneId };
 
-            if (!zoneId) {
-                return res.status(200).json({
-                    success: true,
-                    data: [],
-                    tiffinZone: { ...tiffinZone, status: 'OUT_OF_SERVICE' }
-                });
-            }
-
-            const kitchenIds = await getKitchenIdsForTiffinZone(zoneId);
-            if (!kitchenIds || kitchenIds.length === 0) {
-                return res.status(200).json({
-                    success: true,
-                    data: [],
-                    tiffinZone: { ...tiffinZone, status: 'IN_SERVICE' }
-                });
-            }
-            filter.restaurantId = restaurantId
-                ? { $in: kitchenIds.filter((id) => String(id) === String(restaurantId)) }
-                : { $in: kitchenIds };
+        if (!zoneId) {
+            return res.status(200).json({
+                success: true,
+                data: [],
+                tiffinZone: { ...tiffinZone, status: 'OUT_OF_SERVICE' }
+            });
         }
+
+        const kitchenIds = await getKitchenIdsForTiffinZone(zoneId);
+        if (!kitchenIds || kitchenIds.length === 0) {
+            return res.status(200).json({
+                success: true,
+                data: [],
+                tiffinZone: { ...tiffinZone, status: 'IN_SERVICE' }
+            });
+        }
+        filter.restaurantId = restaurantId
+            ? { $in: kitchenIds.filter((id) => String(id) === String(restaurantId)) }
+            : { $in: kitchenIds };
 
         const plans = await TiffinPlan.find(filter)
             .populate('restaurantId', 'restaurantName name address location profileImage logo phone')
@@ -54,7 +49,7 @@ export const getAvailablePlans = async (req, res) => {
         res.status(200).json({
             success: true,
             data: plans,
-            tiffinZone: { ...tiffinZone, status: tiffinZone.inService ? 'IN_SERVICE' : 'OUT_OF_SERVICE' }
+            tiffinZone: { ...tiffinZone, status: 'IN_SERVICE' }
         });
     } catch (error) {
         console.error('Error fetching available Tiffin Plans:', error);
@@ -74,23 +69,20 @@ export const getPlanById = async (req, res) => {
         // The plan itself stays readable (deep links and existing subscribers
         // must keep working); we only report whether it is orderable from the
         // caller's tiffin zone so the UI can gate the purchase button.
-        let tiffinZone = { enforced: false, zoneId: null, status: 'IN_SERVICE', serviceable: true };
-        if (await isTiffinZoningEnabled()) {
-            const zoneId = await resolveRequestTiffinZoneId(req);
-            let serviceable = false;
-            if (zoneId) {
-                const kitchenIds = await getKitchenIdsForTiffinZone(zoneId);
-                serviceable = Boolean(
-                    kitchenIds?.some((id) => String(id) === String(plan.restaurantId?._id || plan.restaurantId))
-                );
-            }
-            tiffinZone = {
-                enforced: true,
-                zoneId,
-                status: zoneId ? 'IN_SERVICE' : 'OUT_OF_SERVICE',
-                serviceable
-            };
+        const zoneId = await resolveRequestTiffinZoneId(req);
+        let serviceable = false;
+        if (zoneId) {
+            const kitchenIds = await getKitchenIdsForTiffinZone(zoneId);
+            serviceable = Boolean(
+                kitchenIds?.some((id) => String(id) === String(plan.restaurantId?._id || plan.restaurantId))
+            );
         }
+        const tiffinZone = {
+            enforced: true,
+            zoneId,
+            status: zoneId ? 'IN_SERVICE' : 'OUT_OF_SERVICE',
+            serviceable
+        };
 
         res.status(200).json({ success: true, data: plan, tiffinZone });
     } catch (error) {
@@ -136,40 +128,43 @@ export const purchaseSubscription = async (req, res) => {
 
         // Tiffin zone gate. Runs before any pricing or payment work so an
         // out-of-zone attempt never creates a subscription or charges a wallet.
-        // No active tiffin zone configured -> skipped, matching old behaviour.
-        if (await isTiffinZoningEnabled()) {
-            const { lat, lng } = extractAddressCoords(normalizeAddressCoords(deliveryAddress));
+        const { lat, lng } = extractAddressCoords(normalizeAddressCoords(deliveryAddress));
 
-            let resolvedZoneId = null;
-            if (lat !== null && lng !== null) {
-                const zone = await findTiffinZoneForPoint(lat, lng);
-                if (!zone) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'Tiffin service is not available at this delivery address yet.',
-                        code: 'TIFFIN_ZONE_OUT_OF_SERVICE'
-                    });
-                }
-                resolvedZoneId = String(zone._id);
-            } else {
-                // Address has no coordinates (older saved addresses). Fall back to
-                // the zone the client is browsing in rather than failing the purchase.
-                resolvedZoneId = await resolveRequestTiffinZoneId(req);
+        let resolvedZoneId = null;
+        if (lat !== null && lng !== null) {
+            const zone = await findTiffinZoneForPoint(lat, lng);
+            if (!zone) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tiffin service is not available at this delivery address yet.',
+                    code: 'TIFFIN_ZONE_OUT_OF_SERVICE'
+                });
             }
+            resolvedZoneId = String(zone._id);
+        } else {
+            // Address has no coordinates (older saved addresses). Fall back to
+            // the zone the client is browsing in; with neither, the purchase is refused below.
+            resolvedZoneId = await resolveRequestTiffinZoneId(req);
+        }
 
-            if (resolvedZoneId) {
-                const kitchenIds = await getKitchenIdsForTiffinZone(resolvedZoneId);
-                const servesZone = kitchenIds?.some(
-                    (id) => String(id) === String(plan.restaurantId)
-                );
-                if (!servesZone) {
-                    return res.status(400).json({
-                        success: false,
-                        message: 'This tiffin plan does not serve your delivery zone.',
-                        code: 'TIFFIN_ZONE_PLAN_UNAVAILABLE'
-                    });
-                }
-            }
+        if (!resolvedZoneId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Tiffin service is not available at this delivery address yet.',
+                code: 'TIFFIN_ZONE_OUT_OF_SERVICE'
+            });
+        }
+
+        const zoneKitchenIds = await getKitchenIdsForTiffinZone(resolvedZoneId);
+        const servesZone = zoneKitchenIds?.some(
+            (id) => String(id) === String(plan.restaurantId)
+        );
+        if (!servesZone) {
+            return res.status(400).json({
+                success: false,
+                message: 'This tiffin plan does not serve your delivery zone.',
+                code: 'TIFFIN_ZONE_PLAN_UNAVAILABLE'
+            });
         }
 
         // Box selection is mandatory and always priced from the plan, not the client
