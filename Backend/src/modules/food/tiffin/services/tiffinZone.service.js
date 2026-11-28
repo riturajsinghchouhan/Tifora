@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { TiffinZone } from '../models/tiffinZone.model.js';
+import { markTiffinZoningEnforced } from '../helpers/tiffinZone.helper.js';
 import { FoodRestaurant } from '../../restaurant/models/restaurant.model.js';
 
 /**
@@ -77,6 +78,7 @@ export async function createTiffinZone(body = {}) {
         isActive: body.isActive !== false
     });
     await zone.save();
+    await markTiffinZoningEnforced();
     return { zone: zone.toObject() };
 }
 
@@ -104,7 +106,13 @@ export async function updateTiffinZone(id, body = {}) {
 
 export async function deleteTiffinZone(id) {
     const zone = await TiffinZone.findByIdAndDelete(id);
-    return zone ? { id } : null;
+    if (!zone) return null;
+    // Drop the now-dangling membership so restaurants do not keep a dead zone id.
+    await FoodRestaurant.updateMany(
+        { tiffinZoneIds: zone._id },
+        { $pull: { tiffinZoneIds: zone._id } }
+    );
+    return { id };
 }
 
 // ----- Kitchen membership -----

@@ -1,5 +1,5 @@
 import * as tiffinZoneService from '../services/tiffinZone.service.js';
-import { findTiffinZoneForPoint, getActiveTiffinZones, toFiniteNumber } from '../helpers/tiffinZone.helper.js';
+import { findTiffinZoneForPoint, getActiveTiffinZones, isTiffinZoningEnabled, toFiniteNumber } from '../helpers/tiffinZone.helper.js';
 
 // ----- Admin -----
 
@@ -91,11 +91,10 @@ export async function detectTiffinZone(req, res, next) {
             return res.status(400).json({ success: false, message: 'lat and lng are required' });
         }
 
-        const zones = await getActiveTiffinZones();
-
-        // No tiffin zone configured yet -> tiffin stays open everywhere, which
-        // is exactly how it behaved before tiffin zoning existed.
-        if (zones.length === 0) {
+        // Not enforced only until an admin has ever created a tiffin zone. After
+        // that, no matching active zone means out of service, even if every zone
+        // was later deleted or deactivated.
+        if (!(await isTiffinZoningEnabled())) {
             return res.status(200).json({
                 success: true,
                 message: 'Tiffin zoning not configured',
