@@ -97,6 +97,7 @@ import { getMaxSkipDays } from '../helpers/tiffinPause.helper.js';
 import { getUserWallet, deductWalletBalance } from '../../user/services/userWallet.service.js';
 import { getIO, rooms } from '../../../../config/socket.js';
 import { notifyTiffinPurchaseOnWhatsapp } from '../helpers/tiffinWhatsapp.helper.js';
+import { reconcilePendingTiffinPayments } from '../helpers/tiffinPaymentReconcile.helper.js';
 
 const normalizeAddressCoords = (addr) => {
     if (!addr) return addr;
@@ -359,6 +360,11 @@ export const getMySubscriptions = async (req, res) => {
         if (!userId) {
             return res.status(401).json({ success: false, message: 'Unauthorized: User not authenticated' });
         }
+
+        // Activate any plan that Razorpay says is paid but our verify/webhook missed
+        await reconcilePendingTiffinPayments({ userId }).catch((err) =>
+            console.error('Tiffin payment reconcile failed:', err?.message)
+        );
 
         const subscriptions = await TiffinSubscription.find({ userId })
             .populate('restaurantId', 'name address phone image logo')

@@ -265,4 +265,15 @@ export const initTiffinScheduler = () => {
             generateDailyDeliveries(true);
         }
     }, 30 * 60 * 1000);
+
+    // Razorpay safety net: activate pending subscriptions that were paid but
+    // never confirmed (client verify dropped and webhook missed). Imported
+    // lazily because the reconcile helper itself imports this module.
+    const runPaymentReconcile = () => {
+        import('../helpers/tiffinPaymentReconcile.helper.js')
+            .then(({ reconcilePendingTiffinPayments }) => reconcilePendingTiffinPayments())
+            .catch((e) => console.error('[Tiffin Scheduler] Payment reconcile error:', e?.message));
+    };
+    setTimeout(runPaymentReconcile, 15 * 1000);
+    setInterval(runPaymentReconcile, 10 * 60 * 1000);
 };
